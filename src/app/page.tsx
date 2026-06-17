@@ -7,7 +7,7 @@ export default async function LandingPage() {
     const { auth } = await import("@clerk/nextjs/server");
     const { redirect } = await import("next/navigation");
     const { userId } = await auth();
-    if (userId) redirect("/standings");
+    if (userId) redirect("/news");
   }
 
   return (
@@ -48,10 +48,10 @@ export default async function LandingPage() {
             {DEMO_MODE ? "Prova la demo 🚀" : "Inizia gratis"}
           </Link>
           <Link
-            href={DEMO_MODE ? "/squad" : "/sign-in"}
+            href={DEMO_MODE ? "/news" : "/sign-in"}
             className="w-full py-4 bg-white/10 hover:bg-white/20 text-white font-semibold text-center rounded-2xl transition-colors border border-white/20 backdrop-blur"
           >
-            {DEMO_MODE ? "Vai alla squadra" : "Accedi"}
+            {DEMO_MODE ? "Vai alle notizie" : "Accedi"}
           </Link>
         </div>
 
