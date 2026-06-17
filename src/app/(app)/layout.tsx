@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 
 const NAV_ITEMS = [
-  { href: "/squad",     label: "Squadra",   icon: SquadIcon },
-  { href: "/players",   label: "Giocatori", icon: PlayersIcon },
+  { href: "/news",      label: "Notizie",   icon: NewsIcon },
+  { href: "/players",   label: "Mercato",   icon: TransferIcon },
   { href: "/standings", label: "Classifica",icon: StandingsIcon },
   { href: "/calendar",  label: "Calendario",icon: CalendarIcon },
 ];
@@ -44,27 +44,21 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function SquadIcon({ active }: { active: boolean }) {
+function NewsIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
-        stroke="currentColor" strokeWidth={active ? 2 : 1.5}
-        fill={active ? "currentColor" : "none"} fillOpacity={0.15} />
-      <circle cx="12" cy="9" r="2.5"
-        stroke="currentColor" strokeWidth={1.5}
-        fill={active ? "currentColor" : "none"} fillOpacity={0.5} />
+      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
+        fill={active ? "currentColor" : "none"} fillOpacity={0.1} />
+      <path d="M7 9h10M7 13h6M7 17h4" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round"/>
     </svg>
   );
 }
 
-function PlayersIcon({ active }: { active: boolean }) {
+function TransferIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <circle cx="9" cy="7" r="3" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
-        fill={active ? "currentColor" : "none"} fillOpacity={0.15} />
-      <circle cx="17" cy="7" r="2.5" stroke="currentColor" strokeWidth={1.5} fill="none" />
-      <path d="M2 21v-1a7 7 0 0114 0v1" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round" />
-      <path d="M19 11c2.21 0 4 1.79 4 4v1" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <path d="M5 12h14M15 7l5 5-5 5" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M19 12H5M9 17l-5-5 5-5" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.4}/>
     </svg>
   );
 }
