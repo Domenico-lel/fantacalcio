@@ -275,9 +275,10 @@ export default function SquadPage() {
       <ProfileDrawer
         open={showProfile}
         onClose={() => setShowProfile(false)}
-        teamName={profile?.teamName}
-        logo={profile?.logo}
-        budget={profile?.budget}
+        profile={profile ?? null}
+        onProfileSaved={(updated) => {
+          persist({ profile: updated, squad: state!.squad });
+        }}
       />
     </div>
   );
