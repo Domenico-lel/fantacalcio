@@ -7,7 +7,7 @@ export default async function LandingPage() {
     const { auth } = await import("@clerk/nextjs/server");
     const { redirect } = await import("next/navigation");
     const { userId } = await auth();
-    if (userId) redirect("/squad");
+    if (userId) redirect("/standings");
   }
 
   return (

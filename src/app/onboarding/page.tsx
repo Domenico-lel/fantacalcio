@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TEAM_LOGO_OPTIONS } from "@/lib/mock-data";
-import { loadState, saveState } from "@/lib/store";
-import { upsertProfile, upsertSquad } from "@/app/actions";
+import { saveState } from "@/lib/store";
+import { upsertProfile } from "@/app/actions";
 import { useAppUser } from "@/lib/app-user-context";
 
 export default function OnboardingPage() {
@@ -36,23 +36,15 @@ export default function OnboardingPage() {
         budget: 500,
       };
 
-      // Persist locally first
-      const state = loadState();
-      const nextState = { ...state, profile };
-      saveState(nextState);
+      saveState(profile);
 
-      // Sync to Supabase — user.id is the real Clerk ID (or "demo-user" in demo mode)
       const userId = user.id || "demo-user";
-      const [profileResult, squadResult] = await Promise.all([
-        upsertProfile(userId, profile),
-        upsertSquad(userId, nextState.squad),
-      ]);
+      const profileResult = await upsertProfile(userId, profile);
 
       if (profileResult.error) console.error("Supabase profile error:", profileResult.error);
-      if (squadResult.error) console.error("Supabase squad error:", squadResult.error);
 
       setSaving(false);
-      router.push("/squad");
+      router.push("/standings");
     }
   }
 

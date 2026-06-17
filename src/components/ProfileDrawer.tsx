@@ -5,7 +5,7 @@ import { useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useAppUser } from "@/lib/app-user-context";
 import { upsertProfile } from "@/app/actions";
-import { loadState, saveState } from "@/lib/store";
+import { saveState } from "@/lib/store";
 import { TEAM_LOGO_OPTIONS } from "@/lib/mock-data";
 import type { TeamProfile } from "@/lib/store";
 
@@ -61,8 +61,7 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
     };
 
     // Aggiorna localStorage
-    const state = loadState();
-    saveState({ ...state, profile: updated });
+    saveState(updated);
 
     // Sync Supabase in background
     const userId = DEMO_MODE ? "demo-user" : user.id;
