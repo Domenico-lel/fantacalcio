@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { href: "/news",      label: "Notizie",   icon: NewsIcon },
   { href: "/players",   label: "Mercato",   icon: TransferIcon },
   { href: "/standings", label: "Classifica",icon: StandingsIcon },
-  { href: "/calendar",  label: "Calendario",icon: CalendarIcon },
+  { href: "/trophies",  label: "Trofei",     icon: TrophyIcon },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -111,15 +111,13 @@ function StandingsIcon({ active }: { active: boolean }) {
   );
 }
 
-function CalendarIcon({ active }: { active: boolean }) {
+function TrophyIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
-        fill={active ? "currentColor" : "none"} fillOpacity={0.1} />
-      <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round" />
-      <circle cx="8" cy="14" r="1.5" fill="currentColor" />
-      <circle cx="12" cy="14" r="1.5" fill="currentColor" />
-      <circle cx="16" cy="14" r="1.5" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1" />
+      <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round"/>
+      <path d="M5 4h14v8a7 7 0 01-14 0V4z" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
+        fill={active ? "currentColor" : "none"} fillOpacity={0.15} strokeLinejoin="round"/>
+      <path d="M5 7H2a2 2 0 002 2h1M19 7h3a2 2 0 01-2 2h-1" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round"/>
     </svg>
   );
 }

@@ -63,6 +63,33 @@ export interface Database {
         Relationships: [];
       };
     };
+      fanta_trophies: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          display_name: string;
+          year: number;
+          season: string;
+          position: number;
+          team_name: string;
+          points: number | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id?: string | null;
+          display_name: string;
+          year: number;
+          season: string;
+          position: number;
+          team_name: string;
+          points?: number | null;
+        };
+        Update: {
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: Record<string, never>;

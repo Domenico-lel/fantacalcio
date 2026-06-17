@@ -3,6 +3,46 @@
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import type { TeamProfile } from "@/lib/store";
 
+// ─── Trophies ─────────────────────────────────────────────────────────────────
+
+export interface Trophy {
+  id: string;
+  user_id: string | null;
+  display_name: string;
+  year: number;
+  season: string;
+  position: 1 | 2 | 3;
+  team_name: string;
+  points: number | null;
+}
+
+export async function claimTrophies(userId: string, firstName: string): Promise<void> {
+  if (!isSupabaseConfigured() || !userId || !firstName) return;
+  try {
+    const db = createAdminClient();
+    await db
+      .from("fanta_trophies")
+      .update({ user_id: userId })
+      .ilike("display_name", firstName.trim())
+      .is("user_id", null);
+  } catch { /* silent */ }
+}
+
+export async function fetchAllTrophies(): Promise<{ data: Trophy[]; error: string | null }> {
+  if (!isSupabaseConfigured()) return { data: [], error: null };
+  try {
+    const db = createAdminClient();
+    const { data, error } = await db
+      .from("fanta_trophies")
+      .select("*")
+      .order("year", { ascending: false });
+    if (error) return { data: [], error: error.message };
+    return { data: (data ?? []) as Trophy[], error: null };
+  } catch (e) {
+    return { data: [], error: String(e) };
+  }
+}
+
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
 export async function upsertProfile(
