@@ -42,14 +42,17 @@ export default function ProfileDrawer({ open, onClose, teamName, logo, budget }:
         }}
       />
 
-      {/* Drawer */}
+      {/* Drawer — posizionato sopra la bottom nav (64px) */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl"
+        className="fixed left-0 right-0 z-50 rounded-t-3xl"
         style={{
+          bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
           background: "#0f2318",
           border: "1px solid rgba(255,255,255,0.1)",
-          transform: open ? "translateY(0)" : "translateY(100%)",
+          transform: open ? "translateY(0)" : "translateY(calc(100% + 64px))",
           transition: "transform 220ms cubic-bezier(0.23,1,0.32,1)",
+          maxHeight: "calc(100dvh - 64px - env(safe-area-inset-bottom, 0px) - 48px)",
+          overflowY: "auto",
         }}
       >
         {/* Handle */}
@@ -58,23 +61,23 @@ export default function ProfileDrawer({ open, onClose, teamName, logo, budget }:
         </div>
 
         {/* Profile header */}
-        <div className="px-6 pt-4 pb-6">
+        <div className="px-6 pt-4 pb-8">
           <div className="flex items-center gap-4 mb-6">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl border"
+              className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl border flex-shrink-0"
               style={{ background: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.12)" }}
             >
               {logo ?? "⚽"}
             </div>
-            <div>
-              <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide mb-0.5">
+            <div className="min-w-0">
+              <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide mb-0.5 truncate">
                 {user.fullName || "Allenatore"}
               </p>
-              <p className="text-white font-bold text-xl leading-tight">
+              <p className="text-white font-bold text-xl leading-tight truncate">
                 {teamName ?? "La tua Squadra"}
               </p>
               {user.email && (
-                <p className="text-white/40 text-xs mt-1">{user.email}</p>
+                <p className="text-white/40 text-xs mt-1 truncate">{user.email}</p>
               )}
             </div>
           </div>
@@ -108,9 +111,6 @@ export default function ProfileDrawer({ open, onClose, teamName, logo, budget }:
             </svg>
             Esci dall&apos;account
           </button>
-
-          {/* Safe area spacer */}
-          <div className="h-6" />
         </div>
       </div>
     </>
