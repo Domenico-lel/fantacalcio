@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  height: -webkit-fill-available;
+}
+
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  background: #0a2010;
+  overscroll-behavior: none;
+}
+
+#__next,
+main {
+  min-height: 100dvh;
+}
+
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+}
+
+/* Striped pitch background */
+.pitch-bg {
+  background: linear-gradient(
+    180deg,
+    #1a5c2a 0%,   #1e6930 8.33%,
+    #1a5c2a 8.33%, #1a5c2a 16.66%,
+    #1e6930 16.66%,#1e6930 25%,
+    #1a5c2a 25%,   #1a5c2a 33.33%,
+    #1e6930 33.33%,#1e6930 41.66%,
+    #1a5c2a 41.66%,#1a5c2a 50%,
+    #1e6930 50%,   #1e6930 58.33%,
+    #1a5c2a 58.33%,#1a5c2a 66.66%,
+    #1e6930 66.66%,#1e6930 75%,
+    #1a5c2a 75%,   #1a5c2a 83.33%,
+    #1e6930 83.33%,#1e6930 91.66%,
+    #1a5c2a 91.66%,#1a5c2a 100%
+  );
+}
+
+.player-badge {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.player-badge:active {
+  transform: scale(0.95);
+}
+
+.slide-up {
+  animation: slideUp 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Hide scrollbar but keep scrolling */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Clerk card override — force white background */
+.cl-card {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+/* Gold accent */
+.text-gold { color: #f5a623; }
+.bg-gold    { background-color: #f5a623; }

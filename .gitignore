@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# env files (non committare le chiavi reali)
+.env.local
+.env*.local
+
+# TypeScript cache
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+Thumbs.db
+
+# debug
+npm-debug.log*
+pnpm-debug.log*
+
+# Clerk internal temp files
+.clerk/
