@@ -35,7 +35,8 @@ function stripTags(html: string): string {
 function parseCard(html: string, threadId: string): TransferItem | null {
   // Foto e nome giocatore
   const photoUrl  = attr(html, /class="bilderrahmen[^"]*"[^>]*\/>|src="(https:\/\/img\.a\.transfermarkt[^"]+)"/);
-  const photoUrl2 = html.match(/src="(https:\/\/img\.a\.transfermarkt[^"]+)"/)?.[1] ?? "";
+  const photoUrl2 = (html.match(/src="(https:\/\/img\.a\.transfermarkt[^"]+)"/)?.[1] ?? "")
+    .replace("/portrait/medium/", "/portrait/big/");
   const playerName = attr(html, /title="([^"]+)"[^>]*href="\/[^"]+\/profil\/spieler\/\d+"/);
 
   // Dati aggiuntivi

@@ -98,107 +98,94 @@ export default function TransfersPage() {
           const sc = statusFor(item.probability);
           return (
             <a key={item.id} href={item.discussionUrl} target="_blank" rel="noopener noreferrer"
-              className="block rounded-3xl overflow-hidden active:opacity-75 transition-opacity"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
+              className="flex rounded-2xl overflow-hidden active:opacity-75 transition-opacity"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", minHeight: 160 }}>
 
-              {/* Foto giocatore — primo piano */}
-              <div className="relative w-full" style={{ height: 240 }}>
+              {/* Foto giocatore — sinistra, contain senza crop */}
+              <div className="relative flex-shrink-0" style={{ width: 110 }}>
+                <div className="absolute inset-0" style={{ background: "rgba(255,255,255,0.03)" }} />
                 {item.player.photoUrl ? (
                   <img
                     src={item.player.photoUrl}
                     alt={item.player.name}
-                    className="w-full h-full object-cover object-top"
+                    className="absolute inset-0 w-full h-full object-contain object-bottom"
                     loading="lazy"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
+                    onError={(e) => { e.currentTarget.style.opacity = "0"; }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-7xl"
-                    style={{ background: "rgba(255,255,255,0.04)" }}>
-                    👤
-                  </div>
+                  <div className="absolute inset-0 flex items-end justify-center pb-2 text-5xl">👤</div>
                 )}
-
-                {/* Gradiente bottom per leggibilità */}
+                {/* Sfumatura laterale verso destra */}
                 <div className="absolute inset-0"
-                  style={{ background: "linear-gradient(to top, rgba(13,31,20,1) 0%, rgba(13,31,20,0.4) 50%, transparent 100%)" }} />
-
-                {/* Badge probabilità in alto a destra */}
-                <div className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md"
-                  style={{ background: "rgba(0,0,0,0.55)", border: `1px solid ${sc.bar}50` }}>
-                  <span className="font-black text-base" style={{ color: sc.bar }}>{item.probability}%</span>
-                  {item.trend === "up"   && <span className="text-xs" style={{ color: sc.bar }}>↑</span>}
-                  {item.trend === "down" && <span className="text-xs text-red-400">↓</span>}
-                </div>
-
-                {/* Nome giocatore e posizione sopra il footer */}
-                <div className="absolute bottom-0 left-0 right-0 px-4 pb-3">
-                  <p className="text-white/60 text-xs mb-0.5">{item.player.position}</p>
-                  <p className="text-white font-black text-xl leading-tight">{item.player.name}</p>
-                </div>
+                  style={{ background: "linear-gradient(to right, transparent 60%, rgba(13,31,20,0.95) 100%)" }} />
               </div>
 
-              {/* Footer: club da → a */}
-              <div className="px-4 pt-3 pb-4">
+              {/* Info — destra */}
+              <div className="flex-1 flex flex-col justify-between px-3 py-3 min-w-0">
 
-                {/* Club row */}
-                <div className="flex items-center justify-between mb-4">
-                  {/* Club di provenienza */}
-                  <div className="flex flex-col items-center gap-1.5 flex-1">
-                    {item.fromClub.logoUrl ? (
-                      <img src={item.fromClub.logoUrl} alt={item.fromClub.name}
-                        className="w-10 h-10 object-contain" loading="lazy" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                        style={{ background: "rgba(255,255,255,0.08)" }}>⚽</div>
-                    )}
-                    <p className="text-white/60 text-[11px] font-semibold text-center max-w-20 leading-tight">
-                      {item.fromClub.name}
-                    </p>
+                {/* Nome + posizione + badge % */}
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="min-w-0">
+                      <p className="text-white/50 text-[10px] font-medium leading-tight">{item.player.position}</p>
+                      <p className="text-white font-black text-base leading-tight truncate">{item.player.name}</p>
+                    </div>
+                    <div className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full"
+                      style={{ background: `${sc.bar}20`, border: `1px solid ${sc.bar}50` }}>
+                      <span className="font-black text-sm leading-none" style={{ color: sc.bar }}>{item.probability}%</span>
+                      {item.trend === "up"   && <span className="text-[10px] leading-none" style={{ color: sc.bar }}>↑</span>}
+                      {item.trend === "down" && <span className="text-[10px] leading-none text-red-400">↓</span>}
+                    </div>
                   </div>
 
-                  {/* Freccia + valore */}
-                  <div className="flex flex-col items-center gap-1 px-2">
-                    <svg width="28" height="16" viewBox="0 0 28 16" fill="none">
-                      <path d="M0 8h24M20 3l5 5-5 5" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  {/* Club: logo + nome → freccia → logo + nome */}
+                  <div className="flex items-center gap-2 mt-2">
+                    {/* Da */}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {item.fromClub.logoUrl && (
+                        <img src={item.fromClub.logoUrl} alt={item.fromClub.name}
+                          className="w-6 h-6 object-contain flex-shrink-0" loading="lazy" />
+                      )}
+                      <span className="text-white/60 text-[11px] font-semibold truncate max-w-16">
+                        {item.fromClub.name}
+                      </span>
+                    </div>
+
+                    {/* Freccia */}
+                    <svg width="18" height="10" viewBox="0 0 18 10" fill="none" className="flex-shrink-0">
+                      <path d="M0 5h14M10 1l4 4-4 4" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
+
+                    {/* A */}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {item.toClub.logoUrl && (
+                        <img src={item.toClub.logoUrl} alt={item.toClub.name}
+                          className="w-6 h-6 object-contain flex-shrink-0" loading="lazy" />
+                      )}
+                      <span className="text-white font-bold text-[11px] truncate max-w-16">
+                        {item.toClub.name}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Barra probabilità + label + valore */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-white/35 text-[10px] font-semibold uppercase tracking-wide">{sc.label}</span>
                     {item.player.value && (
                       <span className="text-emerald-400 text-[10px] font-bold">{item.player.value}</span>
                     )}
                   </div>
-
-                  {/* Club di destinazione */}
-                  <div className="flex flex-col items-center gap-1.5 flex-1">
-                    {item.toClub.logoUrl ? (
-                      <img src={item.toClub.logoUrl} alt={item.toClub.name}
-                        className="w-10 h-10 object-contain" loading="lazy" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                        style={{ background: "rgba(255,255,255,0.08)" }}>⚽</div>
-                    )}
-                    <p className="text-white/60 text-[11px] font-semibold text-center max-w-20 leading-tight">
-                      {item.toClub.name}
-                    </p>
+                  <div className="w-full rounded-full overflow-hidden" style={{ height: 4, background: "rgba(255,255,255,0.08)" }}>
+                    <div className="h-full rounded-full"
+                      style={{
+                        width: `${item.probability}%`,
+                        background: `linear-gradient(90deg, ${sc.bar}70, ${sc.bar})`,
+                        boxShadow: `0 0 6px ${sc.glow}`,
+                        transition: "width 0.7s ease",
+                      }} />
                   </div>
-                </div>
-
-                {/* Barra probabilità */}
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wide">
-                    {sc.label}
-                  </span>
-                  <span className="text-[10px] font-bold" style={{ color: sc.bar }}>
-                    {item.probability}%
-                  </span>
-                </div>
-                <div className="w-full rounded-full overflow-hidden" style={{ height: 5, background: "rgba(255,255,255,0.08)" }}>
-                  <div className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${item.probability}%`,
-                      background: `linear-gradient(90deg, ${sc.bar}88, ${sc.bar})`,
-                      boxShadow: `0 0 8px ${sc.glow}`,
-                    }} />
                 </div>
 
               </div>
