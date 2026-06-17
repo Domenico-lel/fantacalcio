@@ -14,6 +14,7 @@ export function ClerkUserBridge({ children }: { children: ReactNode }) {
         id: user?.id ?? "",
         fullName: user?.fullName ?? "",
         firstName: user?.firstName ?? "",
+        email: user?.primaryEmailAddress?.emailAddress,
       }}
     >
       {children}

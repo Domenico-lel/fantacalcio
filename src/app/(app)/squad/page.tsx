@@ -8,6 +8,7 @@ import {
 import { parseFormation, ROLE_COLORS, Player } from "@/lib/mock-data";
 import PlayerSheet from "@/components/PlayerSheet";
 import FormationPicker from "@/components/FormationPicker";
+import ProfileDrawer from "@/components/ProfileDrawer";
 import { fetchProfile, fetchSquad, upsertSquad } from "@/app/actions";
 
 const DEMO_MODE = !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_DEMO === "true";
@@ -18,6 +19,7 @@ export default function SquadPage() {
   const [selected, setSelected] = useState<Player | null>(null);
   const [swapTarget, setSwapTarget] = useState<Player | null>(null);
   const [showFormPicker, setShowFormPicker] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -137,18 +139,24 @@ export default function SquadPage() {
       {/* Header */}
       <div className="px-4 pt-12 pb-4" style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowProfile(true)}
+            className="flex items-center gap-3 active:opacity-70 transition-opacity"
+          >
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl border"
                  style={{ background: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.12)" }}>
               {profile?.logo ?? "⚽"}
             </div>
-            <div>
+            <div className="text-left">
               <p className="text-emerald-300 text-xs font-medium">{user.fullName || profile?.firstName || "Allenatore"}</p>
               <h1 className="text-white font-bold text-lg leading-tight">
                 {profile?.teamName ?? "La tua Squadra"}
               </h1>
             </div>
-          </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-white/30 ml-1">
+              <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
           <div className="text-right">
             <p className="text-white/40 text-xs">Crediti</p>
             <p className="text-emerald-300 font-bold">{profile?.budget ?? 500}M</p>
@@ -262,6 +270,15 @@ export default function SquadPage() {
           onClose={() => setShowFormPicker(false)}
         />
       )}
+
+      {/* Profile drawer */}
+      <ProfileDrawer
+        open={showProfile}
+        onClose={() => setShowProfile(false)}
+        teamName={profile?.teamName}
+        logo={profile?.logo}
+        budget={profile?.budget}
+      />
     </div>
   );
 }

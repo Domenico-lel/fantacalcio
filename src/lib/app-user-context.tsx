@@ -6,12 +6,14 @@ export interface AppUser {
   id: string;
   fullName: string;
   firstName: string;
+  email?: string;
 }
 
 const defaultUser: AppUser = {
   id: "demo-user",
   fullName: "Marco Rossi",
   firstName: "Marco",
+  email: undefined,
 };
 
 export const AppUserContext = createContext<AppUser>(defaultUser);
