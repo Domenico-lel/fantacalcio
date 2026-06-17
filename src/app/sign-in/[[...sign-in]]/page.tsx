@@ -17,6 +17,7 @@ export default function SignInPage() {
         <p className="text-white/50 text-xs mt-1">Accedi al tuo account</p>
       </div>
 
+      <div style={{ width: "25rem", maxWidth: "calc(100vw - 2rem)" }}>
       <SignIn
         appearance={{
           variables: {
@@ -30,7 +31,8 @@ export default function SignInPage() {
             fontFamily: "system-ui, sans-serif",
           },
           elements: {
-            card: "shadow-2xl border-0 w-full max-w-sm",
+            rootBox: { width: "100%" },
+            card: "shadow-2xl border-0",
             headerTitle: "text-gray-900 font-bold",
             headerSubtitle: "text-gray-500",
             formButtonPrimary:
@@ -48,6 +50,7 @@ export default function SignInPage() {
           },
         }}
       />
+      </div>
     </main>
   );
 }

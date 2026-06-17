@@ -67,7 +67,7 @@ main {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Clerk card override — force white background */
+/* Clerk overrides */
 .cl-card {
   background: #ffffff !important;
   color: #111827 !important;

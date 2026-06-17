@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
+import ProfileDrawer from "@/components/ProfileDrawer";
+import { loadState } from "@/lib/store";
+import type { TeamProfile } from "@/lib/store";
 
 const NAV_ITEMS = [
   { href: "/news",      label: "Notizie",   icon: NewsIcon },
@@ -13,9 +16,34 @@ const NAV_ITEMS = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [profile, setProfile] = useState<TeamProfile | null>(null);
+
+  useEffect(() => {
+    const { profile: p } = loadState();
+    setProfile(p);
+  }, []);
 
   return (
-    <div className="min-h-dvh bg-[#0d1f14] flex flex-col">
+    <div className="h-dvh bg-[#0d1f14] flex flex-col overflow-hidden">
+      {/* Profile bar — flex-none, mai scrollabile */}
+      <div className="flex-none px-4 pt-4 pb-2 flex justify-center">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl transition-opacity active:opacity-60 w-auto max-w-[60vw]"
+          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
+          aria-label="Profilo"
+        >
+          <span className="text-2xl leading-none flex-none">{profile?.logo ?? "👤"}</span>
+          <div className="flex flex-col items-start min-w-0">
+            <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wide leading-none mb-0.5">Il tuo profilo</span>
+            <span className="text-white text-sm font-bold leading-none truncate w-full">
+              {profile?.teamName ?? "La tua squadra"}
+            </span>
+          </div>
+        </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto pb-20">{children}</div>
 
       {/* Bottom navigation */}
@@ -40,6 +68,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           })}
         </div>
       </nav>
+
+      <ProfileDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        profile={profile}
+        onProfileSaved={(p) => setProfile(p)}
+      />
     </div>
   );
 }

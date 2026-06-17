@@ -152,22 +152,6 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
                 </button>
               </div>
 
-              {/* Info card */}
-              <div
-                className="rounded-2xl p-4 mb-4 flex items-center justify-between"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
-              >
-                <div className="text-center flex-1">
-                  <p className="text-white/40 text-xs mb-1">Crediti</p>
-                  <p className="text-emerald-400 font-bold text-lg">{profile?.budget ?? 500}M</p>
-                </div>
-                <div className="w-px h-8" style={{ background: "rgba(255,255,255,0.1)" }} />
-                <div className="text-center flex-1">
-                  <p className="text-white/40 text-xs mb-1">Modalità</p>
-                  <p className="text-white font-semibold text-sm">{DEMO_MODE ? "Demo" : "Live"}</p>
-                </div>
-              </div>
-
               {/* Logout */}
               <button
                 onClick={handleLogout}

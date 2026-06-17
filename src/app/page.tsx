@@ -11,7 +11,7 @@ export default async function LandingPage() {
   }
 
   return (
-    <main className="min-h-screen pitch-bg flex flex-col items-center justify-center px-6 relative overflow-hidden">
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ background: "#0d1f14" }}>
       {/* Field lines */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-10">
         <div className="w-64 h-64 rounded-full border-2 border-white" />
@@ -25,16 +25,16 @@ export default async function LandingPage() {
             ⚽
           </div>
           <h1 className="text-4xl font-black text-white tracking-tight">
-            Fanta<span className="text-field-300">Calcio</span>
+            Fanta<span className="text-emerald-400">Calcio</span>
           </h1>
-          <p className="text-field-200 text-center text-sm leading-relaxed">
+          <p className="text-white/60 text-center text-sm leading-relaxed">
             Gestisci la tua squadra, sfida gli amici e diventa il campione del fantacalcio
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 justify-center">
           {["🏟️ Formazioni", "📊 Classifiche", "📅 Calendario", "🔄 Mercato"].map((f) => (
-            <span key={f} className="text-xs bg-white/10 text-field-100 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur">
+            <span key={f} className="text-xs bg-white/10 text-white/70 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur">
               {f}
             </span>
           ))}
@@ -43,7 +43,7 @@ export default async function LandingPage() {
         <div className="w-full flex flex-col gap-3">
           <Link
             href={DEMO_MODE ? "/onboarding" : "/sign-up"}
-            className="w-full py-4 bg-field-300 hover:bg-field-200 text-field-900 font-bold text-center rounded-2xl transition-colors shadow-lg text-lg"
+            className="w-full py-4 bg-emerald-400 hover:bg-emerald-300 text-gray-900 font-bold text-center rounded-2xl transition-colors shadow-lg text-lg"
           >
             {DEMO_MODE ? "Prova la demo 🚀" : "Inizia gratis"}
           </Link>
@@ -61,7 +61,7 @@ export default async function LandingPage() {
           </p>
         )}
 
-        <p className="text-field-300 text-xs opacity-60">
+        <p className="text-emerald-400 text-xs opacity-60">
           Dati stagione Serie A 2024/25
         </p>
       </div>
