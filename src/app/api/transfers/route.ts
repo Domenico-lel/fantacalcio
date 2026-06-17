@@ -8,6 +8,8 @@ export interface TransferItem {
     age?: string;
     position?: string;
     value?: string;
+    playerId?: string;
+    playerSlug?: string;
   };
   fromClub: { name: string; logoUrl: string };
   toClub:   { name: string; logoUrl: string };
@@ -43,7 +45,11 @@ function stripTags(html: string): string {
 function parseCard(html: string, threadId: string, leagueLabel: string): TransferItem | null {
   const photoUrl2 = (html.match(/src="(https:\/\/img\.a\.transfermarkt[^"]+)"/)?.[1] ?? "")
     .replace("/portrait/medium/", "/portrait/big/");
-  const playerName = attr(html, /title="([^"]+)"[^>]*href="\/[^"]+\/profil\/spieler\/\d+"/);
+  const playerName = attr(html, /title="([^"]+)"[^>]*href="\/[^"]+\/profil\/spieler\/\d+"/) ||
+                     attr(html, /href="\/[^"]+\/profil\/spieler\/\d+"[^>]*title="([^"]+)"/);
+  const profileHref = html.match(/href="(\/([^"\/]+)\/profil\/spieler\/(\d+))"/);
+  const playerSlug = profileHref?.[2] ?? "";
+  const playerId   = profileHref?.[3] ?? (photoUrl2.match(/\/(\d+)_\d+\./)?.[1] ?? "");
 
   const ageMatch   = html.match(/<b>Età:<\/b>\s*([^<&]+)/);
   const posMatch   = html.match(/<b>Posizione:<\/b>\s*([^<\n]+)/);
@@ -69,9 +75,11 @@ function parseCard(html: string, threadId: string, leagueLabel: string): Transfe
     player: {
       name: playerName,
       photoUrl: photoUrl2,
-      age:      ageMatch   ? stripTags(ageMatch[1])   : undefined,
-      position: posMatch   ? stripTags(posMatch[1])   : undefined,
-      value:    valueMatch ? stripTags(valueMatch[1]) : undefined,
+      age:        ageMatch   ? stripTags(ageMatch[1])   : undefined,
+      position:   posMatch   ? stripTags(posMatch[1])   : undefined,
+      value:      valueMatch ? stripTags(valueMatch[1]) : undefined,
+      playerId:   playerId   || undefined,
+      playerSlug: playerSlug || undefined,
     },
     fromClub,
     toClub,
@@ -115,7 +123,16 @@ async function fetchCard(threadId: string, code: string, slug: string, leagueLab
   }
 }
 
+let memCache: { items: TransferItem[]; ts: number } | null = null;
+const CACHE_TTL = 5 * 60 * 1000;
+
 export async function GET() {
+  if (memCache && Date.now() - memCache.ts < CACHE_TTL) {
+    return NextResponse.json({ items: memCache.items }, {
+      headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=60" },
+    });
+  }
+
   // Fetch thread IDs da tutte e 5 le leghe in parallelo
   const leagueResults = await Promise.allSettled(
     LEAGUES.map(({ slug, code }) => fetchLeagueThreads(slug, code))
@@ -148,6 +165,7 @@ export async function GET() {
     .map((r) => r.value)
     .sort((a, b) => b.probability - a.probability);
 
+  memCache = { items, ts: Date.now() };
   return NextResponse.json({ items }, {
     headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=60" },
   });
