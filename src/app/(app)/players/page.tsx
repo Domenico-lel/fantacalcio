@@ -102,12 +102,13 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
                   {item.trend === "down" && <span className="text-[11px] text-red-400">↓</span>}
                 </div>
               </div>
-              <div className="w-full rounded-full overflow-hidden" style={{ height: 5, background: "rgba(255,255,255,0.08)" }}>
+              <div className="w-full rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.08)" }}>
                 <div className="h-full rounded-full"
                   style={{
                     width: `${item.probability}%`,
                     background: `linear-gradient(90deg, ${sc.bar}70, ${sc.bar})`,
                     boxShadow: `0 0 8px ${sc.glow}`,
+                    transition: "width 0.7s ease",
                   }} />
               </div>
             </div>
@@ -285,12 +286,12 @@ export default function TransfersPage() {
                       <span className="text-emerald-400 text-[10px] font-bold">{item.player.value}</span>
                     )}
                   </div>
-                  <div className="w-full rounded-full overflow-hidden" style={{ height: 4, background: "rgba(255,255,255,0.08)" }}>
+                  <div className="w-full rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.08)" }}>
                     <div className="h-full rounded-full"
                       style={{
                         width: `${item.probability}%`,
                         background: `linear-gradient(90deg, ${sc.bar}70, ${sc.bar})`,
-                        boxShadow: `0 0 6px ${sc.glow}`,
+                        boxShadow: `0 0 8px ${sc.glow}`,
                         transition: "width 0.7s ease",
                       }} />
                   </div>

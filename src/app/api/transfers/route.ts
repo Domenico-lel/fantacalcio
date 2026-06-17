@@ -163,7 +163,13 @@ export async function GET() {
       r.status === "fulfilled" && r.value !== null
     )
     .map((r) => r.value)
-    .sort((a, b) => b.probability - a.probability);
+    .sort((a, b) => {
+      // trend "up" sempre in cima (trattativa sbloccata/accelerata)
+      if (a.trend === "up" && b.trend !== "up") return -1;
+      if (b.trend === "up" && a.trend !== "up") return  1;
+      // poi dal più recente al più vecchio (threadId numerico più alto = più nuovo)
+      return parseInt(b.id, 10) - parseInt(a.id, 10);
+    });
 
   memCache = { items, ts: Date.now() };
   return NextResponse.json({ items }, {
