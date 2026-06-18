@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from "react";
 import { MOCK_STANDINGS } from "@/lib/mock-data";
 import { loadState } from "@/lib/store";
