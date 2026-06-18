@@ -29,16 +29,20 @@ export async function claimTrophies(userId: string, firstName: string): Promise<
 }
 
 export async function fetchAllTrophies(): Promise<{ data: Trophy[]; error: string | null }> {
-  if (!isSupabaseConfigured()) return { data: [], error: null };
+  const configured = isSupabaseConfigured();
+  console.log("[trophies] isSupabaseConfigured:", configured);
+  if (!configured) return { data: [], error: "supabase not configured" };
   try {
     const db = createAdminClient();
     const { data, error } = await db
       .from("fanta_trophies")
       .select("*")
       .order("year", { ascending: false });
+    console.log("[trophies] rows:", data?.length, "error:", error?.message);
     if (error) return { data: [], error: error.message };
     return { data: (data ?? []) as Trophy[], error: null };
   } catch (e) {
+    console.log("[trophies] exception:", String(e));
     return { data: [], error: String(e) };
   }
 }
