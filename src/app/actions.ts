@@ -22,7 +22,7 @@ export async function claimTrophies(userId: string, firstName: string): Promise<
     const db = createAdminClient();
     await db
       .from("fanta_trophies")
-      .update({ user_id: userId })
+      .update({ user_id: userId } as never)
       .ilike("display_name", firstName.trim())
       .is("user_id", null);
   } catch { /* silent */ }
@@ -62,7 +62,7 @@ export async function upsertProfile(
         logo: profile.logo,
         budget: profile.budget,
         updated_at: new Date().toISOString(),
-      },
+      } as never,
       { onConflict: "user_id" }
     );
     if (error) return { error: error.message };

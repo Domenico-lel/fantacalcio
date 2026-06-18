@@ -62,7 +62,6 @@ export interface Database {
         };
         Relationships: [];
       };
-    };
       fanta_trophies: {
         Row: {
           id: string;
