@@ -1,14 +1,10 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 
-const DEMO_MODE = !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_DEMO === "true";
-
 export default async function LandingPage() {
-  if (!DEMO_MODE) {
-    const { auth } = await import("@clerk/nextjs/server");
-    const { redirect } = await import("next/navigation");
-    const { userId } = await auth();
-    if (userId) redirect("/news");
-  }
+  const { userId } = await auth();
+  if (userId) redirect("/news");
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ background: "#0d1f14" }}>
@@ -42,28 +38,18 @@ export default async function LandingPage() {
 
         <div className="w-full flex flex-col gap-3">
           <Link
-            href={DEMO_MODE ? "/onboarding" : "/sign-up"}
+            href="/sign-up"
             className="w-full py-4 bg-emerald-400 hover:bg-emerald-300 text-gray-900 font-bold text-center rounded-2xl transition-colors shadow-lg text-lg"
           >
-            {DEMO_MODE ? "Prova la demo 🚀" : "Inizia gratis"}
+            Inizia gratis
           </Link>
           <Link
-            href={DEMO_MODE ? "/news" : "/sign-in"}
+            href="/sign-in"
             className="w-full py-4 bg-white/10 hover:bg-white/20 text-white font-semibold text-center rounded-2xl transition-colors border border-white/20 backdrop-blur"
           >
-            {DEMO_MODE ? "Vai alle notizie" : "Accedi"}
+            Accedi
           </Link>
         </div>
-
-        {DEMO_MODE && (
-          <p className="text-yellow-400/70 text-xs text-center bg-yellow-400/10 px-4 py-2 rounded-xl border border-yellow-400/20">
-            ⚡ Modalità demo — configura le chiavi Clerk in .env.local per l&apos;auth completa
-          </p>
-        )}
-
-        <p className="text-emerald-400 text-xs opacity-60">
-          Dati stagione Serie A 2024/25
-        </p>
       </div>
     </main>
   );

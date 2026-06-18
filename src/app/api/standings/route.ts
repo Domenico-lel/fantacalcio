@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 export interface StandingEntry {
   position: number;
   teamName: string;
-  points: number;       // punti classifica (V=2, N=1, P=0)
-  totalFp: number;      // punti fantacalcio totali stagione
+  points: number;
+  totalFp: number;
   played: number;
   won: number;
   drawn: number;
@@ -14,7 +14,7 @@ export interface StandingEntry {
   goalsAgainst: number;
 }
 
-const LEAGUE_SLUG = "fantacazzo-nella-bocca";
+const LEAGUE_SLUG = process.env.FANTACALCIO_LEAGUE_SLUG ?? "";
 const LEAGUE_URL = `https://leghe.fantacalcio.it/${LEAGUE_SLUG}`;
 
 const HEADERS = {
@@ -24,29 +24,22 @@ const HEADERS = {
 
 function parseStandingsFromHtml(html: string): StandingEntry[] {
   const standings: StandingEntry[] = [];
-
-  // Regex per trovare le righe ranking-row
   const rowRegex = /<tr[^>]*class="ranking-row"[^>]*>([\s\S]*?)<\/tr>/gi;
   let rowMatch;
 
   while ((rowMatch = rowRegex.exec(html)) !== null) {
     const rowHtml = rowMatch[1];
 
-    // Estrai le celle per ogni data-key
     const getCell = (key: string): string => {
-      // Usa un pattern che cerchi data-key con virgolette e spazi opzionali
       const pattern = `data-key\\s*=\\s*["\']${key}["\']`;
       const cellRegex = new RegExp(`<td[^>]*${pattern}[^>]*>([\\s\\S]*?)<\\/td>`, "i");
       const match = cellRegex.exec(rowHtml);
       if (!match) return "";
       let content = match[1];
-
-      // Per teamName, estrai il testo dal primo <a> tag
       if (key === "teamName") {
         const aMatch = content.match(/<a[^>]*>([^<]+)<\/a>/i);
         if (aMatch) content = aMatch[1];
       }
-
       return content
         .replace(/<[^>]+>/g, "")
         .replace(/&nbsp;/g, " ")
@@ -74,53 +67,28 @@ function parseStandingsFromHtml(html: string): StandingEntry[] {
 
     if (!teamName) continue;
 
-    standings.push({
-      position,
-      teamName,
-      points,
-      totalFp,
-      played,
-      won,
-      drawn,
-      lost,
-      goalDiff,
-      goalsFor,
-      goalsAgainst,
-    });
+    standings.push({ position, teamName, points, totalFp, played, won, drawn, lost, goalDiff, goalsFor, goalsAgainst });
   }
 
   return standings;
 }
 
 async function fetchStandings(): Promise<StandingEntry[]> {
+  if (!LEAGUE_SLUG) return [];
   try {
-    const res = await fetch(LEAGUE_URL, {
-      headers: HEADERS,
-      next: { revalidate: 600 }, // cache 10 minuti
-    });
-
-    if (!res.ok) {
-      console.error(`Failed to fetch standings: ${res.status}`);
-      return [];
-    }
-
+    const res = await fetch(LEAGUE_URL, { headers: HEADERS, next: { revalidate: 600 } });
+    if (!res.ok) return [];
     const html = await res.text();
-    const standings = parseStandingsFromHtml(html);
-
-    return standings;
-  } catch (error) {
-    console.error("Error fetching standings:", error);
+    return parseStandingsFromHtml(html);
+  } catch {
     return [];
   }
 }
 
 export async function GET() {
   const standings = await fetchStandings();
-
   return NextResponse.json(
     { items: standings },
-    {
-      headers: { "Cache-Control": "s-maxage=600, stale-while-revalidate=120" },
-    }
+    { headers: { "Cache-Control": "s-maxage=600, stale-while-revalidate=120" } }
   );
 }

@@ -1,14 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { DemoUserProvider } from "@/lib/app-user-context";
 import { ClerkUserBridge } from "@/components/ClerkUserBridge";
 import "./globals.css";
 
 export const dynamic = 'force-dynamic';
-
-const DEMO_MODE =
-  !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_DEMO === "true";
 
 export const metadata: Metadata = {
   title: "FantaCalcio",
@@ -29,22 +24,7 @@ export const viewport: Viewport = {
   themeColor: "#0a2010",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  if (DEMO_MODE) {
-    return (
-      <DemoUserProvider>
-        <html lang="it">
-          <head />
-          <body className="font-sans antialiased">{children}</body>
-        </html>
-      </DemoUserProvider>
-    );
-  }
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
       <html lang="it">
