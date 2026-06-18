@@ -1,6 +1,5 @@
 "use client";
 
-export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from "react";
 import type { NewsItem } from "@/app/api/news/route";

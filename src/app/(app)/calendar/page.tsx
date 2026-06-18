@@ -1,6 +1,5 @@
 "use client";
 
-export const dynamic = 'force-dynamic';
 
 import { useState } from "react";
 import { MOCK_CALENDAR, SERIE_A_TEAMS } from "@/lib/mock-data";

@@ -4,6 +4,8 @@ import { DemoUserProvider } from "@/lib/app-user-context";
 import { ClerkUserBridge } from "@/components/ClerkUserBridge";
 import "./globals.css";
 
+export const dynamic = 'force-dynamic';
+
 const DEMO_MODE =
   !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
   process.env.NEXT_PUBLIC_DEMO === "true";
