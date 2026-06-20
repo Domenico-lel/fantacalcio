@@ -6,6 +6,7 @@ import { ReactNode, useState, useEffect } from "react";
 import ProfileDrawer from "@/components/ProfileDrawer";
 import { loadState } from "@/lib/store";
 import type { TeamProfile } from "@/lib/store";
+import { getCurrentViewer } from "@/app/social-actions";
 
 const NAV_ITEMS = [
   { href: "/news",      label: "Notizie",   icon: NewsIcon },
@@ -18,11 +19,18 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState<TeamProfile | null>(null);
+  const [viewer, setViewer] = useState<{ logo: string; displayName: string } | null>(null);
 
   useEffect(() => {
     const { profile: p } = loadState();
     setProfile(p);
+    getCurrentViewer().then((v) => {
+      if (v) setViewer({ logo: v.logo, displayName: v.displayName });
+    }).catch(() => {});
   }, []);
+
+  const avatarSrc = viewer?.logo ?? profile?.logo ?? "👤";
+  const teamLabel = viewer?.displayName ?? profile?.teamName ?? "La tua squadra";
 
   return (
     <div className="h-dvh bg-[#0d1f14] flex flex-col overflow-hidden">
@@ -34,11 +42,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
           aria-label="Profilo"
         >
-          <span className="text-2xl leading-none flex-none">{profile?.logo ?? "👤"}</span>
+          {avatarSrc.startsWith("http")
+            ? <img src={avatarSrc} alt="" className="w-7 h-7 rounded-full object-cover flex-none" />
+            : <span className="text-2xl leading-none flex-none">{avatarSrc}</span>}
           <div className="flex flex-col items-start min-w-0">
             <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wide leading-none mb-0.5">Il tuo profilo</span>
             <span className="text-white text-sm font-bold leading-none truncate w-full">
-              {profile?.teamName ?? "La tua squadra"}
+              {teamLabel}
             </span>
           </div>
         </button>

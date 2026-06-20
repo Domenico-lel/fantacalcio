@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { MOCK_STANDINGS } from "@/lib/mock-data";
 import { loadState } from "@/lib/store";
+import { fetchTeams } from "@/app/teams-actions";
 
 interface StandingEntryWithLogo {
   position: number;
@@ -36,6 +37,7 @@ export default function StandingsPage() {
   const [myLogo, setMyLogo] = useState("⭐");
   const [standings, setStandings] = useState<StandingEntryWithLogo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [teamLogos, setTeamLogos] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const s = loadState();
@@ -44,6 +46,22 @@ export default function StandingsPage() {
       setMyLogo(s.profile.logo);
     }
   }, []);
+
+  // Loghi reali delle squadre (caricati dall'admin)
+  useEffect(() => {
+    fetchTeams().then((teams) => {
+      const map: Record<string, string> = {};
+      for (const t of teams) if (t.logoUrl) map[t.name] = t.logoUrl;
+      setTeamLogos(map);
+    }).catch(() => {});
+  }, []);
+
+  const renderLogo = (teamName: string, fallback: string, size: number) => {
+    const url = teamLogos[teamName];
+    return url
+      ? <img src={url} alt="" className="rounded-full object-cover inline-block align-middle" style={{ width: size, height: size }} />
+      : <span style={{ fontSize: size * 0.9, lineHeight: 1 }}>{fallback}</span>;
+  };
 
   useEffect(() => {
     async function loadStandings() {
@@ -108,7 +126,7 @@ export default function StandingsPage() {
           <div className="flex items-center gap-3">
             <span className="text-3xl font-black text-emerald-400">#{myEntry.position}</span>
             <div className="flex items-center gap-2 flex-1">
-              <span className="text-2xl">{myEntry.logoEmoji}</span>
+              {renderLogo(myEntry.teamName, myEntry.logoEmoji, 26)}
               <div>
                 <p className="text-white font-semibold">{myEntry.teamName}</p>
                 <p className="text-white/50 text-xs">{myEntry.points} pt classifica • {myEntry.totalFp.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pt totali</p>
@@ -159,7 +177,7 @@ export default function StandingsPage() {
 
                 {/* Team */}
                 <div className="flex items-center gap-2 flex-1 pl-2 min-w-0">
-                  <span className="text-xl">{entry.logoEmoji}</span>
+                  {renderLogo(entry.teamName, entry.logoEmoji, 22)}
                   <span className={`text-sm font-semibold truncate ${isMe ? "text-emerald-400" : "text-white"}`}>
                     {entry.teamName}
                   </span>
@@ -192,7 +210,7 @@ export default function StandingsPage() {
                 const isMe = entry.teamName === myTeamName;
                 return (
                   <div key={entry.position} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${isMe ? "bg-emerald-400/10" : "bg-white/5"}`}>
-                    <span className="text-base">{entry.logoEmoji}</span>
+                    {renderLogo(entry.teamName, entry.logoEmoji, 18)}
                     <span className={`flex-1 text-sm truncate ${isMe ? "text-emerald-400 font-semibold" : "text-white"}`}>{entry.teamName}</span>
                     <span className={`text-sm font-bold ${isMe ? "text-emerald-400" : "text-white/80"}`}>
                       {entry.totalFp.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -6,6 +6,13 @@ import {
   fetchListings, createListing, setListingStatus, deleteListing,
   type FeedPost, type Listing, type Viewer,
 } from "@/app/social-actions";
+import {
+  fetchMyRoster, fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
+  addRosterPlayer, deleteRosterPlayer,
+  type Team, type RosterPlayer,
+} from "@/app/teams-actions";
+
+type TabKey = "scoop" | "cedibili" | "gestione";
 
 function timeAgo(dateStr: string): string {
   if (!dateStr) return "";
@@ -20,8 +27,16 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 }
 
+/* Mostra un logo (URL immagine) oppure un'emoji */
+function Avatar({ src, size }: { src: string; size: number }) {
+  if (src?.startsWith("http")) {
+    return <img src={src} alt="" className="rounded-full object-cover flex-none" style={{ width: size, height: size }} />;
+  }
+  return <span className="flex-none leading-none" style={{ fontSize: size * 0.85 }}>{src}</span>;
+}
+
 export default function BachecaPage() {
-  const [tab, setTab] = useState<"scoop" | "cedibili">("scoop");
+  const [tab, setTab] = useState<TabKey>("scoop");
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +58,8 @@ export default function BachecaPage() {
         <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide">La lega</p>
         <h1 className="text-white font-bold text-2xl leading-tight mb-3">Bacheca</h1>
         <div className="flex gap-2">
-          {([["scoop", "📣 Scoop"], ["cedibili", "🔁 Cedibili"]] as const).map(([key, label]) => (
+          {(([["scoop", "📣 Scoop"], ["cedibili", "🔁 Cedibili"],
+              ...(viewer?.isAdmin ? [["gestione", "⚙️ Gestione"]] : [])] as [TabKey, string][])).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
               style={{
@@ -57,9 +73,9 @@ export default function BachecaPage() {
         </div>
       </div>
 
-      {tab === "scoop"
-        ? <ScoopTab viewer={viewer} posts={posts} loading={loading} reload={loadFeed} setPosts={setPosts} />
-        : <CedibiliTab viewer={viewer} />}
+      {tab === "scoop" && <ScoopTab viewer={viewer} posts={posts} loading={loading} reload={loadFeed} setPosts={setPosts} />}
+      {tab === "cedibili" && <CedibiliTab viewer={viewer} />}
+      {tab === "gestione" && viewer?.isAdmin && <GestioneTab />}
     </div>
   );
 }
@@ -247,7 +263,7 @@ function PostCard({ post, viewer, reload, setPosts }: {
             {post.comments.length === 0 && <p className="text-white/35 text-xs">Nessun commento. Scrivi il primo!</p>}
             {post.comments.map((c) => (
               <div key={c.id} className="flex items-start gap-2">
-                <span className="text-base leading-none mt-0.5">{c.authorLogo}</span>
+                <span className="mt-0.5"><Avatar src={c.authorLogo} size={18} /></span>
                 <div className="flex-1 min-w-0">
                   <span className="text-emerald-400 text-xs font-bold">{c.authorName}</span>
                   <span className="text-white/30 text-[10px] ml-2">{timeAgo(c.createdAt)} fa</span>
@@ -281,6 +297,7 @@ function PostCard({ post, viewer, reload, setPosts }: {
 
 function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
   const [listings, setListings] = useState<Listing[]>([]);
+  const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [player, setPlayer] = useState("");
   const [note, setNote] = useState("");
@@ -288,8 +305,9 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const { listings } = await fetchListings();
+    const [{ listings }, my] = await Promise.all([fetchListings(), fetchMyRoster()]);
     setListings(listings);
+    setRoster(my.players);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -313,9 +331,22 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
       {viewer?.hasProfile ? (
         <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
           <p className="text-emerald-400 text-xs font-bold uppercase tracking-wide mb-3">Metti un giocatore sul mercato</p>
-          <input value={player} onChange={(e) => setPlayer(e.target.value)} placeholder="Nome giocatore (es. Lautaro)"
-            className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none mb-2 focus:ring-2 focus:ring-emerald-400/40"
-            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }} />
+          {roster.length > 0 ? (
+            <select value={player} onChange={(e) => setPlayer(e.target.value)}
+              className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none mb-2 focus:ring-2 focus:ring-emerald-400/40"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              <option value="" style={{ background: "#0f2318" }}>Seleziona un giocatore…</option>
+              {roster.map((p) => (
+                <option key={p.id} value={p.playerName} style={{ background: "#0f2318" }}>
+                  {p.role ? `${p.role} · ` : ""}{p.playerName}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input value={player} onChange={(e) => setPlayer(e.target.value)} placeholder="Nome giocatore (es. Lautaro)"
+              className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none mb-2 focus:ring-2 focus:ring-emerald-400/40"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }} />
+          )}
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota (facoltativa) — es. cerco un centrocampista"
             className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-400/40"
             style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }} />
@@ -369,7 +400,7 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
         border: `1px solid ${isClosed ? "rgba(255,255,255,0.07)" : "rgba(52,211,153,0.2)"}`,
         opacity: isClosed ? 0.6 : 1,
       }}>
-      <span className="text-xl flex-none">{listing.ownerLogo}</span>
+      <Avatar src={listing.ownerLogo} size={28} />
       <div className="flex-1 min-w-0">
         <p className={`font-bold text-sm truncate ${isClosed ? "text-white/60 line-through" : "text-white"}`}>
           {listing.playerName}
@@ -390,6 +421,154 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
             style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
             🗑️
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── TAB GESTIONE (solo admin) ─────────────────────────────────────────── */
+
+function GestioneTab() {
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const load = useCallback(async () => {
+    setTeams(await fetchTeams());
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function sync() {
+    setSyncing(true); setMsg("");
+    const res = await syncTeams();
+    setSyncing(false);
+    setMsg(res.error ?? `✓ Sincronizzate ${res.count} squadre dalla classifica`);
+    await load();
+  }
+
+  return (
+    <div className="px-4 py-4 flex flex-col gap-3">
+      <button onClick={sync} disabled={syncing}
+        className="w-full py-3 rounded-xl text-sm font-bold disabled:opacity-50"
+        style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399" }}>
+        {syncing ? "Sincronizzo…" : "🔄 Sincronizza squadre dalla classifica"}
+      </button>
+      {msg && <p className="text-white/60 text-xs text-center">{msg}</p>}
+
+      {loading && Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="rounded-xl animate-pulse" style={{ height: 56, background: "rgba(255,255,255,0.05)" }} />
+      ))}
+      {!loading && teams.length === 0 && (
+        <p className="text-white/50 text-sm text-center py-10">
+          Nessuna squadra. Premi &quot;Sincronizza&quot; per importarle dalla classifica.
+        </p>
+      )}
+      {teams.map((t) => <TeamAdminCard key={t.id} team={t} onTeamsChange={load} />)}
+      <div className="h-4" />
+    </div>
+  );
+}
+
+function TeamAdminCard({ team, onTeamsChange }: { team: Team; onTeamsChange: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [roster, setRoster] = useState<RosterPlayer[]>([]);
+  const [loadingRoster, setLoadingRoster] = useState(false);
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("");
+  const [busy, setBusy] = useState(false);
+  const logoRef = useRef<HTMLInputElement>(null);
+
+  const loadRoster = useCallback(async () => {
+    setLoadingRoster(true);
+    setRoster(await fetchRoster(team.id));
+    setLoadingRoster(false);
+  }, [team.id]);
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next) loadRoster();
+  }
+
+  async function onLogo(file: File) {
+    setBusy(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    await uploadTeamLogo(team.id, fd);
+    if (logoRef.current) logoRef.current.value = "";
+    setBusy(false);
+    await onTeamsChange();
+  }
+
+  async function add() {
+    if (!name.trim()) return;
+    await addRosterPlayer(team.id, name, role || null);
+    setName(""); setRole("");
+    await loadRoster();
+  }
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
+      <button onClick={toggle} className="w-full flex items-center gap-3 px-3 py-3 text-left">
+        {team.logoUrl
+          ? <img src={team.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-none" />
+          : <span className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
+        <div className="flex-1 min-w-0">
+          <p className="text-white font-semibold text-sm truncate">{team.name}</p>
+          <p className="text-white/40 text-xs">{team.claimed ? "Assegnata" : "Libera"}</p>
+        </div>
+        <span className="text-white/30 text-sm">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 flex flex-col gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          {/* Logo */}
+          <div className="pt-3">
+            <button onClick={() => logoRef.current?.click()} disabled={busy}
+              className="px-3 py-2 rounded-lg text-xs font-semibold text-white/70 disabled:opacity-50"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              {busy ? "Carico…" : team.logoUrl ? "🖼️ Cambia logo" : "🖼️ Carica logo"}
+            </button>
+            <input ref={logoRef} type="file" accept="image/*" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onLogo(f); }} />
+          </div>
+
+          {/* Rosa */}
+          <div>
+            <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-wide mb-2">Rosa</p>
+            <div className="flex gap-2 mb-2">
+              <select value={role} onChange={(e) => setRole(e.target.value)}
+                className="rounded-lg px-2 py-2 text-white text-sm outline-none"
+                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <option value="" style={{ background: "#0f2318" }}>—</option>
+                {["P", "D", "C", "A"].map((r) => <option key={r} value={r} style={{ background: "#0f2318" }}>{r}</option>)}
+              </select>
+              <input value={name} onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+                placeholder="Nome giocatore"
+                className="flex-1 rounded-lg px-3 py-2 text-white text-sm outline-none"
+                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }} />
+              <button onClick={add}
+                className="px-3 py-2 rounded-lg text-sm font-bold"
+                style={{ background: "#34d399", color: "#052e16" }}>+</button>
+            </div>
+
+            {loadingRoster && <p className="text-white/40 text-xs">Carico rosa…</p>}
+            {!loadingRoster && roster.length === 0 && <p className="text-white/35 text-xs">Nessun giocatore inserito.</p>}
+            <div className="flex flex-col gap-1">
+              {roster.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  {p.role && <span className="text-emerald-400/80 text-[10px] font-bold w-4">{p.role}</span>}
+                  <span className="text-white/85 text-sm flex-1 truncate">{p.playerName}</span>
+                  <button onClick={async () => { await deleteRosterPlayer(p.id); await loadRoster(); }}
+                    className="text-red-400/70 text-xs px-1.5">✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

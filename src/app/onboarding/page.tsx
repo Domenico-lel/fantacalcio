@@ -1,12 +1,11 @@
 "use client";
 
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { TEAM_LOGO_OPTIONS } from "@/lib/mock-data";
 import { saveState } from "@/lib/store";
 import { upsertProfile } from "@/app/actions";
 import { getCurrentViewer } from "@/app/social-actions";
+import { fetchTeams, claimTeam, type Team } from "@/app/teams-actions";
 import { useAppUser } from "@/lib/app-user-context";
 
 export default function OnboardingPage() {
@@ -16,47 +15,58 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [teamName, setTeamName] = useState("");
-  const [logo, setLogo] = useState("⚽");
+
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [freeName, setFreeName] = useState(""); // fallback se non ci sono squadre sincronizzate
+
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   // L'admin non ha una squadra: salta l'onboarding e va alla bacheca
   useEffect(() => {
     getCurrentViewer().then((v) => {
-      if (v?.isAdmin) router.replace("/bacheca");
-      else setChecking(false);
+      if (v?.isAdmin) { router.replace("/bacheca"); return; }
+      fetchTeams().then((t) => setTeams(t)).finally(() => setChecking(false));
     }).catch(() => setChecking(false));
   }, [router]);
+
+  const available = teams.filter((t) => !t.claimed);
+  const hasTeams = teams.length > 0;
 
   async function handleNext() {
     if (step === 1) {
       if (!firstName.trim() || !lastName.trim()) { setError("Inserisci nome e cognome"); return; }
       setError(""); setStep(2);
-    } else if (step === 2) {
-      if (!teamName.trim()) { setError("Inserisci il nome della squadra"); return; }
-      setError(""); setStep(3);
-    } else {
-      setSaving(true);
-
-      const profile = {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        teamName: teamName.trim(),
-        logo,
-        budget: 500,
-      };
-
-      saveState(profile);
-
-      if (user.id) {
-        const { error } = await upsertProfile(user.id, profile);
-        if (error) console.error("Supabase profile error:", error);
-      }
-
-      setSaving(false);
-      router.push("/standings");
+      return;
     }
+
+    // step 2: scelta squadra
+    const teamName = hasTeams ? (selectedTeam?.name ?? "") : freeName.trim();
+    if (!teamName) { setError(hasTeams ? "Seleziona la tua squadra" : "Inserisci il nome della squadra"); return; }
+
+    setSaving(true); setError("");
+
+    const profile = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      teamName,
+      logo: "⚽",
+      budget: 500,
+    };
+    saveState(profile);
+
+    if (user.id) {
+      const res = await upsertProfile(user.id, profile);
+      if (res.error) { setError("Errore nel salvataggio: " + res.error); setSaving(false); return; }
+      if (selectedTeam) {
+        const claim = await claimTeam(selectedTeam.id);
+        if (claim.error) { setError(claim.error); setSaving(false); return; }
+      }
+    }
+
+    setSaving(false);
+    router.push("/standings");
   }
 
   if (checking) {
@@ -72,12 +82,9 @@ export default function OnboardingPage() {
       <div className="w-full max-w-sm">
         {/* Progress */}
         <div className="flex gap-2 mb-8">
-          {[1, 2, 3].map((s) => (
-            <div
-              key={s}
-              className="h-1.5 flex-1 rounded-full transition-colors"
-              style={{ background: s <= step ? "#34d399" : "rgba(255,255,255,0.2)" }}
-            />
+          {[1, 2].map((s) => (
+            <div key={s} className="h-1.5 flex-1 rounded-full transition-colors"
+              style={{ background: s <= step ? "#34d399" : "rgba(255,255,255,0.2)" }} />
           ))}
         </div>
 
@@ -92,22 +99,16 @@ export default function OnboardingPage() {
               <div>
                 <label className="text-white/60 text-sm font-medium block mb-1.5">Nome</label>
                 <input
-                  className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none transition-colors"
+                  className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none"
                   style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
-                  placeholder="es. Marco"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                />
+                  placeholder="es. Marco" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               </div>
               <div>
                 <label className="text-white/60 text-sm font-medium block mb-1.5">Cognome</label>
                 <input
-                  className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none transition-colors"
+                  className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none"
                   style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
-                  placeholder="es. Rossi"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
+                  placeholder="es. Rossi" value={lastName} onChange={(e) => setLastName(e.target.value)} />
               </div>
             </div>
           </div>
@@ -115,73 +116,63 @@ export default function OnboardingPage() {
 
         {step === 2 && (
           <div className="slide-up">
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
               <div className="text-5xl mb-3">🏟️</div>
               <h2 className="text-2xl font-bold text-white">La tua squadra</h2>
-              <p className="text-white/50 text-sm mt-1">Come si chiama la tua squadra del fanta?</p>
+              <p className="text-white/50 text-sm mt-1">
+                {hasTeams ? "Seleziona la squadra che ti appartiene" : "Inserisci il nome della tua squadra"}
+              </p>
             </div>
-            <div>
-              <label className="text-white/60 text-sm font-medium block mb-1.5">Nome squadra</label>
-              <input
-                className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none transition-colors"
-                style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
-                placeholder="es. I Gladiatori"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                maxLength={30}
-              />
-              <p className="text-white/25 text-xs mt-1.5 text-right">{teamName.length}/30</p>
-            </div>
-          </div>
-        )}
 
-        {step === 3 && (
-          <div className="slide-up">
-            <div className="text-center mb-8">
-              <div className="text-5xl mb-3">{logo}</div>
-              <h2 className="text-2xl font-bold text-white">Scegli il logo</h2>
-              <p className="text-white/50 text-sm mt-1">L&apos;emblema della tua squadra</p>
-            </div>
-            <div className="grid grid-cols-5 gap-3">
-              {TEAM_LOGO_OPTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => setLogo(emoji)}
-                  className="aspect-square rounded-2xl text-3xl flex items-center justify-center transition-all"
-                  style={{
-                    background: logo === emoji ? "#34d399" : "rgba(255,255,255,0.08)",
-                    transform: logo === emoji ? "scale(1.1)" : "scale(1)",
-                    boxShadow: logo === emoji ? "0 4px 16px rgba(52,211,153,0.4)" : "none",
-                  }}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+            {hasTeams ? (
+              <div className="flex flex-col gap-2 max-h-[46vh] overflow-y-auto pr-1">
+                {available.length === 0 && (
+                  <p className="text-white/50 text-sm text-center py-4">
+                    Tutte le squadre risultano già assegnate. Contatta l&apos;admin.
+                  </p>
+                )}
+                {available.map((t) => {
+                  const sel = selectedTeam?.id === t.id;
+                  return (
+                    <button key={t.id} onClick={() => setSelectedTeam(t)}
+                      className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all"
+                      style={{
+                        background: sel ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.06)",
+                        border: `1px solid ${sel ? "#34d399" : "rgba(255,255,255,0.1)"}`,
+                      }}>
+                      {t.logoUrl
+                        ? <img src={t.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-none" />
+                        : <span className="w-9 h-9 rounded-full flex items-center justify-center text-xl flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
+                      <span className={`font-semibold text-sm ${sel ? "text-emerald-400" : "text-white"}`}>{t.name}</span>
+                      {sel && <span className="ml-auto text-emerald-400">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <input
+                className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none"
+                style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
+                placeholder="es. I Gladiatori" value={freeName} onChange={(e) => setFreeName(e.target.value)} maxLength={40} />
+            )}
           </div>
         )}
 
         {error && <p className="text-red-400 text-sm text-center mt-3">{error}</p>}
 
         <div className="mt-8 flex flex-col gap-3">
-          <button
-            onClick={handleNext}
-            disabled={saving}
+          <button onClick={handleNext} disabled={saving}
             className="w-full py-4 font-bold rounded-2xl text-lg transition-all active:scale-95 disabled:opacity-60"
-            style={{ background: "#34d399", color: "#052e16" }}
-          >
+            style={{ background: "#34d399", color: "#052e16" }}>
             {saving ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 Salvataggio…
               </span>
-            ) : step === 3 ? "Inizia a giocare! 🚀" : "Continua →"}
+            ) : step === 2 ? "Inizia a giocare! 🚀" : "Continua →"}
           </button>
           {step > 1 && !saving && (
-            <button
-              onClick={() => { setStep(step - 1); setError(""); }}
-              className="w-full py-3 text-white/40 text-sm"
-            >
+            <button onClick={() => { setStep(step - 1); setError(""); }} className="w-full py-3 text-white/40 text-sm">
               ← Indietro
             </button>
           )}

@@ -10,6 +10,7 @@ export interface Database {
           team_name: string;
           logo: string;
           budget: number;
+          team_ref: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -20,6 +21,7 @@ export interface Database {
           team_name: string;
           logo?: string;
           budget?: number;
+          team_ref?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -28,6 +30,7 @@ export interface Database {
           team_name?: string;
           logo?: string;
           budget?: number;
+          team_ref?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -193,6 +196,46 @@ export interface Database {
           player_name?: string;
           note?: string | null;
           status?: "available" | "closed";
+        };
+        Relationships: [];
+      };
+      fanta_teams: {
+        Row: {
+          id: string;
+          name: string;
+          team_id: string | null;
+          logo_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          name: string;
+          team_id?: string | null;
+          logo_url?: string | null;
+        };
+        Update: {
+          name?: string;
+          team_id?: string | null;
+          logo_url?: string | null;
+        };
+        Relationships: [];
+      };
+      fanta_roster: {
+        Row: {
+          id: string;
+          team_ref: string;
+          player_name: string;
+          role: "P" | "D" | "C" | "A" | null;
+          created_at: string;
+        };
+        Insert: {
+          team_ref: string;
+          player_name: string;
+          role?: "P" | "D" | "C" | "A" | null;
+        };
+        Update: {
+          player_name?: string;
+          role?: "P" | "D" | "C" | "A" | null;
         };
         Relationships: [];
       };

@@ -83,17 +83,26 @@ async function getViewer(): Promise<ViewerInternal | null> {
   // Manager con profilo squadra?
   const { data: profile } = await db
     .from("fanta_profiles")
-    .select("first_name, logo, team_name")
+    .select("first_name, logo, team_name, team_ref")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (profile) {
+    let logo = profile.logo || "⚽";
+    if (profile.team_ref) {
+      const { data: team } = await db
+        .from("fanta_teams")
+        .select("logo_url")
+        .eq("id", profile.team_ref)
+        .maybeSingle();
+      if (team?.logo_url) logo = team.logo_url;
+    }
     return {
       userId,
       email,
       isAdmin: false,
       displayName: profile.team_name || profile.first_name || cu?.firstName || "Manager",
-      logo: profile.logo || "⚽",
+      logo,
       hasProfile: true,
     };
   }
