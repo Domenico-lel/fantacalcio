@@ -99,8 +99,8 @@ export default function StandingsPage() {
 
   if (loading && standings.length === 0) {
     return (
-      <div className="min-h-dvh" style={{ background: "#0d1f14" }}>
-        <div className="px-4 pt-12 pb-4" style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="screen sec-rank">
+        <div className="sec-header px-4 pt-12 pb-4">
           <h1 className="text-white font-bold text-xl">Classifica</h1>
         </div>
         <div className="flex items-center justify-center h-96">
@@ -111,9 +111,9 @@ export default function StandingsPage() {
   }
 
   return (
-    <div className="min-h-dvh" style={{ background: "#0d1f14" }}>
+    <div className="screen sec-rank">
       {/* Header */}
-      <div className="px-4 pt-12 pb-4" style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="sec-header px-4 pt-12 pb-4">
         <h1 className="text-white font-bold text-xl">Classifica</h1>
         <p className="text-white/50 text-xs mt-0.5 font-medium">{standings.length} squadre • aggiornamento automatico</p>
       </div>

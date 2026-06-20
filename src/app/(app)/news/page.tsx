@@ -50,16 +50,13 @@ export default function NewsPage() {
     : items.filter((i) => i.category === filter);
 
   return (
-    <div className="min-h-dvh" style={{ background: "#0d1f14" }}>
+    <div className="screen sec-news">
 
       {/* Header */}
-      <div
-        className="px-4 pt-12 pb-4"
-        style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-      >
+      <div className="sec-header px-4 pt-12 pb-4">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide">Live feed</p>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>Live feed</p>
             <h1 className="text-white font-bold text-2xl leading-tight">Notizie</h1>
           </div>
           <button
@@ -72,7 +69,7 @@ export default function NewsPage() {
             <svg
               width="16" height="16" viewBox="0 0 24 24" fill="none"
               className={loading ? "animate-spin" : ""}
-              style={{ color: "#34d399" }}
+              style={{ color: "var(--accent)" }}
             >
               <path d="M4 4v5h5M20 20v-5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M4 9a8 8 0 0114.93-2M20 15a8 8 0 01-14.93 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -88,8 +85,8 @@ export default function NewsPage() {
               onClick={() => setFilter(cat)}
               className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all"
               style={{
-                background: filter === cat ? "#34d399" : "rgba(255,255,255,0.07)",
-                color: filter === cat ? "#0d1f14" : "rgba(255,255,255,0.6)",
+                background: filter === cat ? "var(--accent)" : "rgba(255,255,255,0.07)",
+                color: filter === cat ? "var(--accent-ink)" : "rgba(255,255,255,0.6)",
                 border: filter === cat ? "none" : "1px solid rgba(255,255,255,0.1)",
               }}
             >
@@ -172,9 +169,9 @@ export default function NewsPage() {
                   <span
                     className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full backdrop-blur-sm"
                     style={{
-                      color: SOURCE_COLORS[item.source] ?? "#34d399",
+                      color: SOURCE_COLORS[item.source] ?? "var(--accent)",
                       background: `rgba(0,0,0,0.55)`,
-                      border: `1px solid ${SOURCE_COLORS[item.source] ?? "#34d399"}40`,
+                      border: `1px solid ${SOURCE_COLORS[item.source] ?? "var(--accent)"}40`,
                     }}
                   >
                     {item.sourceLabel}
@@ -200,8 +197,8 @@ export default function NewsPage() {
                   <span
                     className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
                     style={{
-                      color: SOURCE_COLORS[item.source] ?? "#34d399",
-                      background: `${SOURCE_COLORS[item.source] ?? "#34d399"}18`,
+                      color: SOURCE_COLORS[item.source] ?? "var(--accent)",
+                      background: `${SOURCE_COLORS[item.source] ?? "var(--accent)"}18`,
                     }}
                   >
                     {item.sourceLabel}
@@ -230,9 +227,9 @@ export default function NewsPage() {
 
               {/* Read more */}
               <div className="flex items-center gap-1 mt-3">
-                <span className="text-emerald-400 text-[10px] font-semibold">Leggi su {item.sourceLabel}</span>
+                <span className="text-[10px] font-semibold" style={{ color: "var(--accent-soft)" }}>Leggi su {item.sourceLabel}</span>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                  <path d="M7 17L17 7M17 7H7M17 7v10" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M7 17L17 7M17 7H7M17 7v10" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
             </div>

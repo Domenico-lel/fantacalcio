@@ -51,11 +51,10 @@ export default function BachecaPage() {
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
   return (
-    <div className="min-h-dvh" style={{ background: "#0d1f14" }}>
+    <div className="screen sec-board">
       {/* Header + tabs */}
-      <div className="px-4 pt-12 pb-3 sticky top-0 z-20"
-        style={{ background: "rgba(13,31,20,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-        <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide">La lega</p>
+      <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>La lega</p>
         <h1 className="text-white font-bold text-2xl leading-tight mb-3">Bacheca</h1>
         <div className="flex gap-2">
           {(([["scoop", "📣 Scoop"], ["cedibili", "🔁 Cedibili"],
@@ -335,9 +334,9 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
             <select value={player} onChange={(e) => setPlayer(e.target.value)}
               className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none mb-2 focus:ring-2 focus:ring-emerald-400/40"
               style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}>
-              <option value="" style={{ background: "#0f2318" }}>Seleziona un giocatore…</option>
+              <option value="" style={{ background: "#141d33" }}>Seleziona un giocatore…</option>
               {roster.map((p) => (
-                <option key={p.id} value={p.playerName} style={{ background: "#0f2318" }}>
+                <option key={p.id} value={p.playerName} style={{ background: "#141d33" }}>
                   {p.role ? `${p.role} · ` : ""}{p.playerName}
                 </option>
               ))}
@@ -543,8 +542,8 @@ function TeamAdminCard({ team, onTeamsChange }: { team: Team; onTeamsChange: () 
               <select value={role} onChange={(e) => setRole(e.target.value)}
                 className="rounded-lg px-2 py-2 text-white text-sm outline-none"
                 style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                <option value="" style={{ background: "#0f2318" }}>—</option>
-                {["P", "D", "C", "A"].map((r) => <option key={r} value={r} style={{ background: "#0f2318" }}>{r}</option>)}
+                <option value="" style={{ background: "#141d33" }}>—</option>
+                {["P", "D", "C", "A"].map((r) => <option key={r} value={r} style={{ background: "#141d33" }}>{r}</option>)}
               </select>
               <input value={name} onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") add(); }}

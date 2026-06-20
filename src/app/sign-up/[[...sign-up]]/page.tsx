@@ -4,7 +4,7 @@ export default function SignUpPage() {
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
-      style={{ background: "linear-gradient(160deg, #0a2010 0%, #1a4028 100%)" }}
+      style={{ background: "linear-gradient(165deg, #0a0f1d 0%, #16203c 60%, #0e2e26 100%)" }}
     >
       <div className="mb-6 text-center">
         <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-4xl mx-auto mb-3 shadow-xl">

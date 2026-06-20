@@ -99,7 +99,7 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
         className="fixed left-0 right-0 z-50 rounded-t-3xl"
         style={{
           bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
-          background: "#0f2318",
+          background: "#141d33",
           border: "1px solid rgba(255,255,255,0.1)",
           transform: open ? "translateY(0)" : "translateY(calc(100% + 64px))",
           transition: "transform 220ms cubic-bezier(0.23,1,0.32,1)",

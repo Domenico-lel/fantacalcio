@@ -4,7 +4,7 @@ export default function SignInPage() {
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
-      style={{ background: "linear-gradient(160deg, #0a2010 0%, #1a4028 100%)" }}
+      style={{ background: "linear-gradient(165deg, #0a0f1d 0%, #16203c 60%, #0e2e26 100%)" }}
     >
       {/* Logo */}
       <div className="mb-6 text-center">

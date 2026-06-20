@@ -71,7 +71,7 @@ export default function OnboardingPage() {
 
   if (checking) {
     return (
-      <main className="min-h-dvh flex items-center justify-center" style={{ background: "#0d1f14" }}>
+      <main className="min-h-dvh flex items-center justify-center" style={{ background: "var(--bg)" }}>
         <span className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
       </main>
     );

@@ -7,7 +7,7 @@ export default async function LandingPage() {
   if (userId) redirect("/news");
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ background: "#0d1f14" }}>
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden pitch-bg">
       {/* Field lines */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-10">
         <div className="w-64 h-64 rounded-full border-2 border-white" />

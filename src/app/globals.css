@@ -2,6 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Base navy palette */
+  --bg: #0a0f1d;
+  --bg-soft: #0e1528;
+  --surface: #141d33;
+  --surface-2: #1b2542;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-2: rgba(255, 255, 255, 0.15);
+  --text: #f3f6fc;
+  --text-dim: rgba(255, 255, 255, 0.55);
+  --text-faint: rgba(255, 255, 255, 0.34);
+
+  /* Default accent (emerald) */
+  --accent: #34d399;
+  --accent-soft: #6ee7b7;
+  --accent-ink: #04241a;
+  --accent-bg: #0e3329;
+}
+
+/* Per-section accent themes */
+.sec-news   { --accent:#3b8eea; --accent-soft:#8fc0f4; --accent-ink:#06294f; --accent-bg:#10243f; }
+.sec-market { --accent:#f0a43a; --accent-soft:#f9c878; --accent-ink:#3f2509; --accent-bg:#3a2912; }
+.sec-rank   { --accent:#857cf0; --accent-soft:#bbb6f6; --accent-ink:#1f1a4a; --accent-bg:#1d1840; }
+.sec-board  { --accent:#34d399; --accent-soft:#6ee7b7; --accent-ink:#04241a; --accent-bg:#0e3329; }
+
 * {
   -webkit-tap-highlight-color: transparent;
   box-sizing: border-box;
@@ -16,7 +41,8 @@ body {
   min-height: 100vh;
   min-height: -webkit-fill-available;
   min-height: 100dvh;
-  background: #0a2010;
+  background: var(--bg);
+  color: var(--text);
   overscroll-behavior: none;
 }
 
@@ -29,50 +55,66 @@ main {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
 }
 
-/* Striped pitch background */
+/* Full-screen section surface */
+.screen {
+  min-height: 100dvh;
+  background:
+    radial-gradient(130% 80% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    var(--bg);
+}
+
+/* Tinted section header */
+.sec-header {
+  background: linear-gradient(180deg, var(--accent-bg), color-mix(in srgb, var(--accent-bg) 35%, var(--bg)));
+  border-bottom: 1px solid var(--border);
+}
+
+/* Reusable card */
+.app-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+/* Primary pill button */
+.btn-accent {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.btn-accent:active { transform: scale(0.97); filter: brightness(1.05); }
+
+/* Onboarding / auth backdrop */
 .pitch-bg {
-  background: linear-gradient(
-    180deg,
-    #1a5c2a 0%,   #1e6930 8.33%,
-    #1a5c2a 8.33%, #1a5c2a 16.66%,
-    #1e6930 16.66%,#1e6930 25%,
-    #1a5c2a 25%,   #1a5c2a 33.33%,
-    #1e6930 33.33%,#1e6930 41.66%,
-    #1a5c2a 41.66%,#1a5c2a 50%,
-    #1e6930 50%,   #1e6930 58.33%,
-    #1a5c2a 58.33%,#1a5c2a 66.66%,
-    #1e6930 66.66%,#1e6930 75%,
-    #1a5c2a 75%,   #1a5c2a 83.33%,
-    #1e6930 83.33%,#1e6930 91.66%,
-    #1a5c2a 91.66%,#1a5c2a 100%
-  );
+  background:
+    radial-gradient(80% 50% at 50% 0%, #16305a 0%, transparent 60%),
+    radial-gradient(70% 40% at 50% 100%, #0e3a2c 0%, transparent 55%),
+    var(--bg);
 }
 
-.player-badge {
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
-}
-.player-badge:active {
-  transform: scale(0.95);
-}
+.player-badge { transition: transform 0.15s ease-out; }
+.player-badge:active { transform: scale(0.95); }
 
-.slide-up {
-  animation: slideUp 0.2s cubic-bezier(0.23, 1, 0.32, 1);
-}
+.slide-up { animation: slideUp 0.22s cubic-bezier(0.23, 1, 0.32, 1); }
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Hide scrollbar but keep scrolling */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* Clerk overrides */
-.cl-card {
-  background: #ffffff !important;
-  color: #111827 !important;
+.pop-in { animation: popIn 0.25s cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
-/* Gold accent */
+/* Hide scrollbar but keep scrolling */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.no-scrollbar, .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Clerk overrides */
+.cl-card { background: #ffffff !important; color: #111827 !important; }
+
 .text-gold { color: #f5a623; }
-.bg-gold    { background-color: #f5a623; }
+.bg-gold   { background-color: #f5a623; }

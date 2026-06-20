@@ -31,7 +31,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="min-h-dvh" style={{ background: "#0d1f14" }}>
+    <div className="screen" style={{ background: "var(--bg)" }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-4" style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <h1 className="text-white font-bold text-xl">Calendario</h1>

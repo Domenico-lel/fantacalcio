@@ -9,10 +9,10 @@ import type { TeamProfile } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
 
 const NAV_ITEMS = [
-  { href: "/news",      label: "Notizie",   icon: NewsIcon },
-  { href: "/players",   label: "Mercato",   icon: TransferIcon },
-  { href: "/standings", label: "Classifica",icon: StandingsIcon },
-  { href: "/bacheca",   label: "Bacheca",    icon: MegaphoneIcon },
+  { href: "/news",      label: "Notizie",   icon: NewsIcon,       color: "#3b8eea" },
+  { href: "/players",   label: "Mercato",   icon: TransferIcon,   color: "#f0a43a" },
+  { href: "/standings", label: "Classifica",icon: StandingsIcon,  color: "#857cf0" },
+  { href: "/bacheca",   label: "Bacheca",   icon: MegaphoneIcon,  color: "#1fb083" },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -33,13 +33,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const teamLabel = viewer?.displayName ?? profile?.teamName ?? "La tua squadra";
 
   return (
-    <div className="h-dvh bg-[#0d1f14] flex flex-col overflow-hidden">
+    <div className="h-dvh flex flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
       {/* Profile bar — flex-none, mai scrollabile */}
       <div className="flex-none px-4 pt-4 pb-2 flex justify-center">
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl transition-opacity active:opacity-60 w-auto max-w-[60vw]"
-          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
+          className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl transition-opacity active:opacity-60 w-auto max-w-[70vw]"
+          style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
           aria-label="Profilo"
         >
           {avatarSrc.startsWith("http")
@@ -58,21 +58,25 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
-           style={{ background: "rgba(10,28,16,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+           style={{ background: "rgba(8,12,24,0.92)", backdropFilter: "blur(16px)", borderTop: "1px solid var(--border)" }}>
         <div className="flex">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          {NAV_ITEMS.map(({ href, label, icon: Icon, color }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
-                  active ? "text-emerald-400" : "text-white/35"
-                }`}
+                className="flex-1 flex flex-col items-center gap-1 pt-2.5 pb-2 transition-colors"
+                style={{ color: active ? color : "rgba(255,255,255,0.35)" }}
               >
-                <Icon active={active} />
+                <div className="flex items-center justify-center rounded-xl transition-all"
+                  style={{
+                    width: 44, height: 30,
+                    background: active ? `${color}22` : "transparent",
+                  }}>
+                  <Icon active={active} />
+                </div>
                 <span className="text-[10px] font-semibold tracking-wide">{label}</span>
-                {active && <div className="w-1 h-1 rounded-full bg-emerald-400" />}
               </Link>
             );
           })}

@@ -32,7 +32,7 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
 
       {/* Sheet */}
       <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-hidden"
-        style={{ background: "#0d1f14", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "90dvh" }}>
+        style={{ background: "var(--bg)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "90dvh" }}>
 
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
@@ -61,7 +61,7 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
                 {item.player.name}
               </h2>
               {item.player.value && (
-                <p className="text-emerald-400 font-bold text-sm mt-1">{item.player.value}</p>
+                <p className="font-bold text-sm mt-1" style={{ color: "var(--accent-soft)" }}>{item.player.value}</p>
               )}
             </div>
           </div>
@@ -80,7 +80,7 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
               </div>
               {/* Freccia */}
               <svg width="22" height="12" viewBox="0 0 22 12" fill="none" className="flex-shrink-0">
-                <path d="M0 6h18M14 1.5l5 4.5-5 4.5" stroke="#34d399" strokeWidth="1.8"
+                <path d="M0 6h18M14 1.5l5 4.5-5 4.5" stroke="var(--accent)" strokeWidth="1.8"
                   strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               {/* A */}
@@ -166,21 +166,20 @@ export default function TransfersPage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="min-h-dvh" style={{ background: "#0d1f14" }}>
+    <div className="screen sec-market">
 
       {/* Header */}
-      <div className="px-4 pt-12 pb-5"
-        style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="sec-header px-4 pt-12 pb-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide">Transfermarkt</p>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>Transfermarkt</p>
             <h1 className="text-white font-bold text-2xl leading-tight">Mercato</h1>
           </div>
           <button onClick={load} disabled={loading}
             className="w-9 h-9 rounded-xl flex items-center justify-center active:opacity-60 disabled:opacity-40"
             style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              className={loading ? "animate-spin" : ""} style={{ color: "#34d399" }}>
+              className={loading ? "animate-spin" : ""} style={{ color: "var(--accent)" }}>
               <path d="M4 4v5h5M20 20v-5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M4 9a8 8 0 0114.93-2M20 15a8 8 0 01-14.93 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
@@ -236,7 +235,7 @@ export default function TransfersPage() {
                   <div className="absolute inset-0 flex items-end justify-center pb-2 text-5xl">👤</div>
                 )}
                 <div className="absolute inset-0"
-                  style={{ background: "linear-gradient(to right, transparent 60%, rgba(13,31,20,0.95) 100%)" }} />
+                  style={{ background: "linear-gradient(to right, transparent 60%, rgba(10,15,29,0.95) 100%)" }} />
               </div>
 
               {/* Info */}
@@ -266,7 +265,7 @@ export default function TransfersPage() {
                       </span>
                     </div>
                     <svg width="18" height="10" viewBox="0 0 18 10" fill="none" className="flex-shrink-0">
-                      <path d="M0 5h14M10 1l4 4-4 4" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M0 5h14M10 1l4 4-4 4" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                     <div className="flex items-center gap-1.5 min-w-0">
                       {item.toClub.logoUrl && (
@@ -284,7 +283,7 @@ export default function TransfersPage() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-white/35 text-[10px] font-semibold uppercase tracking-wide">{sc.label}</span>
                     {item.player.value && (
-                      <span className="text-emerald-400 text-[10px] font-bold">{item.player.value}</span>
+                      <span className="text-[10px] font-bold" style={{ color: "var(--accent-soft)" }}>{item.player.value}</span>
                     )}
                   </div>
                   <div className="w-full rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.08)" }}>
