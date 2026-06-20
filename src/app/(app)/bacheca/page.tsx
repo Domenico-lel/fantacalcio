@@ -56,15 +56,14 @@ export default function BachecaPage() {
       <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>La lega</p>
         <h1 className="text-white font-bold text-2xl leading-tight mb-3">Bacheca</h1>
-        <div className="flex gap-2">
-          {(([["scoop", "📣 Scoop"], ["cedibili", "🔁 Cedibili"],
-              ...(viewer?.isAdmin ? [["gestione", "⚙️ Gestione"]] : [])] as [TabKey, string][])).map(([key, label]) => (
+        <div className="flex gap-1 p-1 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
+          {(([["scoop", "Scoop"], ["cedibili", "Cedibili"],
+              ...(viewer?.isAdmin ? [["gestione", "Gestione"]] : [])] as [TabKey, string][])).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
-              className="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
+              className="flex-1 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
               style={{
-                background: tab === key ? "#34d399" : "rgba(255,255,255,0.06)",
-                color: tab === key ? "#052e16" : "rgba(255,255,255,0.6)",
-                border: `1px solid ${tab === key ? "#34d399" : "rgba(255,255,255,0.1)"}`,
+                background: tab === key ? "var(--accent)" : "transparent",
+                color: tab === key ? "var(--accent-ink)" : "rgba(255,255,255,0.55)",
               }}>
               {label}
             </button>
@@ -223,17 +222,21 @@ function PostCard({ post, viewer, reload, setPosts }: {
     <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
       {/* Header autore */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-          style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)" }}>
-          {post.authorLogo}
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden text-xl flex-none"
+          style={{ background: "var(--accent-bg)", border: "1px solid rgba(255,255,255,0.1)" }}>
+          {post.authorLogo?.startsWith("http")
+            ? <img src={post.authorLogo} alt="" className="w-full h-full object-cover" />
+            : <span>{post.authorLogo}</span>}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-bold text-sm leading-tight">{post.authorName}</p>
+          <p className="text-white font-semibold text-sm leading-tight truncate">{post.authorName}</p>
           <p className="text-white/40 text-xs">{timeAgo(post.createdAt)} fa</p>
         </div>
+        <span className="text-[9px] font-bold tracking-wider px-2 py-1 rounded-md flex-none"
+          style={{ background: "rgba(52,211,153,0.15)", color: "var(--accent-soft)" }}>SCOOP</span>
         {viewer?.isAdmin && (
           <button onClick={async () => { if (confirm("Eliminare questo scoop?")) { await deletePost(post.id); await reload(); } }}
-            className="text-white/30 text-xs px-2 py-1 active:opacity-60">🗑️</button>
+            className="text-white/30 text-sm px-1 active:opacity-60 flex-none">🗑️</button>
         )}
       </div>
 
@@ -244,12 +247,12 @@ function PostCard({ post, viewer, reload, setPosts }: {
       )}
 
       {/* Azioni */}
-      <div className="flex items-center gap-4 px-4 py-3">
-        <button onClick={onLike} className="flex items-center gap-1.5 active:opacity-60">
+      <div className="flex items-center gap-5 px-4 py-3 mt-1" style={{ borderTop: "1px solid var(--border)" }}>
+        <button onClick={onLike} className="flex items-center gap-1.5 active:scale-90 transition-transform">
           <span className="text-lg">{post.likedByMe ? "❤️" : "🤍"}</span>
           <span className="text-white/70 text-sm font-semibold">{post.likeCount}</span>
         </button>
-        <button onClick={() => setShowComments((s) => !s)} className="flex items-center gap-1.5 active:opacity-60">
+        <button onClick={() => setShowComments((s) => !s)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
           <span className="text-lg">💬</span>
           <span className="text-white/70 text-sm font-semibold">{post.comments.length}</span>
         </button>

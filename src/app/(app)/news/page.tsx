@@ -136,107 +136,52 @@ export default function NewsPage() {
           </div>
         )}
 
-        {/* News cards */}
-        {!loading && !error && visible.map((item) => (
-          <a
-            key={item.id}
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block rounded-2xl overflow-hidden transition-opacity active:opacity-70"
-            style={{
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
-            {/* Immagine */}
-            {item.imageUrl ? (
-              <div className="relative w-full" style={{ height: 180 }}>
-                <img
-                  src={item.imageUrl}
-                  alt={item.title}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                  onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
-                />
-                {/* Gradient overlay per leggibilità del badge fonte */}
-                <div
-                  className="absolute inset-0"
-                  style={{ background: "linear-gradient(to top, rgba(13,31,20,0.7) 0%, transparent 50%)" }}
-                />
-                {/* Badge fonte sovrapposto all'immagine */}
-                <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full backdrop-blur-sm"
-                    style={{
-                      color: SOURCE_COLORS[item.source] ?? "var(--accent)",
-                      background: `rgba(0,0,0,0.55)`,
-                      border: `1px solid ${SOURCE_COLORS[item.source] ?? "var(--accent)"}40`,
-                    }}
-                  >
-                    {item.sourceLabel}
-                  </span>
-                  <span className="text-white/60 text-[10px] backdrop-blur-sm">{timeAgo(item.pubDate)}</span>
+        {/* Notizia in primo piano */}
+        {!loading && !error && visible.length > 0 && (
+          <a href={visible[0].url} target="_blank" rel="noopener noreferrer"
+            className="pop-in block rounded-3xl overflow-hidden active:opacity-80 transition-opacity"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <div className="relative w-full" style={{ height: 210 }}>
+              {visible[0].imageUrl
+                ? <img src={visible[0].imageUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                : <div className="w-full h-full flex items-center justify-center text-6xl" style={{ background: "var(--accent-bg)" }}>⚽</div>}
+              <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(8,12,24,0.97) 6%, rgba(8,12,24,0.2) 55%, transparent 80%)" }} />
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white"
+                    style={{ background: SOURCE_COLORS[visible[0].source] ?? "var(--accent)" }}>{visible[0].sourceLabel}</span>
+                  <span className="text-white/70 text-[10px]">{timeAgo(visible[0].pubDate)} fa</span>
                 </div>
+                <h2 className="text-white font-bold text-lg leading-tight line-clamp-3">{visible[0].title}</h2>
               </div>
-            ) : (
-              /* Placeholder quando non c'è immagine */
-              <div
-                className="w-full flex items-center justify-center text-4xl"
-                style={{ height: 80, background: "rgba(255,255,255,0.03)" }}
-              >
-                ⚽
+            </div>
+          </a>
+        )}
+
+        {/* Lista compatta */}
+        {!loading && !error && visible.slice(1).map((item) => (
+          <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer"
+            className="flex gap-3 rounded-2xl overflow-hidden active:opacity-70 transition-opacity p-2.5"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <div className="flex-none rounded-xl overflow-hidden" style={{ width: 86, height: 86 }}>
+              {item.imageUrl
+                ? <img src={item.imageUrl} alt="" className="w-full h-full object-cover" loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                : <div className="w-full h-full flex items-center justify-center text-2xl" style={{ background: "var(--accent-bg)" }}>⚽</div>}
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider"
+                  style={{ color: SOURCE_COLORS[item.source] ?? "var(--accent-soft)" }}>{item.sourceLabel}</span>
+                <span className="text-white/30 text-[9px]">· {timeAgo(item.pubDate)} fa</span>
               </div>
-            )}
-
-            {/* Testo */}
-            <div className="p-4">
-              {/* Source + time (solo se no immagine) */}
-              {!item.imageUrl && (
-                <div className="flex items-center justify-between mb-2">
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                    style={{
-                      color: SOURCE_COLORS[item.source] ?? "var(--accent)",
-                      background: `${SOURCE_COLORS[item.source] ?? "var(--accent)"}18`,
-                    }}
-                  >
-                    {item.sourceLabel}
-                  </span>
-                  <span className="text-white/30 text-[10px]">{timeAgo(item.pubDate)}</span>
-                </div>
-              )}
-
-              {/* Categoria */}
-              <span
-                className="text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block mb-2"
-                style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.45)" }}
-              >
-                {item.category}
-              </span>
-
-              {/* Titolo */}
-              <h2 className="text-white font-semibold text-sm leading-snug mb-1.5 line-clamp-2">
-                {item.title}
-              </h2>
-
-              {/* Summary */}
-              <p className="text-white/45 text-xs leading-relaxed line-clamp-2">
-                {item.summary}
-              </p>
-
-              {/* Read more */}
-              <div className="flex items-center gap-1 mt-3">
-                <span className="text-[10px] font-semibold" style={{ color: "var(--accent-soft)" }}>Leggi su {item.sourceLabel}</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                  <path d="M7 17L17 7M17 7H7M17 7v10" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
+              <h3 className="text-white font-semibold text-[13px] leading-snug line-clamp-2 mb-1">{item.title}</h3>
+              <p className="text-white/40 text-[11px] leading-snug line-clamp-2">{item.summary}</p>
             </div>
           </a>
         ))}
 
-        <div className="h-4" />
+        <div className="h-20" />
       </div>
     </div>
   );
