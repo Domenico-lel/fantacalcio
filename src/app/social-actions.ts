@@ -2,6 +2,7 @@
 
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
+import { isAdminPostTag } from "@/lib/post-tags";
 
 // ─── Tipi esposti al client ─────────────────────────────────────────────────
 
@@ -28,6 +29,8 @@ export interface FeedPost {
   authorLogo: string;
   body: string;
   imageUrl: string | null;
+  tag: string | null;
+  mine: boolean;
   createdAt: string;
   likeCount: number;
   likedByMe: boolean;
@@ -165,6 +168,8 @@ export async function fetchFeed(): Promise<{ posts: FeedPost[]; viewer: Viewer |
       authorLogo: p.author_logo,
       body: p.body,
       imageUrl: p.image_url,
+      tag: p.tag,
+      mine: p.author_id === viewer.userId,
       createdAt: p.created_at,
       likeCount: postLikes.length,
       likedByMe: postLikes.some((l) => l.user_id === viewer.userId),
@@ -181,16 +186,19 @@ function stripEmail(v: ViewerInternal): Viewer {
   return pub;
 }
 
-// ─── Mutazioni post (solo admin) ────────────────────────────────────────────
+// ─── Mutazioni post ─────────────────────────────────────────────────────────
+// Tutti i manager possono pubblicare; solo l'admin può assegnare/cambiare un tag.
 
-export async function createPost(input: { body: string; imageUrl?: string | null }): Promise<{ error: string | null }> {
+export async function createPost(input: { body: string; imageUrl?: string | null; tag?: string | null }): Promise<{ error: string | null }> {
   const viewer = await getViewer();
   if (!viewer) return { error: "Non autenticato" };
-  if (!viewer.isAdmin) return { error: "Solo l'admin può pubblicare" };
 
   const body = (input.body ?? "").trim();
   const imageUrl = input.imageUrl || null;
   if (!body && !imageUrl) return { error: "Scrivi qualcosa o aggiungi un'immagine" };
+
+  // Solo l'admin può assegnare un tag; gli utenti normali postano senza tag
+  const tag = viewer.isAdmin && isAdminPostTag(input.tag) ? input.tag : null;
 
   const db = createAdminClient();
   const { error } = await db.from("fanta_posts").insert({
@@ -199,13 +207,14 @@ export async function createPost(input: { body: string; imageUrl?: string | null
     author_logo: viewer.logo,
     body,
     image_url: imageUrl,
+    tag,
   });
   return { error: error?.message ?? null };
 }
 
 export async function uploadPostImage(formData: FormData): Promise<{ url: string | null; error: string | null }> {
   const viewer = await getViewer();
-  if (!viewer?.isAdmin) return { url: null, error: "Solo l'admin può caricare immagini" };
+  if (!viewer) return { url: null, error: "Non autenticato" };
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { url: null, error: "Nessun file valido" };
@@ -226,11 +235,26 @@ export async function uploadPostImage(formData: FormData): Promise<{ url: string
   return { url: data.publicUrl, error: null };
 }
 
+export async function updatePostTag(postId: string, tag: string | null): Promise<{ error: string | null }> {
+  const viewer = await getViewer();
+  if (!viewer?.isAdmin) return { error: "Solo l'admin può cambiare il tag" };
+
+  // null = rimuove il tag; altrimenti deve essere un tag valido
+  const next = isAdminPostTag(tag) ? tag : null;
+
+  const db = createAdminClient();
+  const { error } = await db.from("fanta_posts").update({ tag: next }).eq("id", postId);
+  return { error: error?.message ?? null };
+}
+
 export async function deletePost(postId: string): Promise<{ error: string | null }> {
   const viewer = await getViewer();
-  if (!viewer?.isAdmin) return { error: "Non autorizzato" };
+  if (!viewer) return { error: "Non autorizzato" };
   const db = createAdminClient();
-  const { error } = await db.from("fanta_posts").delete().eq("id", postId);
+  // l'admin può cancellare qualsiasi post; l'utente solo i propri
+  let q = db.from("fanta_posts").delete().eq("id", postId);
+  if (!viewer.isAdmin) q = q.eq("author_id", viewer.userId);
+  const { error } = await q;
   return { error: error?.message ?? null };
 }
 

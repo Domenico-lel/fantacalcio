@@ -87,6 +87,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         profile={profile}
+        avatar={avatarSrc}
         onProfileSaved={(p) => setProfile(p)}
       />
     </div>

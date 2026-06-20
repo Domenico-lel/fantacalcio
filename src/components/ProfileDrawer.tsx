@@ -6,17 +6,26 @@ import { useRouter } from "next/navigation";
 import { useAppUser } from "@/lib/app-user-context";
 import { upsertProfile } from "@/app/actions";
 import { saveState } from "@/lib/store";
-import { TEAM_LOGO_OPTIONS } from "@/lib/mock-data";
 import type { TeamProfile } from "@/lib/store";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   profile: TeamProfile | null;
+  /** Avatar effettivo usato dall'app: logo squadra (impostato dall'admin) o emoji di fallback */
+  avatar: string;
   onProfileSaved: (p: TeamProfile) => void;
 }
 
-export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }: Props) {
+/* Mostra il logo squadra (URL immagine) oppure l'emoji di fallback */
+function TeamAvatar({ src, className }: { src: string; className: string }) {
+  if (src?.startsWith("http")) {
+    return <img src={src} alt="" className={`${className} object-cover`} />;
+  }
+  return <div className={`${className} flex items-center justify-center text-3xl`}>{src || "⚽"}</div>;
+}
+
+export default function ProfileDrawer({ open, onClose, profile, avatar, onProfileSaved }: Props) {
   const user = useAppUser();
   const { signOut } = useClerk();
   const router = useRouter();
@@ -25,7 +34,6 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [teamName, setTeamName] = useState("");
-  const [logo, setLogo] = useState("⚽");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -35,7 +43,6 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
       setFirstName(profile.firstName ?? "");
       setLastName(profile.lastName ?? "");
       setTeamName(profile.teamName ?? "");
-      setLogo(profile.logo ?? "⚽");
     }
     if (!open) {
       setEditing(false);
@@ -54,7 +61,7 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       teamName: teamName.trim(),
-      logo,
+      logo: profile?.logo ?? "⚽",
       budget: profile?.budget ?? 500,
     };
 
@@ -120,10 +127,10 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4 min-w-0">
                   <div
-                    className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl border flex-shrink-0"
+                    className="w-16 h-16 rounded-2xl overflow-hidden border flex-shrink-0"
                     style={{ background: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.12)" }}
                   >
-                    {profile?.logo ?? "⚽"}
+                    <TeamAvatar src={avatar} className="w-full h-full" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide mb-0.5 truncate">
@@ -177,22 +184,17 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
                 </button>
               </div>
 
-              {/* Logo picker */}
+              {/* Logo squadra — gestito dall'admin, non modificabile dal manager */}
               <p className="text-white/50 text-xs font-semibold uppercase tracking-wide mb-3">Logo squadra</p>
-              <div className="grid grid-cols-10 gap-2 mb-6">
-                {TEAM_LOGO_OPTIONS.map((em) => (
-                  <button
-                    key={em}
-                    onClick={() => setLogo(em)}
-                    className="aspect-square rounded-xl flex items-center justify-center text-xl transition-all active:scale-90"
-                    style={{
-                      background: logo === em ? "rgba(52,211,153,0.2)" : "rgba(255,255,255,0.06)",
-                      border: `1px solid ${logo === em ? "rgba(52,211,153,0.5)" : "rgba(255,255,255,0.08)"}`,
-                    }}
-                  >
-                    {em}
-                  </button>
-                ))}
+              <div className="flex items-center gap-3 mb-6 p-3 rounded-2xl"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <div className="w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0"
+                  style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <TeamAvatar src={avatar} className="w-full h-full" />
+                </div>
+                <p className="text-white/45 text-xs leading-snug">
+                  Il logo della tua squadra è impostato dall&apos;admin della lega e non è modificabile da qui.
+                </p>
               </div>
 
               {/* Campi testo */}

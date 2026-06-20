@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  fetchFeed, createPost, uploadPostImage, toggleLike, addComment, deletePost,
+  fetchFeed, createPost, uploadPostImage, toggleLike, addComment, deletePost, updatePostTag,
   fetchListings, createListing, setListingStatus, deleteListing,
   type FeedPost, type Listing, type Viewer,
 } from "@/app/social-actions";
+import { ADMIN_POST_TAGS } from "@/lib/post-tags";
 import {
   fetchMyRoster, fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
   addRosterPlayer, deleteRosterPlayer,
@@ -33,6 +34,21 @@ function Avatar({ src, size }: { src: string; size: number }) {
     return <img src={src} alt="" className="rounded-full object-cover flex-none" style={{ width: size, height: size }} />;
   }
   return <span className="flex-none leading-none" style={{ fontSize: size * 0.85 }}>{src}</span>;
+}
+
+/* Metadati dei tag (solo l'admin può assegnarli) */
+const TAG_META: Record<string, { label: string; color: string }> = {
+  scoop:     { label: "Scoop",     color: "#34d399" },
+  ufficiale: { label: "Ufficiale", color: "#3b8eea" },
+  mercato:   { label: "Mercato",   color: "#f0a43a" },
+  sondaggio: { label: "Sondaggio", color: "#857cf0" },
+};
+
+/* Badge mostrato per i post senza tag (utenti normali) */
+const MANAGER_TAG = { label: "Manager", color: "#94a3b8" };
+
+function tagMeta(tag: string | null) {
+  return (tag && TAG_META[tag]) || MANAGER_TAG;
 }
 
 export default function BachecaPage() {
@@ -89,7 +105,7 @@ function ScoopTab({ viewer, posts, loading, reload, setPosts }: {
 }) {
   return (
     <div className="px-4 py-4 flex flex-col gap-4">
-      {viewer?.isAdmin && <Composer onPublished={reload} />}
+      {viewer && <Composer viewer={viewer} onPublished={reload} />}
 
       {loading && Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="rounded-2xl animate-pulse" style={{ height: 180, background: "rgba(255,255,255,0.05)" }} />
@@ -99,7 +115,7 @@ function ScoopTab({ viewer, posts, loading, reload, setPosts }: {
         <div className="flex flex-col items-center py-20 gap-3">
           <span className="text-5xl">📣</span>
           <p className="text-white/50 text-sm text-center">
-            Nessuno scoop ancora.{viewer?.isAdmin ? " Pubblica il primo!" : " Torna più tardi."}
+            Nessun post ancora.{viewer ? " Pubblica il primo!" : " Torna più tardi."}
           </p>
         </div>
       )}
@@ -112,8 +128,9 @@ function ScoopTab({ viewer, posts, loading, reload, setPosts }: {
   );
 }
 
-function Composer({ onPublished }: { onPublished: () => Promise<void> }) {
+function Composer({ viewer, onPublished }: { viewer: Viewer; onPublished: () => Promise<void> }) {
   const [body, setBody] = useState("");
+  const [tag, setTag] = useState<string>(ADMIN_POST_TAGS[0]);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -137,7 +154,8 @@ function Composer({ onPublished }: { onPublished: () => Promise<void> }) {
         if (up.error) { setError(up.error); setBusy(false); return; }
         imageUrl = up.url;
       }
-      const res = await createPost({ body, imageUrl });
+      // solo l'admin assegna un tag; gli utenti normali pubblicano senza tag
+      const res = await createPost({ body, imageUrl, tag: viewer.isAdmin ? tag : null });
       if (res.error) { setError(res.error); setBusy(false); return; }
       setBody(""); pickFile(null);
       if (fileRef.current) fileRef.current.value = "";
@@ -150,13 +168,37 @@ function Composer({ onPublished }: { onPublished: () => Promise<void> }) {
   return (
     <div className="rounded-2xl p-4" style={{ background: "rgba(52,211,153,0.06)", border: "1px solid rgba(52,211,153,0.2)" }}>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xl">📣</span>
-        <span className="text-emerald-400 text-xs font-bold uppercase tracking-wide">Pubblica uno scoop</span>
+        <span className="text-xl">{viewer.isAdmin ? "📣" : "✍️"}</span>
+        <span className="text-emerald-400 text-xs font-bold uppercase tracking-wide">
+          {viewer.isAdmin ? "Pubblica un post" : "Condividi con la lega"}
+        </span>
       </div>
+
+      {/* Selettore tag: solo l'admin */}
+      {viewer.isAdmin && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {ADMIN_POST_TAGS.map((t) => {
+            const meta = tagMeta(t);
+            const active = tag === t;
+            return (
+              <button key={t} onClick={() => setTag(t)}
+                className="px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide transition-all active:scale-95"
+                style={{
+                  background: active ? meta.color : "rgba(255,255,255,0.06)",
+                  color: active ? "#06121f" : "rgba(255,255,255,0.6)",
+                  border: `1px solid ${active ? meta.color : "rgba(255,255,255,0.12)"}`,
+                }}>
+                {meta.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="Es. Tizio rende cedibile Lautaro…"
+        placeholder={viewer.isAdmin ? "Es. Tizio rende cedibile Lautaro…" : "Cosa vuoi dire alla lega?"}
         rows={3}
         className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none resize-none focus:ring-2 focus:ring-emerald-400/40"
         style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }}
@@ -218,6 +260,15 @@ function PostCard({ post, viewer, reload, setPosts }: {
     if (!res.error) { setComment(""); await reload(); }
   }
 
+  async function changeTag(value: string) {
+    const next = value === "" ? null : value;
+    setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, tag: next } : p));
+    const res = await updatePostTag(post.id, next);
+    if (res.error) reload();
+  }
+
+  const meta = tagMeta(post.tag);
+
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
       {/* Header autore */}
@@ -232,10 +283,25 @@ function PostCard({ post, viewer, reload, setPosts }: {
           <p className="text-white font-semibold text-sm leading-tight truncate">{post.authorName}</p>
           <p className="text-white/40 text-xs">{timeAgo(post.createdAt)} fa</p>
         </div>
-        <span className="text-[9px] font-bold tracking-wider px-2 py-1 rounded-md flex-none"
-          style={{ background: "rgba(52,211,153,0.15)", color: "var(--accent-soft)" }}>SCOOP</span>
-        {viewer?.isAdmin && (
-          <button onClick={async () => { if (confirm("Eliminare questo scoop?")) { await deletePost(post.id); await reload(); } }}
+        {viewer?.isAdmin ? (
+          <select
+            value={post.tag ?? ""}
+            onChange={(e) => changeTag(e.target.value)}
+            className="text-[10px] font-bold tracking-wider rounded-md px-1.5 py-1 outline-none flex-none appearance-none cursor-pointer"
+            style={{ background: `${meta.color}26`, color: meta.color, border: `1px solid ${meta.color}55` }}
+            aria-label="Cambia tag"
+          >
+            <option value="" style={{ background: "#141d33", color: "#fff" }}>— Nessuno</option>
+            {ADMIN_POST_TAGS.map((t) => (
+              <option key={t} value={t} style={{ background: "#141d33", color: "#fff" }}>{TAG_META[t].label}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-[9px] font-bold tracking-wider px-2 py-1 rounded-md flex-none uppercase"
+            style={{ background: `${meta.color}26`, color: meta.color }}>{meta.label}</span>
+        )}
+        {(viewer?.isAdmin || post.mine) && (
+          <button onClick={async () => { if (confirm("Eliminare questo post?")) { await deletePost(post.id); await reload(); } }}
             className="text-white/30 text-sm px-1 active:opacity-60 flex-none">🗑️</button>
         )}
       </div>

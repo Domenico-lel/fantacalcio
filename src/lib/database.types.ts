@@ -117,6 +117,7 @@ export interface Database {
           author_logo: string;
           body: string;
           image_url: string | null;
+          tag: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -126,10 +127,12 @@ export interface Database {
           author_logo?: string;
           body?: string;
           image_url?: string | null;
+          tag?: string | null;
         };
         Update: {
           body?: string;
           image_url?: string | null;
+          tag?: string | null;
         };
         Relationships: [];
       };
