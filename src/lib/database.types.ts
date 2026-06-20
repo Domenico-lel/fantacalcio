@@ -88,6 +88,114 @@ export interface Database {
         };
         Relationships: [];
       };
+      fanta_admins: {
+        Row: {
+          email: string;
+          display_name: string;
+          avatar: string;
+          created_at: string;
+        };
+        Insert: {
+          email: string;
+          display_name?: string;
+          avatar?: string;
+        };
+        Update: {
+          display_name?: string;
+          avatar?: string;
+        };
+        Relationships: [];
+      };
+      fanta_posts: {
+        Row: {
+          id: string;
+          author_id: string;
+          author_name: string;
+          author_logo: string;
+          body: string;
+          image_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          author_id: string;
+          author_name?: string;
+          author_logo?: string;
+          body?: string;
+          image_url?: string | null;
+        };
+        Update: {
+          body?: string;
+          image_url?: string | null;
+        };
+        Relationships: [];
+      };
+      fanta_post_likes: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          post_id: string;
+          user_id: string;
+        };
+        Update: {
+          post_id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      fanta_post_comments: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          author_name: string;
+          author_logo: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          post_id: string;
+          user_id: string;
+          author_name: string;
+          author_logo?: string;
+          body: string;
+        };
+        Update: {
+          body?: string;
+        };
+        Relationships: [];
+      };
+      fanta_transfer_listings: {
+        Row: {
+          id: string;
+          user_id: string;
+          owner_name: string;
+          owner_logo: string;
+          player_name: string;
+          note: string | null;
+          status: "available" | "closed";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          owner_name: string;
+          owner_logo?: string;
+          player_name: string;
+          note?: string | null;
+          status?: "available" | "closed";
+        };
+        Update: {
+          player_name?: string;
+          note?: string | null;
+          status?: "available" | "closed";
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

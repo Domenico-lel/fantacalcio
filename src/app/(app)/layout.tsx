@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { href: "/news",      label: "Notizie",   icon: NewsIcon },
   { href: "/players",   label: "Mercato",   icon: TransferIcon },
   { href: "/standings", label: "Classifica",icon: StandingsIcon },
-  { href: "/trophies",  label: "Trofei",     icon: TrophyIcon },
+  { href: "/bacheca",   label: "Bacheca",    icon: MegaphoneIcon },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -111,13 +111,12 @@ function StandingsIcon({ active }: { active: boolean }) {
   );
 }
 
-function TrophyIcon({ active }: { active: boolean }) {
+function MegaphoneIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round"/>
-      <path d="M5 4h14v8a7 7 0 01-14 0V4z" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
-        fill={active ? "currentColor" : "none"} fillOpacity={0.15} strokeLinejoin="round"/>
-      <path d="M5 7H2a2 2 0 002 2h1M19 7h3a2 2 0 01-2 2h-1" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round"/>
+      <path d="M3 11v2a1 1 0 001 1h2l4 4V6L6 10H4a1 1 0 00-1 1z" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
+        fill={active ? "currentColor" : "none"} fillOpacity={0.12} strokeLinejoin="round"/>
+      <path d="M14 8a4 4 0 010 8M17 5a8 8 0 010 14" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round"/>
     </svg>
   );
 }

@@ -1,16 +1,18 @@
 "use client";
 
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { TEAM_LOGO_OPTIONS } from "@/lib/mock-data";
 import { saveState } from "@/lib/store";
 import { upsertProfile } from "@/app/actions";
+import { getCurrentViewer } from "@/app/social-actions";
 import { useAppUser } from "@/lib/app-user-context";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const user = useAppUser();
+  const [checking, setChecking] = useState(true);
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -18,6 +20,14 @@ export default function OnboardingPage() {
   const [logo, setLogo] = useState("⚽");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // L'admin non ha una squadra: salta l'onboarding e va alla bacheca
+  useEffect(() => {
+    getCurrentViewer().then((v) => {
+      if (v?.isAdmin) router.replace("/bacheca");
+      else setChecking(false);
+    }).catch(() => setChecking(false));
+  }, [router]);
 
   async function handleNext() {
     if (step === 1) {
@@ -47,6 +57,14 @@ export default function OnboardingPage() {
       setSaving(false);
       router.push("/standings");
     }
+  }
+
+  if (checking) {
+    return (
+      <main className="min-h-dvh flex items-center justify-center" style={{ background: "#0d1f14" }}>
+        <span className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+      </main>
+    );
   }
 
   return (
