@@ -39,10 +39,10 @@ export default function OnboardingPage() {
 
       saveState(profile);
 
-      const userId = user.id || "demo-user";
-      const profileResult = await upsertProfile(userId, profile);
-
-      if (profileResult.error) console.error("Supabase profile error:", profileResult.error);
+      if (user.id) {
+        const { error } = await upsertProfile(user.id, profile);
+        if (error) console.error("Supabase profile error:", error);
+      }
 
       setSaving(false);
       router.push("/standings");

@@ -4,12 +4,12 @@
 import { useState, useEffect } from "react";
 import type { NewsItem } from "@/app/api/news/route";
 
-const CATEGORIES = ["Tutte", "Fantacalcio", "Serie A", "Mercato"];
+const CATEGORIES = ["Tutte", "Serie A", "Mercato"];
 
 const SOURCE_COLORS: Record<string, string> = {
-  fantacalcio: "#34d399",
-  gazzetta:    "#f59e0b",
-  calciomercato: "#60a5fa",
+  corriere:        "#e63946",
+  "corriere-calcio": "#60a5fa",
+  tuttosport:      "#f59e0b",
 };
 
 function timeAgo(dateStr: string): string {

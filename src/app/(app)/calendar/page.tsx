@@ -2,7 +2,7 @@
 
 
 import { useState } from "react";
-import { MOCK_CALENDAR, SERIE_A_TEAMS } from "@/lib/mock-data";
+import { MOCK_CALENDAR } from "@/lib/mock-data";
 
 const TEAM_EMOJIS: Record<string, string> = {
   Internazionale: "🔵⚫", Milan: "🔴⚫", Juventus: "⚫⚪", Napoli: "🔵",

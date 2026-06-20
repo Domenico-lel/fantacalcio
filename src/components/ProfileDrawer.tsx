@@ -9,8 +9,6 @@ import { saveState } from "@/lib/store";
 import { TEAM_LOGO_OPTIONS } from "@/lib/mock-data";
 import type { TeamProfile } from "@/lib/store";
 
-const DEMO_MODE = !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -64,8 +62,7 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
     saveState(updated);
 
     // Sync Supabase in background
-    const userId = DEMO_MODE ? "demo-user" : user.id;
-    upsertProfile(userId, updated).catch(console.error);
+    if (user.id) upsertProfile(user.id, updated).catch(console.error);
 
     onProfileSaved(updated);
     setSaving(false);
@@ -74,7 +71,6 @@ export default function ProfileDrawer({ open, onClose, profile, onProfileSaved }
 
   async function handleLogout() {
     onClose();
-    if (DEMO_MODE) { router.push("/"); return; }
     await signOut();
     router.push("/");
   }

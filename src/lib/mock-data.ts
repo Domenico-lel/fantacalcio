@@ -1,10 +1,3 @@
-export interface SerieATeam {
-  id: string;
-  name: string;
-  shortName: string;
-  color: string;
-}
-
 export interface CalendarMatch {
   id: number;
   homeTeam: string;
@@ -26,29 +19,6 @@ export interface StandingEntry {
   goalsFor: number;
   goalsAgainst: number;
 }
-
-export const SERIE_A_TEAMS: SerieATeam[] = [
-  { id: "inter", name: "Internazionale", shortName: "INT", color: "#003399" },
-  { id: "milan", name: "Milan", shortName: "MIL", color: "#cc0000" },
-  { id: "juve", name: "Juventus", shortName: "JUV", color: "#000000" },
-  { id: "napoli", name: "Napoli", shortName: "NAP", color: "#0080ff" },
-  { id: "atalanta", name: "Atalanta", shortName: "ATA", color: "#0000cc" },
-  { id: "lazio", name: "Lazio", shortName: "LAZ", color: "#87ceeb" },
-  { id: "roma", name: "Roma", shortName: "ROM", color: "#8b2500" },
-  { id: "fiorentina", name: "Fiorentina", shortName: "FIO", color: "#6600cc" },
-  { id: "bologna", name: "Bologna", shortName: "BOL", color: "#cc0000" },
-  { id: "torino", name: "Torino", shortName: "TOR", color: "#8b0000" },
-  { id: "genoa", name: "Genoa", shortName: "GEN", color: "#cc0000" },
-  { id: "udinese", name: "Udinese", shortName: "UDI", color: "#000000" },
-  { id: "cagliari", name: "Cagliari", shortName: "CAG", color: "#cc0000" },
-  { id: "monza", name: "Monza", shortName: "MON", color: "#cc0000" },
-  { id: "lecce", name: "Lecce", shortName: "LEC", color: "#cc0000" },
-  { id: "empoli", name: "Empoli", shortName: "EMP", color: "#0055a4" },
-  { id: "verona", name: "Verona", shortName: "VER", color: "#002b6e" },
-  { id: "venezia", name: "Venezia", shortName: "VEN", color: "#ff6600" },
-  { id: "como", name: "Como", shortName: "COM", color: "#004d99" },
-  { id: "parma", name: "Parma", shortName: "PAR", color: "#f5c518" },
-];
 
 export const MOCK_STANDINGS: StandingEntry[] = [
   { position: 1, teamName: "Squadra dei Campioni", logoEmoji: "🏆", points: 78, played: 12, won: 8, drawn: 3, lost: 1, goalsFor: 42, goalsAgainst: 18 },

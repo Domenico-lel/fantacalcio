@@ -6,7 +6,7 @@ export async function GET() {
 
   if (!supabaseConfigured) {
     return NextResponse.json({
-      status: "demo",
+      status: "unconfigured",
       supabase: "not configured",
       clerk: !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     });
