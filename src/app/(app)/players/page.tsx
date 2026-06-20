@@ -4,22 +4,15 @@
 import { useState, useEffect, useCallback } from "react";
 import type { TransferItem } from "@/app/api/transfers/route";
 
-const STATUS_COLORS = {
-  high: { bar: "#34d399", glow: "rgba(52,211,153,0.3)",  label: "Molto probabile" },
-  mid:  { bar: "#fbbf24", glow: "rgba(251,191,36,0.3)",  label: "In trattativa"   },
-  low:  { bar: "#60a5fa", glow: "rgba(96,165,250,0.3)",  label: "Rumors"          },
-  vlow: { bar: "rgba(255,255,255,0.35)", glow: "transparent", label: "Interesse"  },
-};
-
-function statusFor(p: number) {
-  if (p >= 80) return STATUS_COLORS.high;
-  if (p >= 55) return STATUS_COLORS.mid;
-  if (p >= 30) return STATUS_COLORS.low;
-  return STATUS_COLORS.vlow;
+// Stato trattativa: verde = quasi fatta, giallo = probabilità bassa, rosso = a rischio/saltata
+function dealStatus(probability: number, trend: TransferItem["trend"]) {
+  if (trend === "down" || probability < 35) return { color: "#ef4444", label: "A rischio" };
+  if (probability >= 65) return { color: "#22c55e", label: "Quasi fatta" };
+  return { color: "#eab308", label: "Probabilità bassa" };
 }
 
 function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => void }) {
-  const sc = statusFor(item.probability);
+  const ds = dealStatus(item.probability, item.trend);
   const profileUrl = item.player.playerSlug && item.player.playerId
     ? `https://www.transfermarkt.it/${item.player.playerSlug}/profil/spieler/${item.player.playerId}`
     : null;
@@ -93,25 +86,22 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
               </div>
             </div>
 
-            {/* Barra probabilità */}
-            <div className="mt-4">
-              <div className="flex justify-between mb-1.5">
-                <span className="text-white/40 text-[11px] font-semibold uppercase tracking-wide">{sc.label}</span>
-                <div className="flex items-center gap-1">
-                  <span className="font-black text-sm" style={{ color: sc.bar }}>{item.probability}%</span>
-                  {item.trend === "up"   && <span className="text-[11px]" style={{ color: sc.bar }}>↑</span>}
-                  {item.trend === "down" && <span className="text-[11px] text-red-400">↓</span>}
+            {/* Stato trattativa */}
+            <div className="mt-4 flex items-center justify-between rounded-2xl px-4 py-3"
+              style={{ background: `${ds.color}14`, border: `1px solid ${ds.color}40` }}>
+              <div className="flex items-center gap-2.5">
+                <span className="status-dot" style={{ width: 11, height: 11, background: ds.color }} />
+                <div>
+                  <p className="font-bold text-sm" style={{ color: ds.color }}>{ds.label}</p>
+                  <p className="text-white/40 text-[11px]">Probabilità {item.probability}%</p>
                 </div>
               </div>
-              <div className="w-full rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.08)" }}>
-                <div className="h-full rounded-full"
-                  style={{
-                    width: `${item.probability}%`,
-                    background: `linear-gradient(90deg, ${sc.bar}70, ${sc.bar})`,
-                    boxShadow: `0 0 8px ${sc.glow}`,
-                    transition: "width 0.7s ease",
-                  }} />
-              </div>
+              {item.player.value && (
+                <div className="text-right">
+                  <p className="text-white font-black text-base leading-none">{item.player.value}</p>
+                  <p className="text-white/40 text-[10px] mt-0.5">valore</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -217,7 +207,7 @@ export default function TransfersPage() {
         )}
 
         {!loading && !error && items.map((item) => {
-          const sc = statusFor(item.probability);
+          const ds = dealStatus(item.probability, item.trend);
           return (
             <button key={item.id} onClick={() => setSelected(item)}
               className="flex rounded-2xl overflow-hidden active:opacity-75 transition-opacity text-left w-full"
@@ -246,11 +236,10 @@ export default function TransfersPage() {
                       <p className="text-white/50 text-[10px] font-medium leading-tight">{item.player.position}</p>
                       <p className="text-white font-black text-base leading-tight truncate">{item.player.name}</p>
                     </div>
-                    <div className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full"
-                      style={{ background: `${sc.bar}20`, border: `1px solid ${sc.bar}50` }}>
-                      <span className="font-black text-sm leading-none" style={{ color: sc.bar }}>{item.probability}%</span>
-                      {item.trend === "up"   && <span className="text-[10px] leading-none" style={{ color: sc.bar }}>↑</span>}
-                      {item.trend === "down" && <span className="text-[10px] leading-none text-red-400">↓</span>}
+                    <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full"
+                      style={{ background: `${ds.color}1f`, border: `1px solid ${ds.color}55` }}>
+                      <span className="status-dot" style={{ width: 8, height: 8, background: ds.color }} />
+                      <span className="font-bold text-xs leading-none" style={{ color: ds.color }}>{item.probability}%</span>
                     </div>
                   </div>
 
@@ -279,22 +268,14 @@ export default function TransfersPage() {
                   </div>
                 </div>
 
-                <div className="mt-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-white/35 text-[10px] font-semibold uppercase tracking-wide">{sc.label}</span>
-                    {item.player.value && (
-                      <span className="text-[10px] font-bold" style={{ color: "var(--accent-soft)" }}>{item.player.value}</span>
-                    )}
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="status-dot" style={{ width: 9, height: 9, background: ds.color }} />
+                    <span className="text-[11px] font-semibold truncate" style={{ color: ds.color }}>{ds.label}</span>
                   </div>
-                  <div className="w-full rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.08)" }}>
-                    <div className="h-full rounded-full"
-                      style={{
-                        width: `${item.probability}%`,
-                        background: `linear-gradient(90deg, ${sc.bar}70, ${sc.bar})`,
-                        boxShadow: `0 0 8px ${sc.glow}`,
-                        transition: "width 0.7s ease",
-                      }} />
-                  </div>
+                  {item.player.value && (
+                    <span className="text-white font-bold text-sm flex-none">{item.player.value}</span>
+                  )}
                 </div>
               </div>
             </button>

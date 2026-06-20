@@ -122,11 +122,69 @@ async function fetchFeed(feed: typeof FEEDS[0]): Promise<NewsItem[]> {
   }
 }
 
-export async function GET() {
-  const results = await Promise.allSettled(FEEDS.map(fetchFeed));
+// ─── Fantacalcio.it (no RSS → scraping HTML della pagina /news) ──────────────
 
-  const allItems: NewsItem[] = [];
-  results.forEach((r) => {
+function parseFantacalcio(html: string): NewsItem[] {
+  const items: NewsItem[] = [];
+  const seen = new Set<string>();
+  const re = /<a[^>]+href="(\/news\/([a-z-]+)\/(\d{2})_(\d{2})_(\d{4})\/[^"]+-(\d+))"[^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(html)) !== null && items.length < 15) {
+    const [, path, cat, dd, mm, yyyy, id, inner] = m;
+    if (seen.has(id)) continue;
+
+    const titleMatch = inner.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+    if (!titleMatch) continue;
+    const title = decodeEntities(titleMatch[1]);
+    if (!title) continue;
+    seen.add(id);
+
+    const sumMatch = inner.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    const summary = sumMatch ? decodeEntities(sumMatch[1]).slice(0, 160) : "";
+    const imgMatch = inner.match(/src="(https:\/\/content\.fantacalcio\.it\/web\/img\/(?:medium|large|small)\/[^"]+)"/i);
+
+    const category = /mercato/i.test(cat) ? "Mercato" : "Serie A";
+
+    items.push({
+      id: `fantacalcio-${id}`,
+      title,
+      summary: summary || "Leggi l'articolo completo.",
+      url: `https://www.fantacalcio.it${path}`,
+      imageUrl: imgMatch ? imgMatch[1] : undefined,
+      source: "fantacalcio",
+      sourceLabel: "Fantacalcio.it",
+      pubDate: `${yyyy}-${mm}-${dd}T12:00:00Z`,
+      category,
+    });
+  }
+  return items;
+}
+
+async function fetchFantacalcioNews(): Promise<NewsItem[]> {
+  try {
+    const res = await fetch("https://www.fantacalcio.it/news", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Accept-Language": "it-IT,it;q=0.9",
+      },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return [];
+    return parseFantacalcio(await res.text());
+  } catch {
+    return [];
+  }
+}
+
+export async function GET() {
+  const [rssResults, fcItems] = await Promise.all([
+    Promise.allSettled(FEEDS.map(fetchFeed)),
+    fetchFantacalcioNews(),
+  ]);
+
+  const allItems: NewsItem[] = [...fcItems];
+  rssResults.forEach((r) => {
     if (r.status === "fulfilled") allItems.push(...r.value);
   });
 

@@ -7,6 +7,7 @@ import type { NewsItem } from "@/app/api/news/route";
 const CATEGORIES = ["Tutte", "Serie A", "Mercato"];
 
 const SOURCE_COLORS: Record<string, string> = {
+  fantacalcio:     "#16b364",
   corriere:        "#e63946",
   "corriere-calcio": "#60a5fa",
   tuttosport:      "#f59e0b",
