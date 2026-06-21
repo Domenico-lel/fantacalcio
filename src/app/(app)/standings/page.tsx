@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MOCK_STANDINGS } from "@/lib/mock-data";
 import { loadState } from "@/lib/store";
 import { fetchTeams } from "@/app/teams-actions";
 
@@ -78,17 +77,8 @@ export default function StandingsPage() {
           logoEmoji: entry.teamName === myTeamName ? myLogo : assignLogoToTeam(entry.teamName),
         }));
         setStandings(withLogos);
-      } catch (error) {
-        console.error("Error loading standings:", error);
-        setStandings(
-          MOCK_STANDINGS.map((entry) => ({
-            ...entry,
-            totalFp: 0,
-            goalDiff: entry.goalsFor - entry.goalsAgainst,
-            teamName: entry.teamName === "La tua Squadra" ? myTeamName : entry.teamName,
-            logoEmoji: entry.teamName === "La tua Squadra" ? myLogo : assignLogoToTeam(entry.teamName),
-          }))
-        );
+      } catch {
+        setStandings([]);
       } finally {
         setLoading(false);
       }
@@ -119,6 +109,13 @@ export default function StandingsPage() {
         {loading && standings.length === 0 && Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="rounded-2xl animate-pulse" style={{ height: i === 0 ? 88 : 56, background: "rgba(255,255,255,0.05)" }} />
         ))}
+
+        {!loading && standings.length === 0 && (
+          <div className="flex flex-col items-center py-16 gap-3 text-center">
+            <span className="text-4xl">🏆</span>
+            <p className="text-white/50 text-sm">Classifica non ancora disponibile.</p>
+          </div>
+        )}
 
         {/* HERO capolista */}
         {leader && (
