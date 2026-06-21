@@ -26,6 +26,7 @@
 .sec-market { --accent:#f0a43a; --accent-soft:#f9c878; --accent-ink:#3f2509; --accent-bg:#3a2912; }
 .sec-rank   { --accent:#857cf0; --accent-soft:#bbb6f6; --accent-ink:#1f1a4a; --accent-bg:#1d1840; }
 .sec-board  { --accent:#34d399; --accent-soft:#6ee7b7; --accent-ink:#04241a; --accent-bg:#0e3329; }
+.sec-bet    { --accent:#f5a623; --accent-soft:#fbcb6a; --accent-ink:#3a2407; --accent-bg:#3a2a10; }
 
 * {
   -webkit-tap-highlight-color: transparent;

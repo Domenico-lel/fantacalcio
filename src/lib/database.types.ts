@@ -242,6 +242,113 @@ export interface Database {
         };
         Relationships: [];
       };
+      fanta_credits: {
+        Row: {
+          user_id: string;
+          balance: number;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          balance?: number;
+          updated_at?: string;
+        };
+        Update: {
+          balance?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      fanta_bet_rounds: {
+        Row: {
+          id: string;
+          day: number;
+          title: string | null;
+          status: "open" | "closed" | "settled";
+          created_at: string;
+        };
+        Insert: {
+          day: number;
+          title?: string | null;
+          status?: "open" | "closed" | "settled";
+        };
+        Update: {
+          day?: number;
+          title?: string | null;
+          status?: "open" | "closed" | "settled";
+        };
+        Relationships: [];
+      };
+      fanta_bet_matches: {
+        Row: {
+          id: string;
+          round_id: string;
+          home_team: string | null;
+          away_team: string | null;
+          home_name: string;
+          away_name: string;
+          odd_1: number;
+          odd_x: number;
+          odd_2: number;
+          result: "1" | "X" | "2" | null;
+          settled_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          round_id: string;
+          home_team?: string | null;
+          away_team?: string | null;
+          home_name: string;
+          away_name: string;
+          odd_1?: number;
+          odd_x?: number;
+          odd_2?: number;
+          result?: "1" | "X" | "2" | null;
+          settled_at?: string | null;
+        };
+        Update: {
+          home_team?: string | null;
+          away_team?: string | null;
+          home_name?: string;
+          away_name?: string;
+          odd_1?: number;
+          odd_x?: number;
+          odd_2?: number;
+          result?: "1" | "X" | "2" | null;
+          settled_at?: string | null;
+        };
+        Relationships: [];
+      };
+      fanta_bets: {
+        Row: {
+          id: string;
+          match_id: string;
+          user_id: string;
+          pick: "1" | "X" | "2";
+          stake: number;
+          odd: number;
+          status: "pending" | "won" | "lost";
+          payout: number;
+          created_at: string;
+        };
+        Insert: {
+          match_id: string;
+          user_id: string;
+          pick: "1" | "X" | "2";
+          stake: number;
+          odd: number;
+          status?: "pending" | "won" | "lost";
+          payout?: number;
+        };
+        Update: {
+          pick?: "1" | "X" | "2";
+          stake?: number;
+          odd?: number;
+          status?: "pending" | "won" | "lost";
+          payout?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

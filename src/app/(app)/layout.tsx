@@ -9,10 +9,11 @@ import type { TeamProfile } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
 
 const NAV_ITEMS = [
-  { href: "/news",      label: "Notizie",   icon: NewsIcon,       color: "#3b8eea" },
-  { href: "/players",   label: "Mercato",   icon: TransferIcon,   color: "#f0a43a" },
-  { href: "/standings", label: "Classifica",icon: StandingsIcon,  color: "#857cf0" },
-  { href: "/bacheca",   label: "Bacheca",   icon: MegaphoneIcon,  color: "#1fb083" },
+  { href: "/news",        label: "Notizie",    icon: NewsIcon,       color: "#3b8eea" },
+  { href: "/players",     label: "Mercato",    icon: TransferIcon,   color: "#f0a43a" },
+  { href: "/standings",   label: "Classifica", icon: StandingsIcon,  color: "#857cf0" },
+  { href: "/pronostici",  label: "Pronostici", icon: DiceIcon,       color: "#f5a623" },
+  { href: "/bacheca",     label: "Bacheca",    icon: MegaphoneIcon,  color: "#1fb083" },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -122,6 +123,19 @@ function StandingsIcon({ active }: { active: boolean }) {
         fill={active ? "currentColor" : "none"} fillOpacity={0.15} />
       <rect x="17" y="5" width="4" height="16" rx="1" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
         fill={active ? "currentColor" : "none"} fillOpacity={0.15} />
+    </svg>
+  );
+}
+
+function DiceIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
+        fill={active ? "currentColor" : "none"} fillOpacity={0.12} />
+      <circle cx="9" cy="9" r="1.4" fill="currentColor" />
+      <circle cx="15" cy="9" r="1.4" fill="currentColor" />
+      <circle cx="9" cy="15" r="1.4" fill="currentColor" />
+      <circle cx="15" cy="15" r="1.4" fill="currentColor" />
     </svg>
   );
 }
