@@ -1,51 +1,55 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { BrandCrest, BrandWordmark } from "@/components/BrandLogo";
 
 export default async function LandingPage() {
   const { userId } = await auth();
   if (userId) redirect("/news");
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden pitch-bg">
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-10 relative overflow-hidden pitch-bg">
       {/* Field lines */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-10">
-        <div className="w-64 h-64 rounded-full border-2 border-white" />
-        <div className="absolute w-full h-0.5 bg-white top-1/2" />
-        <div className="absolute w-24 h-24 rounded-full border-2 border-white" />
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ opacity: 0.07 }}>
+        <div className="w-72 h-72 rounded-full border-2 border-white" />
+        <div className="absolute w-full h-px bg-white top-1/2" />
+        <div className="absolute w-28 h-28 rounded-full border-2 border-white" />
       </div>
 
-      <div className="relative z-10 flex flex-col items-center gap-8 max-w-sm w-full">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-24 h-24 rounded-3xl bg-white/10 backdrop-blur flex items-center justify-center text-6xl shadow-2xl border border-white/20">
-            ⚽
-          </div>
-          <h1 className="text-4xl font-black text-white tracking-tight">
-            Fanta<span className="text-emerald-400">Calcio</span>
-          </h1>
-          <p className="text-white/60 text-center text-sm leading-relaxed">
-            Gestisci la tua squadra, sfida gli amici e diventa il campione del fantacalcio
+      <div className="relative z-10 flex flex-col items-center gap-7 max-w-sm w-full">
+        <BrandCrest size={132} style={{ filter: "drop-shadow(0 10px 30px rgba(0,0,0,0.45))" }} />
+
+        <div className="flex flex-col items-center gap-3 -mt-1">
+          <BrandWordmark />
+          <p className="text-white/55 text-center text-sm leading-relaxed max-w-[17rem]">
+            La lega più scatenata del fantacalcio. Schiera, sfida gli amici e domina la classifica.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 justify-center">
-          {["🏟️ Formazioni", "📊 Classifiche", "📅 Calendario", "🔄 Mercato"].map((f) => (
-            <span key={f} className="text-xs bg-white/10 text-white/70 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur">
+          {["Formazioni", "Classifiche", "Bacheca", "Mercato"].map((f) => (
+            <span
+              key={f}
+              className="text-xs text-white/70 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur"
+              style={{ background: "rgba(255,255,255,0.07)" }}
+            >
               {f}
             </span>
           ))}
         </div>
 
-        <div className="w-full flex flex-col gap-3">
+        <div className="w-full flex flex-col gap-3 mt-1">
           <Link
             href="/sign-up"
-            className="w-full py-4 bg-emerald-400 hover:bg-emerald-300 text-gray-900 font-bold text-center rounded-2xl transition-colors shadow-lg text-lg"
+            className="w-full py-4 text-center rounded-2xl text-lg font-bold shadow-lg transition-transform active:scale-95"
+            style={{ background: "#34d399", color: "#04241a" }}
           >
-            Inizia gratis
+            Entra nel club
           </Link>
           <Link
             href="/sign-in"
-            className="w-full py-4 bg-white/10 hover:bg-white/20 text-white font-semibold text-center rounded-2xl transition-colors border border-white/20 backdrop-blur"
+            className="w-full py-4 text-center rounded-2xl text-base font-semibold text-white border border-white/20 backdrop-blur transition-colors"
+            style={{ background: "rgba(255,255,255,0.08)" }}
           >
             Accedi
           </Link>

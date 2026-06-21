@@ -6,13 +6,17 @@ import "./globals.css";
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "FantaCalcio",
-  description: "La tua app per il Fantacalcio",
+  title: "Soccer Dick Club",
+  description: "La lega più scatenata del fantacalcio",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "FantaCalcio",
+    title: "Soccer Dick Club",
   },
 };
 
@@ -21,7 +25,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0a2010",
+  themeColor: "#0a0f1d",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

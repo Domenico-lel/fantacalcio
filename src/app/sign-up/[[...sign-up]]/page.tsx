@@ -1,4 +1,5 @@
 import { SignUp } from "@clerk/nextjs";
+import { BrandCrest, BrandWordmark } from "@/components/BrandLogo";
 
 export default function SignUpPage() {
   return (
@@ -6,14 +7,10 @@ export default function SignUpPage() {
       className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
       style={{ background: "linear-gradient(165deg, #0a0f1d 0%, #16203c 60%, #0e2e26 100%)" }}
     >
-      <div className="mb-6 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-4xl mx-auto mb-3 shadow-xl">
-          ⚽
-        </div>
-        <h1 className="text-2xl font-black text-white">
-          Fanta<span className="text-emerald-400">Calcio</span>
-        </h1>
-        <p className="text-white/50 text-xs mt-1">Crea il tuo account gratis</p>
+      <div className="mb-6 flex flex-col items-center text-center">
+        <BrandCrest size={72} />
+        <BrandWordmark size={20} className="mt-2" />
+        <p className="text-white/50 text-xs mt-1.5">Crea il tuo account gratis</p>
       </div>
 
       <SignUp
