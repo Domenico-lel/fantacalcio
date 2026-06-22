@@ -9,8 +9,9 @@ import {
 import { ADMIN_POST_TAGS } from "@/lib/post-tags";
 import {
   fetchMyRoster, fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
-  addRosterPlayer, deleteRosterPlayer,
-  type Team, type RosterPlayer,
+  addRosterPlayer, deleteRosterPlayer, searchPlayers,
+  adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminDeleteProfile,
+  type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
 
 type TabKey = "scoop" | "cedibili" | "gestione";
@@ -499,15 +500,21 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
 
 function GestioneTab() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [profiles, setProfiles] = useState<AdminProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState("");
 
   const load = useCallback(async () => {
-    setTeams(await fetchTeams());
+    const [t, p] = await Promise.all([fetchTeams(), adminListProfiles()]);
+    setTeams(t);
+    setProfiles(p);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const profileByTeam = new Map<string, AdminProfile>();
+  for (const p of profiles) if (p.teamRef) profileByTeam.set(p.teamRef, p);
 
   async function sync() {
     setSyncing(true); setMsg("");
@@ -534,19 +541,155 @@ function GestioneTab() {
           Nessuna squadra. Premi &quot;Sincronizza&quot; per importarle dalla classifica.
         </p>
       )}
-      {teams.map((t) => <TeamAdminCard key={t.id} team={t} onTeamsChange={load} />)}
+      {teams.map((t) => <TeamAdminCard key={t.id} team={t} profile={profileByTeam.get(t.id) ?? null} onTeamsChange={load} />)}
       <div className="h-4" />
     </div>
   );
 }
 
-function TeamAdminCard({ team, onTeamsChange }: { team: Team; onTeamsChange: () => Promise<void> }) {
+function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Promise<void> }) {
+  const [query, setQuery] = useState("");
+  const [role, setRole] = useState("");
+  const [picked, setPicked] = useState<PlayerHit | null>(null);
+  const [hits, setHits] = useState<PlayerHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" };
+
+  // ricerca con debounce su Transfermarkt
+  useEffect(() => {
+    if (picked && picked.name === query) return; // già selezionato, non ricercare
+    const q = query.trim();
+    if (q.length < 2) { setHits([]); setOpen(false); setSearching(false); return; }
+    let active = true;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      const res = await searchPlayers(q);
+      if (!active) return;
+      setHits(res);
+      setOpen(res.length > 0);
+      setSearching(false);
+    }, 350);
+    return () => { active = false; clearTimeout(t); };
+  }, [query, picked]);
+
+  function choose(h: PlayerHit) {
+    setPicked(h);
+    setQuery(h.name);
+    setHits([]);
+    setOpen(false);
+  }
+
+  async function add() {
+    const name = query.trim();
+    if (!name) return;
+    setBusy(true);
+    await addRosterPlayer(teamRef, name, role || null, picked?.photoUrl ?? null);
+    setBusy(false);
+    setQuery(""); setRole(""); setPicked(null); setHits([]); setOpen(false);
+    await onAdded();
+  }
+
+  return (
+    <div className="mb-1">
+      <div className="flex gap-2">
+        <select value={role} onChange={(e) => setRole(e.target.value)}
+          className="rounded-lg px-2 py-2 text-white text-sm outline-none flex-none"
+          style={inputStyle}>
+          <option value="" style={{ background: "#141d33" }}>—</option>
+          {["P", "D", "C", "A"].map((r) => <option key={r} value={r} style={{ background: "#141d33" }}>{r}</option>)}
+        </select>
+
+        <div className="flex-1 min-w-0 relative">
+          <input
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setPicked(null); }}
+            onFocus={() => { if (hits.length > 0) setOpen(true); }}
+            placeholder="Cerca un giocatore…"
+            className="w-full rounded-lg px-3 py-2 text-white text-sm outline-none"
+            style={inputStyle} />
+
+          {open && hits.length > 0 && (
+            <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl overflow-hidden max-h-60 overflow-y-auto shadow-xl"
+              style={{ background: "#141d33", border: "1px solid rgba(255,255,255,0.18)" }}>
+              {hits.map((h) => (
+                <button key={h.id} type="button" onClick={() => choose(h)}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 text-left active:opacity-70"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <img src={h.photoUrl} alt="" className="w-7 h-8 rounded object-cover flex-none" style={{ background: "rgba(255,255,255,0.08)" }} />
+                  <span className="text-white text-sm truncate">{h.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button onClick={add} disabled={busy || !query.trim()}
+          className="px-3 py-2 rounded-lg text-sm font-bold disabled:opacity-40 flex-none"
+          style={{ background: "#34d399", color: "#052e16" }}>+</button>
+      </div>
+      <p className="text-white/30 text-[10px] mt-1">
+        {searching ? "Cerco su Transfermarkt…" : picked ? "Foto associata ✓" : "Scrivi e seleziona dal menu per avere la foto."}
+      </p>
+    </div>
+  );
+}
+
+function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () => Promise<void> }) {
+  const [firstName, setFirstName] = useState(profile.firstName);
+  const [lastName, setLastName] = useState(profile.lastName);
+  const [teamName, setTeamName] = useState(profile.teamName);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
+
+  const dirty = firstName !== profile.firstName || lastName !== profile.lastName || teamName !== profile.teamName;
+
+  async function save() {
+    setBusy(true); setMsg("");
+    const res = await adminUpdateProfile(profile.userId, { firstName, lastName, teamName });
+    setBusy(false);
+    if (res.error) { setMsg(res.error); return; }
+    setMsg("✓ Salvato");
+    await reload();
+  }
+
+  return (
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+      <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-wide mb-2">Manager assegnato</p>
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-2">
+          <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Nome"
+            className="flex-1 min-w-0 rounded-lg px-3 py-2 text-white text-sm outline-none" style={inputStyle} />
+          <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Cognome"
+            className="flex-1 min-w-0 rounded-lg px-3 py-2 text-white text-sm outline-none" style={inputStyle} />
+        </div>
+        <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Nome squadra (mostrato)"
+          className="w-full rounded-lg px-3 py-2 text-white text-sm outline-none" style={inputStyle} />
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={save} disabled={busy || !dirty}
+            className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40"
+            style={{ background: "#34d399", color: "#052e16" }}>Salva</button>
+          <button onClick={async () => { if (confirm("Liberare la squadra di questo manager? Potrà sceglierne un'altra.")) { await adminReleaseTeam(profile.userId); await reload(); } }}
+            className="px-3 py-2 rounded-lg text-xs font-semibold text-white/70"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>Libera squadra</button>
+          <button onClick={async () => { if (confirm(`Eliminare il profilo di ${profile.teamName || profile.firstName || "questo manager"}? La squadra tornerà libera.`)) { await adminDeleteProfile(profile.userId); await reload(); } }}
+            className="px-3 py-2 rounded-lg text-xs text-red-400/80"
+            style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>Elimina profilo</button>
+        </div>
+        {msg && <p className="text-white/60 text-xs">{msg}</p>}
+      </div>
+    </div>
+  );
+}
+
+function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: AdminProfile | null; onTeamsChange: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(false);
-  const [name, setName] = useState("");
-  const [role, setRole] = useState("");
   const [busy, setBusy] = useState(false);
+  const [logoErr, setLogoErr] = useState("");
   const logoRef = useRef<HTMLInputElement>(null);
 
   const loadRoster = useCallback(async () => {
@@ -562,21 +705,20 @@ function TeamAdminCard({ team, onTeamsChange }: { team: Team; onTeamsChange: () 
   }
 
   async function onLogo(file: File) {
-    setBusy(true);
+    setBusy(true); setLogoErr("");
     const fd = new FormData();
     fd.append("file", file);
-    await uploadTeamLogo(team.id, fd);
+    const res = await uploadTeamLogo(team.id, fd);
     if (logoRef.current) logoRef.current.value = "";
     setBusy(false);
+    if (res.error) { setLogoErr(res.error); return; }
     await onTeamsChange();
   }
 
-  async function add() {
-    if (!name.trim()) return;
-    await addRosterPlayer(team.id, name, role || null);
-    setName(""); setRole("");
-    await loadRoster();
-  }
+  const managerLabel = profile
+    ? (`${profile.firstName} ${profile.lastName}`.trim() || profile.teamName || "Manager")
+    : (team.claimed ? "Assegnata" : "Libera");
+
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
@@ -586,53 +728,46 @@ function TeamAdminCard({ team, onTeamsChange }: { team: Team; onTeamsChange: () 
           : <span className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
         <div className="flex-1 min-w-0">
           <p className="text-white font-semibold text-sm truncate">{team.name}</p>
-          <p className="text-white/40 text-xs">{team.claimed ? "Assegnata" : "Libera"}</p>
+          <p className="text-white/40 text-xs truncate">{managerLabel}</p>
         </div>
         <span className="text-white/30 text-sm">{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
         <div className="px-3 pb-3 flex flex-col gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          {/* Logo */}
+          {/* Logo (è anche la foto profilo del manager) */}
           <div className="pt-3">
             <button onClick={() => logoRef.current?.click()} disabled={busy}
               className="px-3 py-2 rounded-lg text-xs font-semibold text-white/70 disabled:opacity-50"
               style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
-              {busy ? "Carico…" : team.logoUrl ? "🖼️ Cambia logo" : "🖼️ Carica logo"}
+              {busy ? "Carico…" : team.logoUrl ? "🖼️ Cambia logo / foto" : "🖼️ Carica logo / foto"}
             </button>
             <input ref={logoRef} type="file" accept="image/*" hidden
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onLogo(f); }} />
+            <p className="text-white/30 text-[10px] mt-1.5">Questo logo è anche la foto profilo del manager.</p>
+            {logoErr && <p className="text-red-400 text-xs mt-1">{logoErr}</p>}
           </div>
+
+          {/* Manager assegnato — l'admin modifica info o libera la squadra */}
+          {profile && <ManagerEditor key={profile.userId} profile={profile} reload={onTeamsChange} />}
 
           {/* Rosa */}
           <div>
             <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-wide mb-2">Rosa</p>
-            <div className="flex gap-2 mb-2">
-              <select value={role} onChange={(e) => setRole(e.target.value)}
-                className="rounded-lg px-2 py-2 text-white text-sm outline-none"
-                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                <option value="" style={{ background: "#141d33" }}>—</option>
-                {["P", "D", "C", "A"].map((r) => <option key={r} value={r} style={{ background: "#141d33" }}>{r}</option>)}
-              </select>
-              <input value={name} onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") add(); }}
-                placeholder="Nome giocatore"
-                className="flex-1 rounded-lg px-3 py-2 text-white text-sm outline-none"
-                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }} />
-              <button onClick={add}
-                className="px-3 py-2 rounded-lg text-sm font-bold"
-                style={{ background: "#34d399", color: "#052e16" }}>+</button>
-            </div>
+            <RosterAdder teamRef={team.id} onAdded={loadRoster} />
 
             {loadingRoster && <p className="text-white/40 text-xs">Carico rosa…</p>}
             {!loadingRoster && roster.length === 0 && <p className="text-white/35 text-xs">Nessun giocatore inserito.</p>}
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 mt-2">
               {roster.map((p) => (
                 <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  {p.role && <span className="text-emerald-400/80 text-[10px] font-bold w-4">{p.role}</span>}
+                  {p.photoUrl
+                    ? <img src={p.photoUrl} alt="" className="w-6 h-7 rounded object-cover flex-none" style={{ background: "rgba(255,255,255,0.08)" }} />
+                    : <span className="w-6 h-7 rounded flex items-center justify-center text-[11px] flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
+                  {p.role && <span className="text-emerald-400/80 text-[10px] font-bold w-4 text-center flex-none">{p.role}</span>}
                   <span className="text-white/85 text-sm flex-1 truncate">{p.playerName}</span>
                   <button onClick={async () => { await deleteRosterPlayer(p.id); await loadRoster(); }}
-                    className="text-red-400/70 text-xs px-1.5">✕</button>
+                    className="text-red-400/70 text-xs px-1.5 flex-none">✕</button>
                 </div>
               ))}
             </div>

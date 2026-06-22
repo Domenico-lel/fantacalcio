@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   fetchBetCenter, placeBet, cancelBet, setMatchResult,
   createBetRound, setRoundStatus, deleteBetRound, addBetMatch, deleteBetMatch, adjustCredits,
+  updateMatchOdds, adminDeleteBet,
   type BetCenter, type BetRound, type BetMatch, type CreditRow,
 } from "@/app/pronostici-actions";
 import { fetchTeams, type Team } from "@/app/teams-actions";
@@ -363,31 +364,7 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
       </div>
 
       {/* scontri esistenti */}
-      {round.matches.map((m) => (
-        <div key={m.id} className="rounded-xl px-3 py-2.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-white text-xs font-semibold truncate flex-1">{m.homeName} <span className="text-white/30">vs</span> {m.awayName}</span>
-            <span className="text-white/40 text-[10px] flex-none">{fmtOdd(m.odd1)} / {fmtOdd(m.oddX)} / {fmtOdd(m.odd2)}</span>
-          </div>
-          <div className="flex items-center gap-1.5 mt-2">
-            {(["1", "X", "2"] as Pick[]).map((p) => (
-              <button key={p} onClick={async () => { await setMatchResult(m.id, p); await reload(); }}
-                className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
-                style={{
-                  background: m.result === p ? "var(--accent)" : "rgba(255,255,255,0.06)",
-                  color: m.result === p ? "var(--accent-ink)" : "rgba(255,255,255,0.6)",
-                  border: `1px solid ${m.result === p ? "var(--accent)" : "rgba(255,255,255,0.1)"}`,
-                }}>{PICK_LABELS[p]}</button>
-            ))}
-            {m.result && (
-              <button onClick={async () => { await setMatchResult(m.id, null); await reload(); }}
-                className="px-2 py-1.5 rounded-lg text-[11px] text-white/50" style={selStyle}>annulla</button>
-            )}
-            <button onClick={async () => { if (confirm("Eliminare lo scontro?")) { await deleteBetMatch(m.id); await reload(); } }}
-              className="px-2 py-1.5 rounded-lg text-[11px] text-red-400/70" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>✕</button>
-          </div>
-        </div>
-      ))}
+      {round.matches.map((m) => <AdminMatchRow key={m.id} match={m} reload={reload} />)}
 
       {/* nuovo scontro */}
       <div className="rounded-xl px-3 py-3 flex flex-col gap-2" style={{ background: "rgba(240,164,58,0.06)", border: "1px solid rgba(240,164,58,0.2)" }}>
@@ -409,6 +386,87 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
         </div>
         {err && <p className="text-red-400 text-xs">{err}</p>}
       </div>
+    </div>
+  );
+}
+
+function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Promise<void> }) {
+  const selStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
+  const [editOdds, setEditOdds] = useState(false);
+  const [o1, setO1] = useState(m.odd1.toFixed(2));
+  const [ox, setOx] = useState(m.oddX.toFixed(2));
+  const [o2, setO2] = useState(m.odd2.toFixed(2));
+  const [err, setErr] = useState("");
+
+  async function saveOdds() {
+    const res = await updateMatchOdds(m.id, parseFloat(o1), parseFloat(ox), parseFloat(o2));
+    if (res.error) { setErr(res.error); return; }
+    setErr(""); setEditOdds(false);
+    await reload();
+  }
+
+  return (
+    <div className="rounded-xl px-3 py-2.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-white text-xs font-semibold truncate flex-1">{m.homeName} <span className="text-white/30">vs</span> {m.awayName}</span>
+        <button
+          onClick={() => { setO1(m.odd1.toFixed(2)); setOx(m.oddX.toFixed(2)); setO2(m.odd2.toFixed(2)); setEditOdds((v) => !v); setErr(""); }}
+          disabled={!!m.result}
+          className="text-white/40 text-[10px] flex-none disabled:opacity-40"
+          title={m.result ? "Scontro concluso" : "Modifica quote"}>
+          {fmtOdd(m.odd1)} / {fmtOdd(m.oddX)} / {fmtOdd(m.odd2)} {!m.result && "✏️"}
+        </button>
+      </div>
+
+      {editOdds && !m.result && (
+        <div className="flex items-center gap-1.5 mt-2">
+          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
+          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
+          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
+          <button onClick={saveOdds} className="px-2.5 py-1.5 rounded-lg text-xs font-bold" style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>✓</button>
+        </div>
+      )}
+
+      {/* risultato */}
+      <div className="flex items-center gap-1.5 mt-2">
+        {(["1", "X", "2"] as Pick[]).map((p) => (
+          <button key={p} onClick={async () => { await setMatchResult(m.id, p); await reload(); }}
+            className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+            style={{
+              background: m.result === p ? "var(--accent)" : "rgba(255,255,255,0.06)",
+              color: m.result === p ? "var(--accent-ink)" : "rgba(255,255,255,0.6)",
+              border: `1px solid ${m.result === p ? "var(--accent)" : "rgba(255,255,255,0.1)"}`,
+            }}>{PICK_LABELS[p]}</button>
+        ))}
+        {m.result && (
+          <button onClick={async () => { await setMatchResult(m.id, null); await reload(); }}
+            className="px-2 py-1.5 rounded-lg text-[11px] text-white/50" style={selStyle}>annulla</button>
+        )}
+        <button onClick={async () => { if (confirm("Eliminare lo scontro?")) { await deleteBetMatch(m.id); await reload(); } }}
+          className="px-2 py-1.5 rounded-lg text-[11px] text-red-400/70" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>✕</button>
+      </div>
+
+      {err && <p className="text-red-400 text-xs mt-1.5">{err}</p>}
+
+      {/* giocate dei manager — l'admin può cancellarne una piazzata per errore */}
+      {m.bets && m.bets.length > 0 && (
+        <div className="mt-2.5 flex flex-col gap-1">
+          <p className="text-white/35 text-[10px] font-semibold uppercase tracking-wide">Giocate ({m.bets.length})</p>
+          {m.bets.map((b) => (
+            <div key={b.betId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+              <Avatar src={b.logo} size={18} />
+              <span className="text-white/85 text-xs flex-1 truncate">{b.name}</span>
+              <span className="text-white/60 text-[11px] flex-none">{PICK_LABELS[b.pick]} · {b.stake}cr</span>
+              <span className="text-[10px] flex-none w-12 text-right"
+                style={{ color: b.status === "won" ? "#34d399" : b.status === "lost" ? "#f87171" : "rgba(255,255,255,0.4)" }}>
+                {b.status === "won" ? `+${b.payout}` : b.status === "lost" ? "persa" : "in gioco"}
+              </span>
+              <button onClick={async () => { if (confirm(`Eliminare la giocata di ${b.name}?`)) { await adminDeleteBet(b.betId); await reload(); } }}
+                className="text-red-400/70 text-xs px-1 flex-none">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

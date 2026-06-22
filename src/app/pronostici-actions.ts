@@ -17,6 +17,19 @@ export interface MyBet {
   payout: number;
 }
 
+// Dettaglio di una singola giocata, visibile solo all'admin (per gestirla/cancellarla)
+export interface AdminBet {
+  betId: string;
+  userId: string;
+  name: string;
+  logo: string;
+  pick: Pick;
+  stake: number;
+  odd: number;
+  status: "pending" | "won" | "lost";
+  payout: number;
+}
+
 export interface BetMatch {
   id: string;
   homeName: string;
@@ -29,6 +42,7 @@ export interface BetMatch {
   result: Pick | null;
   myBet: MyBet | null;
   betCount: number;
+  bets?: AdminBet[]; // popolato solo per l'admin
 }
 
 export interface BetRound {
@@ -102,6 +116,19 @@ export async function fetchBetCenter(): Promise<BetCenter> {
   const logoByTeam = new Map<string, string>();
   for (const t of teams ?? []) if (t.logo_url) logoByTeam.set(t.id, t.logo_url);
 
+  // profili (nomi/loghi manager) + crediti
+  const { data: profiles } = await db
+    .from("fanta_profiles")
+    .select("user_id, first_name, team_name, team_ref, logo");
+  const { data: credits } = await db.from("fanta_credits").select("user_id, balance");
+
+  const nameByUser = new Map<string, string>();
+  const logoByUser = new Map<string, string>();
+  for (const p of profiles ?? []) {
+    nameByUser.set(p.user_id, p.team_name || p.first_name || "Manager");
+    logoByUser.set(p.user_id, (p.team_ref && logoByTeam.get(p.team_ref)) || p.logo || "⚽");
+  }
+
   // giornate + scontri
   const { data: rounds } = await db
     .from("fanta_bet_rounds")
@@ -115,21 +142,37 @@ export async function fetchBetCenter(): Promise<BetCenter> {
     .order("created_at", { ascending: true });
 
   const matchIds = (matches ?? []).map((m) => m.id);
-  const [{ data: myBets }, { data: allBets }] = await Promise.all([
-    matchIds.length
-      ? db.from("fanta_bets").select("*").eq("user_id", viewer.userId).in("match_id", matchIds)
-      : Promise.resolve({ data: [] as never[] }),
-    matchIds.length
-      ? db.from("fanta_bets").select("match_id").in("match_id", matchIds)
-      : Promise.resolve({ data: [] as { match_id: string }[] }),
-  ]);
+  const allBets = matchIds.length
+    ? (await db
+        .from("fanta_bets")
+        .select("id, match_id, user_id, pick, stake, odd, status, payout")
+        .in("match_id", matchIds)).data
+    : [];
 
   const myBetByMatch = new Map<string, MyBet>();
-  for (const b of myBets ?? []) {
-    myBetByMatch.set(b.match_id, { pick: b.pick, stake: b.stake, odd: b.odd, status: b.status, payout: b.payout });
-  }
   const countByMatch = new Map<string, number>();
-  for (const b of allBets ?? []) countByMatch.set(b.match_id, (countByMatch.get(b.match_id) ?? 0) + 1);
+  const adminBetsByMatch = new Map<string, AdminBet[]>();
+  for (const b of allBets ?? []) {
+    countByMatch.set(b.match_id, (countByMatch.get(b.match_id) ?? 0) + 1);
+    if (b.user_id === viewer.userId) {
+      myBetByMatch.set(b.match_id, { pick: b.pick, stake: b.stake, odd: Number(b.odd), status: b.status, payout: b.payout });
+    }
+    if (viewer.isAdmin) {
+      const list = adminBetsByMatch.get(b.match_id) ?? [];
+      list.push({
+        betId: b.id,
+        userId: b.user_id,
+        name: nameByUser.get(b.user_id) ?? "Manager",
+        logo: logoByUser.get(b.user_id) ?? "⚽",
+        pick: b.pick,
+        stake: b.stake,
+        odd: Number(b.odd),
+        status: b.status,
+        payout: b.payout,
+      });
+      adminBetsByMatch.set(b.match_id, list);
+    }
+  }
 
   const matchesByRound = new Map<string, BetMatch[]>();
   for (const m of matches ?? []) {
@@ -146,6 +189,7 @@ export async function fetchBetCenter(): Promise<BetCenter> {
       result: m.result,
       myBet: myBetByMatch.get(m.id) ?? null,
       betCount: countByMatch.get(m.id) ?? 0,
+      bets: viewer.isAdmin ? (adminBetsByMatch.get(m.id) ?? []) : undefined,
     });
     matchesByRound.set(m.round_id, list);
   }
@@ -160,10 +204,6 @@ export async function fetchBetCenter(): Promise<BetCenter> {
   }));
 
   // classifica crediti — tutti i manager con profilo
-  const { data: profiles } = await db
-    .from("fanta_profiles")
-    .select("user_id, first_name, team_name, team_ref, logo");
-  const { data: credits } = await db.from("fanta_credits").select("user_id, balance");
   const balByUser = new Map<string, number>();
   for (const c of credits ?? []) balByUser.set(c.user_id, c.balance);
 
@@ -446,4 +486,22 @@ export async function adjustCredits(userId: string, delta: number): Promise<{ er
   const db = createAdminClient();
   await addBalance(db, userId, delta);
   return { error: null };
+}
+
+// Cancella una singola giocata (es. piazzata per errore), stornando i crediti coinvolti.
+export async function adminDeleteBet(betId: string): Promise<{ error: string | null }> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) return { error: "Solo l'admin" };
+  const db = createAdminClient();
+  const { data: bet } = await db
+    .from("fanta_bets")
+    .select("user_id, stake, status, payout")
+    .eq("id", betId)
+    .maybeSingle();
+  if (!bet) return { error: "Giocata non trovata" };
+  // rimborsa la puntata se ancora in gioco; storna la vincita se era già stata pagata
+  if (bet.status === "pending") await addBalance(db, bet.user_id, bet.stake);
+  else if (bet.status === "won" && bet.payout) await addBalance(db, bet.user_id, -bet.payout);
+  const { error } = await db.from("fanta_bets").delete().eq("id", betId);
+  return { error: error?.message ?? null };
 }

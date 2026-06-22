@@ -229,16 +229,19 @@ export interface Database {
           team_ref: string;
           player_name: string;
           role: "P" | "D" | "C" | "A" | null;
+          photo_url: string | null;
           created_at: string;
         };
         Insert: {
           team_ref: string;
           player_name: string;
           role?: "P" | "D" | "C" | "A" | null;
+          photo_url?: string | null;
         };
         Update: {
           player_name?: string;
           role?: "P" | "D" | "C" | "A" | null;
+          photo_url?: string | null;
         };
         Relationships: [];
       };
