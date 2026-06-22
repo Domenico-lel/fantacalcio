@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
 import ProfileDrawer from "@/components/ProfileDrawer";
 import BadgeRow from "@/components/Badges";
+import PwaInstallGuide from "@/components/PwaInstallGuide";
 import { loadState, loadViewerCache, saveViewerCache } from "@/lib/store";
 import type { TeamProfile, CachedViewer } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
@@ -113,6 +114,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         adminName={viewer?.displayName}
         onProfileSaved={(p) => setProfile(p)}
       />
+
+      <PwaInstallGuide />
     </div>
   );
 }
