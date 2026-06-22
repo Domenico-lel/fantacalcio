@@ -36,28 +36,32 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
-      {/* Profile bar — flex-none, mai scrollabile */}
-      <div className="flex-none px-4 pt-4 pb-2 flex justify-center">
+      {/* Profile bar — full-width, flex-none, mai scrollabile */}
+      <div className="flex-none px-4 pt-4 pb-2">
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl transition-opacity active:opacity-60 w-auto max-w-[70vw]"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-opacity active:opacity-70"
           style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
           aria-label="Profilo"
         >
           {avatarSrc.startsWith("http")
-            ? <img src={avatarSrc} alt="" className="w-7 h-7 rounded-full object-cover flex-none" />
-            : <span className="text-2xl leading-none flex-none">{avatarSrc}</span>}
-          <div className="flex flex-col items-center min-w-0 w-full">
-            <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wide leading-none mb-0.5">Il tuo profilo</span>
-            <span className="text-white text-sm font-bold leading-none truncate w-full text-center">
+            ? <img src={avatarSrc} alt="" className="w-12 h-12 rounded-xl object-cover flex-none" />
+            : <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-none"
+                style={{ background: "rgba(255,255,255,0.06)" }}>{avatarSrc}</span>}
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wide leading-none mb-1">Il tuo profilo</span>
+            <span className="text-white text-base font-bold leading-tight truncate w-full">
               {teamLabel}
             </span>
             {viewer?.badges && viewer.badges.length > 0 && (
-              <div className="mt-1">
+              <div className="mt-1.5">
                 <BadgeRow ids={viewer.badges} compact />
               </div>
             )}
           </div>
+          <svg className="flex-none text-white/30" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
 
