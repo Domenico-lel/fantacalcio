@@ -17,6 +17,10 @@ interface Props {
   avatar: string;
   /** Badge assegnati dall'admin, mostrati nel profilo */
   badges?: string[];
+  /** Se true, l'utente è l'admin della lega: non ha una squadra, niente form di modifica */
+  isAdmin?: boolean;
+  /** Nome mostrato per l'admin (es. "Admin Lega") */
+  adminName?: string;
   onProfileSaved: (p: TeamProfile) => void;
 }
 
@@ -28,7 +32,7 @@ function TeamAvatar({ src, className }: { src: string; className: string }) {
   return <div className={`${className} flex items-center justify-center text-3xl`}>{src || "⚽"}</div>;
 }
 
-export default function ProfileDrawer({ open, onClose, profile, avatar, badges = [], onProfileSaved }: Props) {
+export default function ProfileDrawer({ open, onClose, profile, avatar, badges = [], isAdmin = false, adminName, onProfileSaved }: Props) {
   const user = useAppUser();
   const { signOut } = useClerk();
   const router = useRouter();
@@ -136,14 +140,27 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
                     <TeamAvatar src={avatar} className="w-full h-full" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide mb-0.5 truncate">
-                      {profile?.firstName && profile?.lastName
-                        ? `${profile.firstName} ${profile.lastName}`
-                        : user.fullName || "Allenatore"}
-                    </p>
-                    <p className="text-white font-bold text-xl leading-tight truncate">
-                      {profile?.teamName ?? "La tua Squadra"}
-                    </p>
+                    {isAdmin ? (
+                      <>
+                        <p className="text-red-400 text-xs font-semibold uppercase tracking-wide mb-0.5 truncate">
+                          Amministratore della lega
+                        </p>
+                        <p className="text-white font-bold text-xl leading-tight truncate">
+                          {adminName || "Admin Lega"}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wide mb-0.5 truncate">
+                          {profile?.firstName && profile?.lastName
+                            ? `${profile.firstName} ${profile.lastName}`
+                            : user.fullName || "Allenatore"}
+                        </p>
+                        <p className="text-white font-bold text-xl leading-tight truncate">
+                          {profile?.teamName ?? "La tua Squadra"}
+                        </p>
+                      </>
+                    )}
                     {user.email && (
                       <p className="text-white/40 text-xs mt-1 truncate">{user.email}</p>
                     )}
@@ -152,13 +169,15 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setEditing(true)}
-                  className="flex-shrink-0 ml-3 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-400 transition-opacity active:opacity-60"
-                  style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.25)" }}
-                >
-                  Modifica
-                </button>
+                {!isAdmin && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="flex-shrink-0 ml-3 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-400 transition-opacity active:opacity-60"
+                    style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.25)" }}
+                  >
+                    Modifica
+                  </button>
+                )}
               </div>
 
               {/* Logout */}

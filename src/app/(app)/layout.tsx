@@ -21,13 +21,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState<TeamProfile | null>(null);
-  const [viewer, setViewer] = useState<{ logo: string; displayName: string; badges: string[] } | null>(null);
+  const [viewer, setViewer] = useState<{ logo: string; displayName: string; badges: string[]; isAdmin: boolean } | null>(null);
 
   useEffect(() => {
     const { profile: p } = loadState();
     setProfile(p);
     getCurrentViewer().then((v) => {
-      if (v) setViewer({ logo: v.logo, displayName: v.displayName, badges: v.badges });
+      if (v) setViewer({ logo: v.logo, displayName: v.displayName, badges: v.badges, isAdmin: v.isAdmin });
     }).catch(() => {});
   }, []);
 
@@ -100,6 +100,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         profile={profile}
         avatar={avatarSrc}
         badges={viewer?.badges ?? []}
+        isAdmin={viewer?.isAdmin ?? false}
+        adminName={viewer?.displayName}
         onProfileSaved={(p) => setProfile(p)}
       />
     </div>
