@@ -182,6 +182,7 @@ export interface Database {
           owner_name: string;
           owner_logo: string;
           player_name: string;
+          player_photo: string | null;
           note: string | null;
           status: "available" | "closed";
           created_at: string;
@@ -192,11 +193,13 @@ export interface Database {
           owner_name: string;
           owner_logo?: string;
           player_name: string;
+          player_photo?: string | null;
           note?: string | null;
           status?: "available" | "closed";
         };
         Update: {
           player_name?: string;
+          player_photo?: string | null;
           note?: string | null;
           status?: "available" | "closed";
         };

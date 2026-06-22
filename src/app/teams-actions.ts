@@ -114,20 +114,6 @@ export async function fetchRoster(teamRef: string): Promise<RosterPlayer[]> {
   return (data ?? []).map((r) => ({ id: r.id, playerName: r.player_name, role: r.role, photoUrl: r.photo_url }));
 }
 
-export async function fetchMyRoster(): Promise<{ teamRef: string | null; players: RosterPlayer[] }> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { teamRef: null, players: [] };
-  const db = createAdminClient();
-  const { data: profile } = await db
-    .from("fanta_profiles")
-    .select("team_ref")
-    .eq("user_id", viewer.userId)
-    .maybeSingle();
-  if (!profile?.team_ref) return { teamRef: null, players: [] };
-  const players = await fetchRoster(profile.team_ref);
-  return { teamRef: profile.team_ref, players };
-}
-
 export async function addRosterPlayer(teamRef: string, playerName: string, role: string | null, photoUrl?: string | null): Promise<{ error: string | null }> {
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { error: "Solo l'admin può modificare le rose" };
@@ -269,7 +255,7 @@ function decodeEntities(s: string): string {
 
 export async function searchPlayers(query: string): Promise<PlayerHit[]> {
   const viewer = await getCurrentViewer();
-  if (!viewer?.isAdmin) return [];
+  if (!viewer) return []; // qualsiasi utente autenticato (admin o manager)
   const q = (query ?? "").trim();
   if (q.length < 2) return [];
 

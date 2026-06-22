@@ -42,6 +42,7 @@ export interface Listing {
   ownerName: string;
   ownerLogo: string;
   playerName: string;
+  playerPhoto: string | null;
   note: string | null;
   status: "available" | "closed";
   createdAt: string;
@@ -331,6 +332,7 @@ export async function fetchListings(): Promise<{ listings: Listing[]; viewer: Vi
     ownerName: l.owner_name,
     ownerLogo: l.owner_logo,
     playerName: l.player_name,
+    playerPhoto: l.player_photo ?? null,
     note: l.note,
     status: l.status,
     createdAt: l.created_at,
@@ -340,13 +342,15 @@ export async function fetchListings(): Promise<{ listings: Listing[]; viewer: Vi
   return { listings, viewer: stripEmail(viewer) };
 }
 
-export async function createListing(input: { playerName: string; note?: string }): Promise<{ error: string | null }> {
+export async function createListing(input: { playerName: string; note?: string; photoUrl?: string | null }): Promise<{ error: string | null }> {
   const viewer = await getViewer();
   if (!viewer) return { error: "Non autenticato" };
   if (!viewer.hasProfile) return { error: "Completa prima il tuo profilo squadra" };
 
   const player = (input.playerName ?? "").trim();
   if (!player) return { error: "Inserisci il nome del giocatore" };
+  const photo = (input.photoUrl ?? "").trim() || null;
+  const note = (input.note ?? "").trim() || null;
 
   const db = createAdminClient();
   const { error } = await db.from("fanta_transfer_listings").insert({
@@ -354,8 +358,20 @@ export async function createListing(input: { playerName: string; note?: string }
     owner_name: viewer.displayName,
     owner_logo: viewer.logo,
     player_name: player,
-    note: (input.note ?? "").trim() || null,
+    player_photo: photo,
+    note,
   });
+  // fallback se la colonna player_photo non è ancora stata migrata
+  if (error && /player_photo/i.test(error.message)) {
+    const retry = await db.from("fanta_transfer_listings").insert({
+      user_id: viewer.userId,
+      owner_name: viewer.displayName,
+      owner_logo: viewer.logo,
+      player_name: player,
+      note,
+    });
+    return { error: retry.error?.message ?? null };
+  }
   return { error: error?.message ?? null };
 }
 

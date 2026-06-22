@@ -8,7 +8,7 @@ import {
 } from "@/app/social-actions";
 import { ADMIN_POST_TAGS } from "@/lib/post-tags";
 import {
-  fetchMyRoster, fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
+  fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
   addRosterPlayer, deleteRosterPlayer, searchPlayers,
   adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminDeleteProfile,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
@@ -366,17 +366,16 @@ function PostCard({ post, viewer, reload, setPosts }: {
 
 function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
   const [listings, setListings] = useState<Listing[]>([]);
-  const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [player, setPlayer] = useState("");
+  const [playerPhoto, setPlayerPhoto] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const [{ listings }, my] = await Promise.all([fetchListings(), fetchMyRoster()]);
+    const { listings } = await fetchListings();
     setListings(listings);
-    setRoster(my.players);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -384,10 +383,10 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
   async function add() {
     if (!player.trim()) { setError("Inserisci il nome del giocatore"); return; }
     setBusy(true); setError("");
-    const res = await createListing({ playerName: player, note });
+    const res = await createListing({ playerName: player, note, photoUrl: playerPhoto });
     setBusy(false);
     if (res.error) { setError(res.error); return; }
-    setPlayer(""); setNote("");
+    setPlayer(""); setNote(""); setPlayerPhoto(null);
     await load();
   }
 
@@ -400,22 +399,16 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
       {viewer?.hasProfile ? (
         <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
           <p className="text-emerald-400 text-xs font-bold uppercase tracking-wide mb-3">Metti un giocatore sul mercato</p>
-          {roster.length > 0 ? (
-            <select value={player} onChange={(e) => setPlayer(e.target.value)}
-              className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none mb-2 focus:ring-2 focus:ring-emerald-400/40"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}>
-              <option value="" style={{ background: "#141d33" }}>Seleziona un giocatore…</option>
-              {roster.map((p) => (
-                <option key={p.id} value={p.playerName} style={{ background: "#141d33" }}>
-                  {p.role ? `${p.role} · ` : ""}{p.playerName}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input value={player} onChange={(e) => setPlayer(e.target.value)} placeholder="Nome giocatore (es. Lautaro)"
-              className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none mb-2 focus:ring-2 focus:ring-emerald-400/40"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }} />
-          )}
+          <div className="mb-2">
+            <PlayerSearchBox
+              value={player}
+              onChange={(t) => { setPlayer(t); setPlayerPhoto(null); }}
+              onPick={(h) => { setPlayer(h.name); setPlayerPhoto(h.photoUrl); }}
+              placeholder="Cerca il giocatore da cedere…" />
+            <p className="text-white/30 text-[10px] mt-1">
+              {playerPhoto ? "Foto associata ✓" : "Scrivi e scegli dal menu per avere la foto."}
+            </p>
+          </div>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota (facoltativa) — es. cerco un centrocampista"
             className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-400/40"
             style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }} />
@@ -469,7 +462,9 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
         border: `1px solid ${isClosed ? "rgba(255,255,255,0.07)" : "rgba(52,211,153,0.2)"}`,
         opacity: isClosed ? 0.6 : 1,
       }}>
-      <Avatar src={listing.ownerLogo} size={28} />
+      {listing.playerPhoto
+        ? <img src={listing.playerPhoto} alt="" className="w-9 h-11 rounded object-cover flex-none" style={{ background: "rgba(255,255,255,0.08)" }} />
+        : <Avatar src={listing.ownerLogo} size={28} />}
       <div className="flex-1 min-w-0">
         <p className={`font-bold text-sm truncate ${isClosed ? "text-white/60 line-through" : "text-white"}`}>
           {listing.playerName}
@@ -547,21 +542,22 @@ function GestioneTab() {
   );
 }
 
-function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Promise<void> }) {
-  const [query, setQuery] = useState("");
-  const [role, setRole] = useState("");
-  const [picked, setPicked] = useState<PlayerHit | null>(null);
+/* Campo di ricerca giocatori con tendina + foto (Transfermarkt). Componente riusabile. */
+function PlayerSearchBox({ value, onChange, onPick, placeholder }: {
+  value: string;
+  onChange: (text: string) => void;
+  onPick: (hit: PlayerHit) => void;
+  placeholder?: string;
+}) {
   const [hits, setHits] = useState<PlayerHit[]>([]);
-  const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const pickedName = useRef("");
   const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" };
 
-  // ricerca con debounce su Transfermarkt
   useEffect(() => {
-    if (picked && picked.name === query) return; // già selezionato, non ricercare
-    const q = query.trim();
-    if (q.length < 2) { setHits([]); setOpen(false); setSearching(false); return; }
+    const q = value.trim();
+    if (q.length < 2 || q === pickedName.current) { setHits([]); setOpen(false); setSearching(false); return; }
     let active = true;
     setSearching(true);
     const t = setTimeout(async () => {
@@ -572,14 +568,43 @@ function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Pro
       setSearching(false);
     }, 350);
     return () => { active = false; clearTimeout(t); };
-  }, [query, picked]);
+  }, [value]);
 
-  function choose(h: PlayerHit) {
-    setPicked(h);
-    setQuery(h.name);
-    setHits([]);
-    setOpen(false);
-  }
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => { if (hits.length > 0) setOpen(true); }}
+        placeholder={placeholder}
+        className="w-full rounded-lg px-3 py-2 text-white text-sm outline-none"
+        style={inputStyle} />
+
+      {open && hits.length > 0 && (
+        <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl overflow-hidden max-h-60 overflow-y-auto shadow-xl"
+          style={{ background: "#141d33", border: "1px solid rgba(255,255,255,0.18)" }}>
+          {hits.map((h) => (
+            <button key={h.id} type="button"
+              onClick={() => { pickedName.current = h.name; onPick(h); setOpen(false); setHits([]); }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 text-left active:opacity-70"
+              style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <img src={h.photoUrl} alt="" className="w-7 h-8 rounded object-cover flex-none" style={{ background: "rgba(255,255,255,0.08)" }} />
+              <span className="text-white text-sm truncate">{h.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {searching && <p className="text-white/30 text-[10px] mt-1">Cerco su Transfermarkt…</p>}
+    </div>
+  );
+}
+
+function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Promise<void> }) {
+  const [query, setQuery] = useState("");
+  const [role, setRole] = useState("");
+  const [picked, setPicked] = useState<PlayerHit | null>(null);
+  const [busy, setBusy] = useState(false);
+  const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
 
   async function add() {
     const name = query.trim();
@@ -587,50 +612,31 @@ function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Pro
     setBusy(true);
     await addRosterPlayer(teamRef, name, role || null, picked?.photoUrl ?? null);
     setBusy(false);
-    setQuery(""); setRole(""); setPicked(null); setHits([]); setOpen(false);
+    setQuery(""); setRole(""); setPicked(null);
     await onAdded();
   }
 
   return (
     <div className="mb-1">
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-start">
         <select value={role} onChange={(e) => setRole(e.target.value)}
-          className="rounded-lg px-2 py-2 text-white text-sm outline-none flex-none"
-          style={inputStyle}>
+          className="rounded-lg px-2 py-2 text-white text-sm outline-none flex-none" style={inputStyle}>
           <option value="" style={{ background: "#141d33" }}>—</option>
           {["P", "D", "C", "A"].map((r) => <option key={r} value={r} style={{ background: "#141d33" }}>{r}</option>)}
         </select>
-
-        <div className="flex-1 min-w-0 relative">
-          <input
+        <div className="flex-1 min-w-0">
+          <PlayerSearchBox
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setPicked(null); }}
-            onFocus={() => { if (hits.length > 0) setOpen(true); }}
-            placeholder="Cerca un giocatore…"
-            className="w-full rounded-lg px-3 py-2 text-white text-sm outline-none"
-            style={inputStyle} />
-
-          {open && hits.length > 0 && (
-            <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl overflow-hidden max-h-60 overflow-y-auto shadow-xl"
-              style={{ background: "#141d33", border: "1px solid rgba(255,255,255,0.18)" }}>
-              {hits.map((h) => (
-                <button key={h.id} type="button" onClick={() => choose(h)}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 text-left active:opacity-70"
-                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                  <img src={h.photoUrl} alt="" className="w-7 h-8 rounded object-cover flex-none" style={{ background: "rgba(255,255,255,0.08)" }} />
-                  <span className="text-white text-sm truncate">{h.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
+            onChange={(t) => { setQuery(t); setPicked(null); }}
+            onPick={(h) => { setPicked(h); setQuery(h.name); }}
+            placeholder="Cerca un giocatore…" />
         </div>
-
         <button onClick={add} disabled={busy || !query.trim()}
           className="px-3 py-2 rounded-lg text-sm font-bold disabled:opacity-40 flex-none"
           style={{ background: "#34d399", color: "#052e16" }}>+</button>
       </div>
       <p className="text-white/30 text-[10px] mt-1">
-        {searching ? "Cerco su Transfermarkt…" : picked ? "Foto associata ✓" : "Scrivi e seleziona dal menu per avere la foto."}
+        {picked ? "Foto associata ✓" : "Scrivi e seleziona dal menu per avere la foto."}
       </p>
     </div>
   );
