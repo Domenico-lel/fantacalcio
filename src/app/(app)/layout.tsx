@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
 import ProfileDrawer from "@/components/ProfileDrawer";
 import BadgeRow from "@/components/Badges";
-import { loadState } from "@/lib/store";
-import type { TeamProfile } from "@/lib/store";
+import { loadState, loadViewerCache, saveViewerCache } from "@/lib/store";
+import type { TeamProfile, CachedViewer } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
 
 const NAV_ITEMS = [
@@ -21,18 +21,27 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState<TeamProfile | null>(null);
-  const [viewer, setViewer] = useState<{ logo: string; displayName: string; badges: string[]; isAdmin: boolean } | null>(null);
+  const [viewer, setViewer] = useState<CachedViewer | null>(null);
 
   useEffect(() => {
     const { profile: p } = loadState();
     setProfile(p);
+    // Paint immediato dalla cache viewer (identità autorevole), poi refresh dal server
+    setViewer(loadViewerCache());
     getCurrentViewer().then((v) => {
-      if (v) setViewer({ logo: v.logo, displayName: v.displayName, badges: v.badges, isAdmin: v.isAdmin });
+      if (v) {
+        const vv: CachedViewer = { logo: v.logo, displayName: v.displayName, badges: v.badges, isAdmin: v.isAdmin };
+        setViewer(vv);
+        saveViewerCache(vv);
+      } else {
+        setViewer(null);
+        saveViewerCache(null);
+      }
     }).catch(() => {});
   }, []);
 
-  const avatarSrc = viewer?.logo ?? profile?.logo ?? "👤";
-  const teamLabel = viewer?.displayName ?? profile?.teamName ?? "La tua squadra";
+  const avatarSrc = viewer?.logo ?? "👤";
+  const teamLabel = viewer?.displayName ?? "La tua squadra";
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
