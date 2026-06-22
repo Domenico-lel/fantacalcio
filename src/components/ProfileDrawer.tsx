@@ -8,6 +8,7 @@ import { upsertProfile } from "@/app/actions";
 import { saveState } from "@/lib/store";
 import type { TeamProfile } from "@/lib/store";
 import BadgeRow from "@/components/Badges";
+import { isImageAvatar } from "@/lib/avatar";
 
 interface Props {
   open: boolean;
@@ -26,7 +27,7 @@ interface Props {
 
 /* Mostra il logo squadra (URL immagine) oppure l'emoji di fallback */
 function TeamAvatar({ src, className }: { src: string; className: string }) {
-  if (src?.startsWith("http")) {
+  if (isImageAvatar(src)) {
     return <img src={src} alt="" className={`${className} object-cover`} />;
   }
   return <div className={`${className} flex items-center justify-center text-3xl`}>{src || "⚽"}</div>;

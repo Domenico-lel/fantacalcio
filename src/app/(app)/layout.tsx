@@ -9,6 +9,7 @@ import PwaInstallGuide from "@/components/PwaInstallGuide";
 import { loadState, loadViewerCache, saveViewerCache } from "@/lib/store";
 import type { TeamProfile, CachedViewer } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
+import { isImageAvatar } from "@/lib/avatar";
 
 const NAV_ITEMS = [
   { href: "/news",        label: "Notizie",    icon: NewsIcon,       color: "#3b8eea" },
@@ -46,34 +47,29 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
-      {/* Profile bar — full-width, flex-none, mai scrollabile */}
-      <div className="flex-none px-4 pt-4 pb-2">
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-opacity active:opacity-70"
-          style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-          aria-label="Profilo"
-        >
-          {avatarSrc.startsWith("http")
-            ? <img src={avatarSrc} alt="" className="w-12 h-12 rounded-xl object-cover flex-none" />
-            : <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-none"
-                style={{ background: "rgba(255,255,255,0.06)" }}>{avatarSrc}</span>}
-          <div className="flex flex-col items-start min-w-0 flex-1">
-            <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wide leading-none mb-1">Il tuo profilo</span>
-            <span className="text-white text-base font-bold leading-tight truncate w-full">
-              {teamLabel}
-            </span>
+      {/* Top bar — header app-style, piatto, mai scrollabile */}
+      <header className="flex-none flex items-center gap-3 px-4 pt-4 pb-3">
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-white/35 text-[10px] font-semibold uppercase tracking-wider leading-none">La tua squadra</span>
+          <div className="flex items-center gap-1.5 min-w-0 mt-1">
+            <span className="text-white text-[17px] font-extrabold leading-tight truncate">{teamLabel}</span>
             {viewer?.badges && viewer.badges.length > 0 && (
-              <div className="mt-1.5">
-                <BadgeRow ids={viewer.badges} compact size={26} />
-              </div>
+              <span className="flex-none"><BadgeRow ids={viewer.badges} compact size={16} /></span>
             )}
           </div>
-          <svg className="flex-none text-white/30" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        </div>
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="flex-none rounded-full active:scale-95 transition-transform"
+          aria-label="Apri profilo"
+        >
+          {isImageAvatar(avatarSrc)
+            ? <img src={avatarSrc} alt="" className="w-10 h-10 rounded-full object-cover"
+                style={{ border: "2px solid var(--border)" }} />
+            : <span className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                style={{ background: "var(--surface)", border: "2px solid var(--border)" }}>{avatarSrc}</span>}
         </button>
-      </div>
+      </header>
 
       <div className="flex-1 overflow-y-auto pb-20">{children}</div>
 

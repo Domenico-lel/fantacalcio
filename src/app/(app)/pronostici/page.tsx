@@ -9,6 +9,7 @@ import {
 } from "@/app/pronostici-actions";
 import { fetchTeams, type Team } from "@/app/teams-actions";
 import { STARTING_CREDITS, REWARD_WIN, REWARD_DRAW } from "@/lib/bet-constants";
+import { isImageAvatar } from "@/lib/avatar";
 
 type Pick = "1" | "X" | "2";
 type TabKey = "bet" | "rank" | "admin";
@@ -16,7 +17,7 @@ type TabKey = "bet" | "rank" | "admin";
 const PICK_LABELS: Record<Pick, string> = { "1": "1", X: "X", "2": "2" };
 
 function Avatar({ src, size }: { src: string; size: number }) {
-  if (src?.startsWith("http")) {
+  if (isImageAvatar(src)) {
     return <img src={src} alt="" className="rounded-full object-cover flex-none" style={{ width: size, height: size }} />;
   }
   return <span className="flex-none leading-none" style={{ fontSize: size * 0.85 }}>{src}</span>;
@@ -490,14 +491,16 @@ function AdminCreditsCard({ leaderboard, reload }: { leaderboard: CreditRow[]; r
   return (
     <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
       <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: "var(--accent)" }}>Crediti manuali</p>
-      <div className="flex gap-2">
-        <select value={user} onChange={(e) => setUser(e.target.value)} className="flex-1 rounded-xl px-2 py-2 text-white text-sm outline-none" style={selStyle}>
+      <div className="flex flex-col gap-2">
+        <select value={user} onChange={(e) => setUser(e.target.value)} className="w-full rounded-xl px-2 py-2 text-white text-sm outline-none" style={selStyle}>
           <option value="" style={{ background: "#141d33" }}>Manager…</option>
           {leaderboard.map((r) => <option key={r.userId} value={r.userId} style={{ background: "#141d33" }}>{r.name} ({r.balance})</option>)}
         </select>
-        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="±crediti"
-          className="w-24 rounded-xl px-3 py-2 text-white text-sm outline-none" style={selStyle} />
-        <button onClick={apply} disabled={busy} className="px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50" style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>OK</button>
+        <div className="flex gap-2">
+          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="±crediti"
+            className="flex-1 rounded-xl px-3 py-2 text-white text-sm outline-none" style={selStyle} />
+          <button onClick={apply} disabled={busy} className="px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50" style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>OK</button>
+        </div>
       </div>
       <p className="text-white/35 text-[10px] mt-2">Usa valori negativi per togliere crediti. Es. +100 ricarica, -50 multa.</p>
     </div>

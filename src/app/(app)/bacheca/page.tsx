@@ -15,6 +15,7 @@ import {
   adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminDeleteProfile, adminSetProfileBadges,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
+import { isImageAvatar } from "@/lib/avatar";
 
 type TabKey = "scoop" | "cedibili" | "gestione";
 
@@ -33,7 +34,7 @@ function timeAgo(dateStr: string): string {
 
 /* Mostra un logo (URL immagine) oppure un'emoji */
 function Avatar({ src, size }: { src: string; size: number }) {
-  if (src?.startsWith("http")) {
+  if (isImageAvatar(src)) {
     return <img src={src} alt="" className="rounded-full object-cover flex-none" style={{ width: size, height: size }} />;
   }
   return <span className="flex-none leading-none" style={{ fontSize: size * 0.85 }}>{src}</span>;
@@ -278,7 +279,7 @@ function PostCard({ post, viewer, reload, setPosts }: {
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <div className="w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden text-xl flex-none"
           style={{ background: "var(--accent-bg)", border: "1px solid rgba(255,255,255,0.1)" }}>
-          {post.authorLogo?.startsWith("http")
+          {isImageAvatar(post.authorLogo)
             ? <img src={post.authorLogo} alt="" className="w-full h-full object-cover" />
             : <span>{post.authorLogo}</span>}
         </div>
