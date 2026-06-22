@@ -1,0 +1,36 @@
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="vBlue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3aa0ff"/>
+      <stop offset="100%" stop-color="#1577d4"/>
+    </linearGradient>
+    <radialGradient id="vGloss" cx="42%" cy="28%" r="60%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- scalloped seal: 12 petali arrotondati attorno al centro -->
+  <g fill="url(#vBlue)">
+    <g id="vPetal"><rect x="104" y="14" width="32" height="66" rx="16"/></g>
+    <use href="#vPetal" transform="rotate(30 120 120)"/>
+    <use href="#vPetal" transform="rotate(60 120 120)"/>
+    <use href="#vPetal" transform="rotate(90 120 120)"/>
+    <use href="#vPetal" transform="rotate(120 120 120)"/>
+    <use href="#vPetal" transform="rotate(150 120 120)"/>
+    <use href="#vPetal" transform="rotate(180 120 120)"/>
+    <use href="#vPetal" transform="rotate(210 120 120)"/>
+    <use href="#vPetal" transform="rotate(240 120 120)"/>
+    <use href="#vPetal" transform="rotate(270 120 120)"/>
+    <use href="#vPetal" transform="rotate(300 120 120)"/>
+    <use href="#vPetal" transform="rotate(330 120 120)"/>
+  </g>
+
+  <!-- corpo centrale -->
+  <circle cx="120" cy="120" r="88" fill="url(#vBlue)"/>
+  <circle cx="120" cy="120" r="88" fill="url(#vGloss)"/>
+
+  <!-- spunta bianca -->
+  <path d="M82 122 l24 26 52 -62" fill="none" stroke="#ffffff"
+        stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

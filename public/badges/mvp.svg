@@ -1,0 +1,55 @@
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="mBg" cx="35%" cy="28%" r="85%">
+      <stop offset="0%" stop-color="#2a2208"/>
+      <stop offset="100%" stop-color="#120d02"/>
+    </radialGradient>
+    <linearGradient id="mRibL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e0405a"/>
+      <stop offset="100%" stop-color="#9c1228"/>
+    </linearGradient>
+    <linearGradient id="mRibR" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a8be0"/>
+      <stop offset="100%" stop-color="#0d4a8c"/>
+    </linearGradient>
+    <radialGradient id="mDisc" cx="38%" cy="30%" r="72%">
+      <stop offset="0%" stop-color="#fff3b0"/>
+      <stop offset="45%" stop-color="#ffce4d"/>
+      <stop offset="100%" stop-color="#b87b0a"/>
+    </radialGradient>
+    <linearGradient id="mStar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fffbe0"/>
+      <stop offset="50%" stop-color="#ffd34d"/>
+      <stop offset="100%" stop-color="#c98e14"/>
+    </linearGradient>
+    <filter id="mSh" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#160f00" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <circle cx="120" cy="120" r="116" fill="url(#mBg)"/>
+  <circle cx="120" cy="120" r="116" fill="none" stroke="#8a6512" stroke-opacity="0.4" stroke-width="2"/>
+
+  <!-- ribbons -->
+  <path d="M96 60 L82 150 L104 138 L116 60 Z" fill="url(#mRibL)" filter="url(#mSh)"/>
+  <path d="M144 60 L158 150 L136 138 L124 60 Z" fill="url(#mRibR)" filter="url(#mSh)"/>
+  <path d="M96 60 L116 60 L104 138 Z" fill="#ffffff" opacity="0.12"/>
+
+  <!-- medal disc -->
+  <circle cx="120" cy="150" r="48" fill="url(#mDisc)" filter="url(#mSh)"/>
+  <circle cx="120" cy="150" r="48" fill="none" stroke="#7a4f04" stroke-width="2"/>
+  <circle cx="120" cy="150" r="40" fill="none" stroke="#fff7d6" stroke-opacity="0.5" stroke-width="2" stroke-dasharray="3 5"/>
+
+  <!-- star -->
+  <path d="M120 122 l8 18 20 2 -15 13 5 20 -18 -11 -18 11 5 -20 -15 -13 20 -2 z"
+        fill="url(#mStar)" stroke="#b87b0a" stroke-width="1.5"/>
+  <path d="M120 122 l8 18 -8 4 z" fill="#ffffff" opacity="0.45"/>
+
+  <!-- MVP letters -->
+  <text x="120" y="156" font-family="Arial Black, Arial, sans-serif" font-size="13" font-weight="900"
+        fill="#7a4f04" text-anchor="middle">MVP</text>
+
+  <!-- sparkles -->
+  <path d="M170 92 l3 6 6 3 -6 3 -3 6 -3 -6 -6 -3 6 -3 z" fill="#fff7d6" opacity="0.9"/>
+  <circle cx="70" cy="100" r="2.5" fill="#ffe27a" opacity="0.8"/>
+</svg>

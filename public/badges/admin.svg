@@ -1,0 +1,75 @@
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="aBg" cx="35%" cy="28%" r="85%">
+      <stop offset="0%" stop-color="#0a3236"/>
+      <stop offset="100%" stop-color="#03161a"/>
+    </radialGradient>
+    <linearGradient id="aGear" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7af0e6"/>
+      <stop offset="45%" stop-color="#21c2b4"/>
+      <stop offset="100%" stop-color="#0a7a72"/>
+    </linearGradient>
+    <linearGradient id="aGearDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#149a90"/>
+      <stop offset="100%" stop-color="#054540"/>
+    </linearGradient>
+    <radialGradient id="aHub" cx="38%" cy="32%" r="70%">
+      <stop offset="0%" stop-color="#0c2e33"/>
+      <stop offset="100%" stop-color="#04181b"/>
+    </radialGradient>
+    <radialGradient id="aGloss" cx="42%" cy="25%" r="55%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="aSh" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#021014" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <circle cx="120" cy="120" r="116" fill="url(#aBg)"/>
+  <circle cx="120" cy="120" r="116" fill="none" stroke="#11716a" stroke-opacity="0.4" stroke-width="2"/>
+
+  <!-- gear depth -->
+  <g transform="translate(0,6)">
+    <g fill="url(#aGearDark)">
+      <path d="M120 44 l11 0 4 22 -19 0 z"/>
+      <path d="M120 196 l11 0 4 -22 -19 0 z" transform="rotate(180 120 120)"/>
+    </g>
+  </g>
+
+  <!-- 8 teeth + body -->
+  <g filter="url(#aSh)">
+    <g fill="url(#aGear)">
+      <!-- teeth -->
+      <g id="teeth">
+        <path d="M111 40 h18 l-3 24 h-12 z"/>
+      </g>
+      <use href="#teeth" transform="rotate(45 120 120)"/>
+      <use href="#teeth" transform="rotate(90 120 120)"/>
+      <use href="#teeth" transform="rotate(135 120 120)"/>
+      <use href="#teeth" transform="rotate(180 120 120)"/>
+      <use href="#teeth" transform="rotate(225 120 120)"/>
+      <use href="#teeth" transform="rotate(270 120 120)"/>
+      <use href="#teeth" transform="rotate(315 120 120)"/>
+    </g>
+    <circle cx="120" cy="120" r="62" fill="url(#aGear)"/>
+  </g>
+  <circle cx="120" cy="120" r="62" fill="url(#aGloss)"/>
+  <circle cx="120" cy="120" r="48" fill="url(#aHub)"/>
+  <circle cx="120" cy="120" r="48" fill="none" stroke="#3fe0d2" stroke-opacity="0.4" stroke-width="2"/>
+
+  <!-- slider controls (admin) -->
+  <g stroke-linecap="round">
+    <line x1="98" y1="106" x2="142" y2="106" stroke="#0a2226" stroke-width="6"/>
+    <line x1="98" y1="106" x2="142" y2="106" stroke="#5cf0e2" stroke-width="3"/>
+    <circle cx="128" cy="106" r="7" fill="#eafffd" stroke="#0a7a72" stroke-width="1.5"/>
+
+    <line x1="98" y1="122" x2="142" y2="122" stroke="#0a2226" stroke-width="6"/>
+    <line x1="98" y1="122" x2="142" y2="122" stroke="#5cf0e2" stroke-width="3"/>
+    <circle cx="110" cy="122" r="7" fill="#eafffd" stroke="#0a7a72" stroke-width="1.5"/>
+
+    <line x1="98" y1="138" x2="142" y2="138" stroke="#0a2226" stroke-width="6"/>
+    <line x1="98" y1="138" x2="142" y2="138" stroke="#5cf0e2" stroke-width="3"/>
+    <circle cx="133" cy="138" r="7" fill="#eafffd" stroke="#0a7a72" stroke-width="1.5"/>
+  </g>
+</svg>

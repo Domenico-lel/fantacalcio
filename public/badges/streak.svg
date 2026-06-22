@@ -1,0 +1,53 @@
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="oBg" cx="35%" cy="75%" r="90%">
+      <stop offset="0%" stop-color="#4a1605"/>
+      <stop offset="100%" stop-color="#1a0701"/>
+    </radialGradient>
+    <linearGradient id="oFlame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#ffd83d"/>
+      <stop offset="35%" stop-color="#ff8a1e"/>
+      <stop offset="70%" stop-color="#f23b1e"/>
+      <stop offset="100%" stop-color="#c11212"/>
+    </linearGradient>
+    <linearGradient id="oInner" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#fffce0"/>
+      <stop offset="45%" stop-color="#ffe14d"/>
+      <stop offset="100%" stop-color="#ff8a1e"/>
+    </linearGradient>
+    <radialGradient id="oCore" cx="50%" cy="72%" r="55%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="60%" stop-color="#fff0a0" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffd83d" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="oGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <circle cx="120" cy="120" r="116" fill="url(#oBg)"/>
+  <circle cx="120" cy="120" r="116" fill="none" stroke="#a33812" stroke-opacity="0.4" stroke-width="2"/>
+
+  <!-- outer flame glow -->
+  <path d="M120 36 C150 78 182 96 176 142 C170 188 144 206 120 206
+           C96 206 64 186 64 140 C64 110 86 110 92 86 C108 104 104 70 120 36 Z"
+        fill="url(#oFlame)" filter="url(#oGlow)" opacity="0.95"/>
+
+  <!-- mid flame (depth) -->
+  <path d="M120 70 C140 100 162 116 156 148 C150 182 138 194 120 194
+           C102 194 84 180 84 150 C84 128 100 126 104 108 C116 122 110 96 120 70 Z"
+        fill="url(#oInner)"/>
+
+  <!-- inner core -->
+  <path d="M120 108 C132 126 144 134 140 156 C136 178 130 184 120 184
+           C110 184 102 176 102 158 C102 142 114 140 120 108 Z"
+        fill="url(#oCore)"/>
+  <ellipse cx="120" cy="166" rx="12" ry="16" fill="#ffffff" opacity="0.85"/>
+
+  <!-- embers -->
+  <circle cx="156" cy="70" r="4" fill="#ffb84d" opacity="0.9"/>
+  <circle cx="78" cy="92" r="3" fill="#ff7a3d" opacity="0.85"/>
+  <circle cx="168" cy="120" r="2.5" fill="#ffd83d" opacity="0.8"/>
+  <circle cx="70" cy="140" r="2.5" fill="#ff9a3d" opacity="0.8"/>
+</svg>

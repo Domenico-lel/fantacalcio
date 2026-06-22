@@ -712,9 +712,9 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
                 const b = BADGE_MAP[id];
                 if (!b) return null;
                 return (
-                  <span key={id} className="inline-flex items-center gap-1 rounded-full font-bold"
-                    style={{ background: `${b.color}22`, color: b.color, border: `1px solid ${b.color}55`, fontSize: 11, padding: "2px 4px 2px 8px" }}>
-                    <span style={{ fontSize: 12 }}>{b.emoji}</span>{b.label}
+                  <span key={id} className="inline-flex items-center gap-1.5 rounded-full font-bold"
+                    style={{ background: `${b.color}22`, color: b.color, border: `1px solid ${b.color}55`, fontSize: 11, padding: "2px 6px 2px 4px" }}>
+                    <img src={`/badges/${id}.svg`} alt="" width={18} height={18} style={{ display: "block", flex: "none" }} />{b.label}
                     <button onClick={() => applyBadges(badges.filter((x) => x !== id))} disabled={badgeBusy}
                       className="ml-0.5 px-1 opacity-70 disabled:opacity-30" aria-label={`Rimuovi ${b.label}`}>✕</button>
                   </span>

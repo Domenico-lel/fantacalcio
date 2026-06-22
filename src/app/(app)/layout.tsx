@@ -64,7 +64,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </span>
             {viewer?.badges && viewer.badges.length > 0 && (
               <div className="mt-1.5">
-                <BadgeRow ids={viewer.badges} compact />
+                <BadgeRow ids={viewer.badges} compact size={26} />
               </div>
             )}
           </div>
