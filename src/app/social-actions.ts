@@ -240,7 +240,7 @@ export async function uploadPostImage(formData: FormData): Promise<{ url: string
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { url: null, error: "Nessun file valido" };
-  if (file.size > 5 * 1024 * 1024) return { url: null, error: "Immagine troppo grande (max 5MB)" };
+  if (file.size > 7 * 1024 * 1024) return { url: null, error: "Immagine troppo grande (max 7MB)" };
 
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
   const path = `${crypto.randomUUID()}.${ext || "jpg"}`;
