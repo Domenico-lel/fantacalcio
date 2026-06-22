@@ -203,11 +203,13 @@ export async function fetchBetCenter(): Promise<BetCenter> {
     matches: matchesByRound.get(r.id) ?? [],
   }));
 
-  // classifica crediti — tutti i manager con profilo
+  // classifica crediti — solo manager con una squadra assegnata
+  // (l'admin ha un profilo senza team_ref e non è in gara)
   const balByUser = new Map<string, number>();
   for (const c of credits ?? []) balByUser.set(c.user_id, c.balance);
 
   const leaderboard: CreditRow[] = (profiles ?? [])
+    .filter((p) => !!p.team_ref)
     .map((p) => ({
       userId: p.user_id,
       name: p.team_name || p.first_name || "Manager",
