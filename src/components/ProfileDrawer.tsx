@@ -7,6 +7,7 @@ import { useAppUser } from "@/lib/app-user-context";
 import { upsertProfile } from "@/app/actions";
 import { saveState } from "@/lib/store";
 import type { TeamProfile } from "@/lib/store";
+import BadgeRow from "@/components/Badges";
 
 interface Props {
   open: boolean;
@@ -14,6 +15,8 @@ interface Props {
   profile: TeamProfile | null;
   /** Avatar effettivo usato dall'app: logo squadra (impostato dall'admin) o emoji di fallback */
   avatar: string;
+  /** Badge assegnati dall'admin, mostrati nel profilo */
+  badges?: string[];
   onProfileSaved: (p: TeamProfile) => void;
 }
 
@@ -25,7 +28,7 @@ function TeamAvatar({ src, className }: { src: string; className: string }) {
   return <div className={`${className} flex items-center justify-center text-3xl`}>{src || "⚽"}</div>;
 }
 
-export default function ProfileDrawer({ open, onClose, profile, avatar, onProfileSaved }: Props) {
+export default function ProfileDrawer({ open, onClose, profile, avatar, badges = [], onProfileSaved }: Props) {
   const user = useAppUser();
   const { signOut } = useClerk();
   const router = useRouter();
@@ -143,6 +146,9 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, onProfil
                     </p>
                     {user.email && (
                       <p className="text-white/40 text-xs mt-1 truncate">{user.email}</p>
+                    )}
+                    {badges.length > 0 && (
+                      <div className="mt-2"><BadgeRow ids={badges} /></div>
                     )}
                   </div>
                 </div>

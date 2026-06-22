@@ -11,6 +11,7 @@ export interface Database {
           logo: string;
           budget: number;
           team_ref: string | null;
+          badges: string[];
           created_at: string;
           updated_at: string;
         };
@@ -22,6 +23,7 @@ export interface Database {
           logo?: string;
           budget?: number;
           team_ref?: string | null;
+          badges?: string[];
           updated_at?: string;
         };
         Update: {
@@ -31,6 +33,7 @@ export interface Database {
           logo?: string;
           budget?: number;
           team_ref?: string | null;
+          badges?: string[];
           updated_at?: string;
         };
         Relationships: [];

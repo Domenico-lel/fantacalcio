@@ -3,6 +3,7 @@
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import { fetchLeagueTeams } from "@/lib/league-teams";
 import { getCurrentViewer } from "@/app/social-actions";
+import { normalizeBadges } from "@/lib/badges";
 
 export interface Team {
   id: string;
@@ -173,16 +174,33 @@ export interface AdminProfile {
   teamName: string;
   teamRef: string | null;
   logo: string;
+  badges: string[];
 }
 
 export async function adminListProfiles(): Promise<AdminProfile[]> {
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return [];
   const db = createAdminClient();
-  const { data } = await db
+  const { data, error } = await db
     .from("fanta_profiles")
-    .select("user_id, first_name, last_name, team_name, team_ref, logo")
+    .select("user_id, first_name, last_name, team_name, team_ref, logo, badges")
     .order("team_name", { ascending: true });
+  // fallback se la colonna badges non è ancora stata migrata
+  if (error && /badges/i.test(error.message)) {
+    const { data: d2 } = await db
+      .from("fanta_profiles")
+      .select("user_id, first_name, last_name, team_name, team_ref, logo")
+      .order("team_name", { ascending: true });
+    return (d2 ?? []).map((p) => ({
+      userId: p.user_id,
+      firstName: p.first_name ?? "",
+      lastName: p.last_name ?? "",
+      teamName: p.team_name ?? "",
+      teamRef: p.team_ref,
+      logo: p.logo ?? "⚽",
+      badges: [],
+    }));
+  }
   return (data ?? []).map((p) => ({
     userId: p.user_id,
     firstName: p.first_name ?? "",
@@ -190,6 +208,7 @@ export async function adminListProfiles(): Promise<AdminProfile[]> {
     teamName: p.team_name ?? "",
     teamRef: p.team_ref,
     logo: p.logo ?? "⚽",
+    badges: normalizeBadges(p.badges),
   }));
 }
 
@@ -231,6 +250,19 @@ export async function adminDeleteProfile(userId: string): Promise<{ error: strin
   if (!viewer?.isAdmin) return { error: "Solo l'admin" };
   const db = createAdminClient();
   const { error } = await db.from("fanta_profiles").delete().eq("user_id", userId);
+  return { error: error?.message ?? null };
+}
+
+// Assegna/aggiorna i badge di un manager (l'admin sceglie dal catalogo).
+export async function adminSetProfileBadges(userId: string, badges: string[]): Promise<{ error: string | null }> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) return { error: "Solo l'admin" };
+  const clean = normalizeBadges(badges);
+  const db = createAdminClient();
+  const { error } = await db.from("fanta_profiles").update({ badges: clean } as never).eq("user_id", userId);
+  if (error && /badges/i.test(error.message)) {
+    return { error: "Colonna badges mancante: esegui supabase-badges-migration.sql." };
+  }
   return { error: error?.message ?? null };
 }
 

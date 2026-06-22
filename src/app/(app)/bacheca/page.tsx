@@ -7,10 +7,12 @@ import {
   type FeedPost, type Listing, type Viewer,
 } from "@/app/social-actions";
 import { ADMIN_POST_TAGS } from "@/lib/post-tags";
+import { BADGES, BADGE_MAP } from "@/lib/badges";
+import BadgeRow from "@/components/Badges";
 import {
   fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
   addRosterPlayer, deleteRosterPlayer, searchPlayers,
-  adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminDeleteProfile,
+  adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminDeleteProfile, adminSetProfileBadges,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
 
@@ -281,7 +283,10 @@ function PostCard({ post, viewer, reload, setPosts }: {
             : <span>{post.authorLogo}</span>}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm leading-tight truncate">{post.authorName}</p>
+          <p className="text-white font-semibold text-sm leading-tight flex items-center gap-1.5">
+            <span className="truncate">{post.authorName}</span>
+            <BadgeRow ids={post.authorBadges} compact />
+          </p>
           <p className="text-white/40 text-xs">{timeAgo(post.createdAt)} fa</p>
         </div>
         {viewer?.isAdmin ? (
@@ -646,11 +651,14 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
   const [firstName, setFirstName] = useState(profile.firstName);
   const [lastName, setLastName] = useState(profile.lastName);
   const [teamName, setTeamName] = useState(profile.teamName);
+  const [badges, setBadges] = useState<string[]>(profile.badges);
   const [busy, setBusy] = useState(false);
+  const [badgeBusy, setBadgeBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
 
   const dirty = firstName !== profile.firstName || lastName !== profile.lastName || teamName !== profile.teamName;
+  const availableBadges = BADGES.filter((b) => !badges.includes(b.id));
 
   async function save() {
     setBusy(true); setMsg("");
@@ -658,6 +666,16 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
     setBusy(false);
     if (res.error) { setMsg(res.error); return; }
     setMsg("✓ Salvato");
+    await reload();
+  }
+
+  async function applyBadges(next: string[]) {
+    const prev = badges;
+    setBadges(next);
+    setBadgeBusy(true); setMsg("");
+    const res = await adminSetProfileBadges(profile.userId, next);
+    setBadgeBusy(false);
+    if (res.error) { setMsg(res.error); setBadges(prev); return; }
     await reload();
   }
 
@@ -684,6 +702,38 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
             className="px-3 py-2 rounded-lg text-xs text-red-400/80"
             style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>Elimina profilo</button>
         </div>
+
+        {/* Badge — l'admin assegna onorificenze mostrate nei post e nel profilo */}
+        <div className="mt-1">
+          <p className="text-white/40 text-[10px] font-semibold uppercase tracking-wide mb-1.5">Badge</p>
+          {badges.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {badges.map((id) => {
+                const b = BADGE_MAP[id];
+                if (!b) return null;
+                return (
+                  <span key={id} className="inline-flex items-center gap-1 rounded-full font-bold"
+                    style={{ background: `${b.color}22`, color: b.color, border: `1px solid ${b.color}55`, fontSize: 11, padding: "2px 4px 2px 8px" }}>
+                    <span style={{ fontSize: 12 }}>{b.emoji}</span>{b.label}
+                    <button onClick={() => applyBadges(badges.filter((x) => x !== id))} disabled={badgeBusy}
+                      className="ml-0.5 px-1 opacity-70 disabled:opacity-30" aria-label={`Rimuovi ${b.label}`}>✕</button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <select value="" disabled={badgeBusy || availableBadges.length === 0}
+            onChange={(e) => { if (e.target.value) applyBadges([...badges, e.target.value]); }}
+            className="w-full rounded-lg px-3 py-2 text-white text-sm outline-none disabled:opacity-50" style={inputStyle}>
+            <option value="" style={{ background: "#141d33" }}>
+              {availableBadges.length === 0 ? "Tutti i badge assegnati" : "+ Aggiungi un badge…"}
+            </option>
+            {availableBadges.map((b) => (
+              <option key={b.id} value={b.id} style={{ background: "#141d33" }}>{b.emoji} {b.label} — {b.description}</option>
+            ))}
+          </select>
+        </div>
+
         {msg && <p className="text-white/60 text-xs">{msg}</p>}
       </div>
     </div>

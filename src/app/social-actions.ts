@@ -3,6 +3,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import { isAdminPostTag } from "@/lib/post-tags";
+import { normalizeBadges } from "@/lib/badges";
 
 // ─── Tipi esposti al client ─────────────────────────────────────────────────
 
@@ -12,6 +13,7 @@ export interface Viewer {
   displayName: string;
   logo: string;
   hasProfile: boolean;
+  badges: string[];
 }
 
 export interface FeedComment {
@@ -27,6 +29,7 @@ export interface FeedPost {
   id: string;
   authorName: string;
   authorLogo: string;
+  authorBadges: string[];
   body: string;
   imageUrl: string | null;
   tag: string | null;
@@ -81,7 +84,7 @@ async function getViewer(): Promise<ViewerInternal | null> {
   }
 
   if (isAdmin) {
-    return { userId, email, isAdmin: true, displayName: adminName, logo: adminLogo, hasProfile: false };
+    return { userId, email, isAdmin: true, displayName: adminName, logo: adminLogo, hasProfile: false, badges: ["admin"] };
   }
 
   // Manager con profilo squadra?
@@ -108,6 +111,7 @@ async function getViewer(): Promise<ViewerInternal | null> {
       displayName: profile.team_name || profile.first_name || cu?.firstName || "Manager",
       logo,
       hasProfile: true,
+      badges: await safeProfileBadges(db, userId),
     };
   }
 
@@ -118,7 +122,15 @@ async function getViewer(): Promise<ViewerInternal | null> {
     displayName: cu?.firstName || "Manager",
     logo: "⚽",
     hasProfile: false,
+    badges: [],
   };
+}
+
+// Legge i badge di un profilo in modo sicuro (ritorna [] se la colonna non esiste ancora)
+async function safeProfileBadges(db: ReturnType<typeof createAdminClient>, userId: string): Promise<string[]> {
+  const { data, error } = await db.from("fanta_profiles").select("badges").eq("user_id", userId).maybeSingle();
+  if (error || !data) return [];
+  return normalizeBadges((data as { badges?: unknown }).badges);
 }
 
 export async function getCurrentViewer(): Promise<Viewer | null> {
@@ -146,10 +158,18 @@ export async function fetchFeed(): Promise<{ posts: FeedPost[]; viewer: Viewer |
   }
 
   const ids = posts.map((p) => p.id);
-  const [{ data: likes }, { data: comments }] = await Promise.all([
+  const authorIds = [...new Set(posts.map((p) => p.author_id))];
+  const [{ data: likes }, { data: comments }, badgeRes] = await Promise.all([
     db.from("fanta_post_likes").select("post_id, user_id").in("post_id", ids),
     db.from("fanta_post_comments").select("*").in("post_id", ids).order("created_at", { ascending: true }),
+    db.from("fanta_profiles").select("user_id, badges").in("user_id", authorIds),
   ]);
+
+  // mappa autore → badge (ignora silenziosamente se la colonna non è ancora migrata)
+  const badgeByUser = new Map<string, string[]>();
+  if (!badgeRes.error) {
+    for (const r of badgeRes.data ?? []) badgeByUser.set(r.user_id, normalizeBadges((r as { badges?: unknown }).badges));
+  }
 
   const feed: FeedPost[] = posts.map((p) => {
     const postLikes = (likes ?? []).filter((l) => l.post_id === p.id);
@@ -167,6 +187,7 @@ export async function fetchFeed(): Promise<{ posts: FeedPost[]; viewer: Viewer |
       id: p.id,
       authorName: p.author_name,
       authorLogo: p.author_logo,
+      authorBadges: badgeByUser.get(p.author_id) ?? [],
       body: p.body,
       imageUrl: p.image_url,
       tag: p.tag,
