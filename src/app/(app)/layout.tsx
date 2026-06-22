@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
 import ProfileDrawer from "@/components/ProfileDrawer";
+import BadgeRow from "@/components/Badges";
 import { loadState } from "@/lib/store";
 import type { TeamProfile } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
@@ -46,11 +47,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           {avatarSrc.startsWith("http")
             ? <img src={avatarSrc} alt="" className="w-7 h-7 rounded-full object-cover flex-none" />
             : <span className="text-2xl leading-none flex-none">{avatarSrc}</span>}
-          <div className="flex flex-col items-start min-w-0">
+          <div className="flex flex-col items-center min-w-0 w-full">
             <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wide leading-none mb-0.5">Il tuo profilo</span>
-            <span className="text-white text-sm font-bold leading-none truncate w-full">
+            <span className="text-white text-sm font-bold leading-none truncate w-full text-center">
               {teamLabel}
             </span>
+            {viewer?.badges && viewer.badges.length > 0 && (
+              <div className="mt-1">
+                <BadgeRow ids={viewer.badges} compact />
+              </div>
+            )}
           </div>
         </button>
       </div>
