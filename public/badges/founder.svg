@@ -1,67 +1,92 @@
 <svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <radialGradient id="fBg" cx="35%" cy="28%" r="85%">
-      <stop offset="0%" stop-color="#3a2a08"/>
-      <stop offset="100%" stop-color="#160f02"/>
+    <radialGradient id="fBg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#2a1147"/>
+      <stop offset="60%" stop-color="#160826"/>
+      <stop offset="100%" stop-color="#0a0413"/>
     </radialGradient>
-    <linearGradient id="fGold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fff3b0"/>
-      <stop offset="35%" stop-color="#ffd24d"/>
-      <stop offset="70%" stop-color="#e09b1a"/>
-      <stop offset="100%" stop-color="#9c6406"/>
+    <linearGradient id="fPurple" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e9b6ff"/>
+      <stop offset="32%" stop-color="#b86cf0"/>
+      <stop offset="68%" stop-color="#7d2ed0"/>
+      <stop offset="100%" stop-color="#4a138f"/>
     </linearGradient>
-    <linearGradient id="fGoldDark" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#c98e14"/>
-      <stop offset="100%" stop-color="#6e4503"/>
+    <linearGradient id="fPurpleDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5a17a8"/>
+      <stop offset="100%" stop-color="#2c0758"/>
     </linearGradient>
     <linearGradient id="fBand" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffe27a"/>
-      <stop offset="100%" stop-color="#b87b0a"/>
+      <stop offset="0%" stop-color="#d79bff"/>
+      <stop offset="100%" stop-color="#5a17a8"/>
     </linearGradient>
-    <radialGradient id="fGem" cx="35%" cy="30%" r="75%">
-      <stop offset="0%" stop-color="#ff9bd0"/>
-      <stop offset="50%" stop-color="#e0286f"/>
-      <stop offset="100%" stop-color="#8c0f3e"/>
+    <radialGradient id="fGem" cx="36%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#ffe6fb"/>
+      <stop offset="45%" stop-color="#ff5ad0"/>
+      <stop offset="100%" stop-color="#a0148c"/>
     </radialGradient>
-    <radialGradient id="fGemB" cx="35%" cy="30%" r="75%">
-      <stop offset="0%" stop-color="#a0e4ff"/>
-      <stop offset="50%" stop-color="#2a9be0"/>
-      <stop offset="100%" stop-color="#0d4f8c"/>
+    <radialGradient id="fGemB" cx="36%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#dcc4ff"/>
+      <stop offset="45%" stop-color="#9a6cff"/>
+      <stop offset="100%" stop-color="#4a17b0"/>
     </radialGradient>
     <filter id="fSh" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#1a0f00" flood-opacity="0.6"/>
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#0a0413" flood-opacity="0.6"/>
+    </filter>
+    <filter id="fGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
     </filter>
   </defs>
 
+  <style>
+    @keyframes founderGlow {
+      0%, 100% { opacity: 0.55; stroke-width: 3; }
+      50%      { opacity: 1;    stroke-width: 5; }
+    }
+    .glow-ring { animation: founderGlow 2.5s ease-in-out infinite; transform-origin: center; }
+    @keyframes founderTwk { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+    .twk { animation: founderTwk 1.7s ease-in-out infinite; transform-origin: center; }
+  </style>
+
+  <!-- base disc -->
   <circle cx="120" cy="120" r="116" fill="url(#fBg)"/>
-  <circle cx="120" cy="120" r="116" fill="none" stroke="#8a6512" stroke-opacity="0.4" stroke-width="2"/>
+
+  <!-- glowing purple ring all around -->
+  <circle class="glow-ring" cx="120" cy="120" r="114" fill="none"
+          stroke="#b86cf0" stroke-width="4" filter="url(#fGlow)"/>
+  <circle cx="120" cy="120" r="116" fill="none" stroke="#5a2a9a" stroke-opacity="0.5" stroke-width="2"/>
 
   <!-- crown back depth -->
   <path d="M58 102 L84 150 L120 116 L156 150 L182 102 L172 174 H68 Z"
-        transform="translate(0,6)" fill="url(#fGoldDark)"/>
+        transform="translate(0,6)" fill="url(#fPurpleDark)"/>
   <!-- crown body -->
   <path d="M58 102 L84 150 L120 116 L156 150 L182 102 L172 174 H68 Z"
-        fill="url(#fGold)" filter="url(#fSh)"/>
+        fill="url(#fPurple)" filter="url(#fSh)"/>
   <!-- crown highlight facets -->
   <path d="M58 102 L84 150 L120 116 Z" fill="#ffffff" opacity="0.18"/>
-  <path d="M156 150 L182 102 L120 116 Z" fill="#000000" opacity="0.12"/>
+  <path d="M156 150 L182 102 L120 116 Z" fill="#000000" opacity="0.16"/>
 
   <!-- base band -->
   <rect x="64" y="174" width="112" height="26" rx="6" fill="url(#fBand)" filter="url(#fSh)"/>
-  <rect x="64" y="174" width="112" height="9" rx="4" fill="#ffffff" opacity="0.3"/>
+  <rect x="64" y="174" width="112" height="9" rx="4" fill="#ffffff" opacity="0.28"/>
 
   <!-- spire tips -->
-  <circle cx="58" cy="102" r="9" fill="url(#fGold)" stroke="#7a4f04" stroke-width="1.5"/>
-  <circle cx="120" cy="116" r="9" fill="url(#fGold)" stroke="#7a4f04" stroke-width="1.5"/>
-  <circle cx="182" cy="102" r="9" fill="url(#fGold)" stroke="#7a4f04" stroke-width="1.5"/>
+  <circle cx="58" cy="102" r="9" fill="url(#fPurple)" stroke="#3a0a78" stroke-width="1.5"/>
+  <circle cx="120" cy="116" r="9" fill="url(#fPurple)" stroke="#3a0a78" stroke-width="1.5"/>
+  <circle cx="182" cy="102" r="9" fill="url(#fPurple)" stroke="#3a0a78" stroke-width="1.5"/>
 
   <!-- center gem -->
-  <ellipse cx="120" cy="160" rx="13" ry="15" fill="url(#fGem)" stroke="#5e0a2a" stroke-width="1.5"/>
+  <ellipse cx="120" cy="160" rx="13" ry="15" fill="url(#fGem)" stroke="#6e0a5e" stroke-width="1.5"/>
   <ellipse cx="116" cy="154" rx="4" ry="5" fill="#ffffff" opacity="0.7"/>
   <!-- side gems -->
-  <circle cx="88" cy="187" r="6" fill="url(#fGemB)" stroke="#0a3a66" stroke-width="1"/>
-  <circle cx="152" cy="187" r="6" fill="url(#fGemB)" stroke="#0a3a66" stroke-width="1"/>
+  <circle cx="88" cy="187" r="6" fill="url(#fGemB)" stroke="#2e0a78" stroke-width="1"/>
+  <circle cx="152" cy="187" r="6" fill="url(#fGemB)" stroke="#2e0a78" stroke-width="1"/>
 
   <!-- sparkles -->
-  <path d="M170 70 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z" fill="#fff7d6" opacity="0.9"/>
+  <circle class="twk" cx="172" cy="74" r="3.5" fill="#e9b6ff"/>
+  <circle class="twk" cx="70" cy="96" r="3" fill="#e9b6ff" style="animation-delay:.4s"/>
+  <circle class="twk" cx="160" cy="150" r="3" fill="#e9b6ff" style="animation-delay:.8s"/>
 </svg>

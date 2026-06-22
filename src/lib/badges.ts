@@ -17,7 +17,7 @@ export const BADGES: BadgeDef[] = [
   { id: "bomber",     label: "Bomber",     emoji: "⚽", color: "#34d399", description: "Miglior attacco della lega" },
   { id: "mvp",        label: "MVP",        emoji: "⭐", color: "#857cf0", description: "Giocatore del mese" },
   { id: "veteran",    label: "Veterano",   emoji: "🎖️", color: "#b08d57", description: "Storico della lega" },
-  { id: "founder",    label: "Fondatore",  emoji: "👑", color: "#d4af37", description: "Membro fondatore" },
+  { id: "founder",    label: "Founder",    emoji: "👑", color: "#b86cf0", description: "Membro fondatore" },
 ];
 
 export const BADGE_MAP: Record<string, BadgeDef> = Object.fromEntries(BADGES.map((b) => [b.id, b]));

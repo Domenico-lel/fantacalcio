@@ -1,20 +1,29 @@
-# FantaCalcio
+# ⚽ Soccer Dick Club
 
-App mobile per gestire il fantacalcio creativo con amici. Notizie calcio, transfer rumors, classifica lega in tempo reale, bacheca social e pronostici.
+App mobile PWA per gestire il fantacalcio creativo con amici. **Installabile come app nativa** su smartphone. Notizie calcio, transfer rumors, classifica lega in tempo reale, bacheca social, pronostici e sistema badge illustrati.
 
-**Status**: Standalone repo, fully functional with Clerk auth + Supabase persistence.
+**Status**: PWA fully functional. Clerk auth + Supabase persistence. Installazione mobile via browser menu.
 
 ## Cosa fa
 
-- **Notizie** (`/news`) — Feed RSS da Corriere dello Sport e Tuttosport, cache 5 min.
-- **Mercato** (`/players`) — Transfer rumors da Transfermarkt (top 5 leghe europee: Serie A, Premier League, La Liga, Bundesliga, Ligue 1). Clicca card → scheda con dati trasferimento, link profilo TM.
-- **Classifica** (`/standings`) — Classifica reale lega amici da Leghe FC, scraping HTML cache 10 min.
-- **Calendario** (`/calendar`) — Giornate Serie A (attualmente mock, da aggiornare con API).
-- **Bacheca Social** (`/bacheca`) — Feed di post della lega dove gli utenti possono interagire, commentare e usare i tag.
-- **Pronostici** (`/pronostici`) — Sezione dedicata ai pronostici delle partite.
-- **Squadre** — Gestione avanzata delle squadre degli utenti e dei relativi dati.
-- **Onboarding** — 3 step: nome/cognome → nome squadra → logo emoji.
-- **Profilo** — Accessibile dalla barra header, mostra dati utente + avatar.
+**Navigazione infondo** (bottom nav) con 5 sezioni colorate:
+
+- **🔵 Notizie** (`/news`) — Feed RSS da Corriere dello Sport e Tuttosport, cache 5 min.
+- **🟠 Mercato** (`/players`) — Transfer rumors da Transfermarkt (top 5 leghe europee). Clicca card → scheda con dati trasferimento e link profilo TM.
+- **🟣 Classifica** (`/standings`) — Classifica reale lega amici da Leghe FC, scraping HTML cache 10 min.
+- **🟡 Pronostici** (`/pronostici`) — Sezione pronostici con sistema crediti (esclude admin dalla classifica).
+- **🟢 Bacheca Social** (`/bacheca`) — Feed di post dove interagire, commentare, usare tag.
+
+**Profilo & Badge**:
+- **Profile bar** (top) — Avatar, nome squadra, badge illustrati full-color, accesso al drawer profilo.
+- **Badge system** — Emblemi illustrati (es. verificato Instagram, badge personalizzati lega).
+- **Drawer profilo** — Gestione squadra, avatar, badge e informazioni utente.
+
+**Installazione PWA**:
+- Click menu browser → "Installa app" o "Aggiungi a schermata home".
+- App standalone con icona, launch screen personalizzato, offline support.
+
+**Onboarding** — 3 step: nome/cognome → nome squadra → logo emoji.
 
 ## Stack tecnico
 
@@ -24,17 +33,21 @@ App mobile per gestire il fantacalcio creativo con amici. Notizie calcio, transf
 | Autenticazione | Clerk `@clerk/nextjs` v6 |
 | Database | Supabase `@supabase/supabase-js` v2 |
 | Stile | Tailwind CSS v3, mobile-first 375px |
+| PWA | Web App Manifest, installazione mobile, offline support |
 | Linguaggio | TypeScript strict |
 | Runtime | Node 24, pnpm 10.33.2 |
+| Design | Dark theme (theme-color: #0a0f1d), bottom nav con 5 icone colorate |
 
 ## Avvio in sviluppo
 
 ```bash
 # Dalla root repo fantacalcio
-npm install
-npm run dev -- --port 3004
+pnpm install
+pnpm dev -- --port 3004
 # → http://localhost:3004
 ```
+
+**HTTPS per PWA**: In dev, apri tramite `https://localhost:3004` (Accept HTTPS warning nel browser) per testare l'installazione PWA. Oppure, in Chrome, apri DevTools → More tools → Application → Manifest per verificare che il manifest sia caricato.
 
 ## Variabili d'ambiente
 
@@ -70,6 +83,23 @@ Esegui i file SQL di migrazione nell'SQL Editor del tuo progetto Supabase. I fil
 
 RLS abilitato. Service role key bypassa RLS automaticamente.
 
+## Configurazione PWA
+
+App installabile su:
+- **iOS**: Apri in Safari → Condividi → "Aggiungi a schermata home"
+- **Android**: Chrome menu → "Installa app" (richiede HTTPS + manifest valido)
+
+**File di configurazione PWA**:
+- `public/manifest.json` — Nome app, icone, colori, orientamento
+- `src/app/layout.tsx` — Metadata, `appleWebApp`, viewport, theme-color
+- `src/components/PwaInstallGuide` — Componente per promuovere installazione
+
+**Features PWA**:
+- Display `standalone` (fullscreen, nessuna barra browser)
+- Start URL: `/` (dopo login → `/news`)
+- Background color: `#0a0f1d` (dark theme)
+- Orientamento: portrait
+
 ## Persistenza dati
 
 Dual-layer strategy:
@@ -101,31 +131,57 @@ curl http://localhost:3004/api/health
 ```
 fantacalcio/
 ├── .env.example
+├── public/
+│   ├── manifest.json              # Web App Manifest (PWA)
+│   └── icon.svg                   # Icona app
 ├── supabase-*.sql                 # File di migrazione database
 ├── src/
 │   ├── middleware.ts              # Clerk auth (protegge tutto tranne /, /sign-in, /sign-up)
 │   ├── app/
-│   │   ├── layout.tsx             # ClerkProvider + ClerkUserBridge
-│   │   ├── page.tsx               # Landing page
-│   │   ├── actions.ts             # Server Actions (profilo, ecc)
-│   │   ├── *-actions.ts           # Server Actions per bacheca, pronostici, team
+│   │   ├── layout.tsx             # Root layout (PWA metadata, theme-color, appleWebApp)
+│   │   ├── page.tsx               # Landing page (login redirect)
+│   │   ├── actions.ts             # Server Actions (profilo, team, ecc)
+│   │   ├── *-actions.ts           # Server Actions per bacheca, pronostici, social
 │   │   ├── onboarding/page.tsx
 │   │   ├── sign-in/ e sign-up/
 │   │   ├── api/                   # Endpoint di appoggio (health, news, transfers, standings)
-│   │   └── (app)/                 # Schermate protette con bottom nav
+│   │   └── (app)/                 # Schermate protette con layout PWA
+│   │       ├── layout.tsx         # App layout (profile bar + bottom nav + drawer profilo)
 │   │       ├── bacheca/           # Social feed
-│   │       ├── calendar/          # Calendario
 │   │       ├── news/              # Notizie RSS
 │   │       ├── players/           # Transfer rumors
-│   │       ├── pronostici/        # Sezione pronostici
+│   │       ├── pronostici/        # Sezione pronostici (crediti, ranking)
 │   │       └── standings/         # Classifica lega
-│   ├── components/                # Componenti UI e layout
+│   ├── components/
+│   │   ├── PwaInstallGuide        # Guide per installazione PWA mobile
+│   │   ├── ProfileDrawer          # Drawer profilo + avatar + badge
+│   │   ├── Badges                 # Componente badge illustrati
+│   │   ├── BadgeRow               # Badge riga compatta (profile bar)
+│   │   └── ...altri componenti
 │   └── lib/                       # Utility, context, tipi DB, Supabase client
 ```
 
+## Bottom Navigation
+
+5 tabs alla base dello schermo, sempre visibile. Configurati in `src/app/(app)/layout.tsx`:
+
+```typescript
+const NAV_ITEMS = [
+  { href: "/news",        label: "Notizie",    icon: NewsIcon,       color: "#3b8eea" },      // blu
+  { href: "/players",     label: "Mercato",    icon: TransferIcon,   color: "#f0a43a" },     // arancione
+  { href: "/standings",   label: "Classifica", icon: StandingsIcon,  color: "#857cf0" },     // viola
+  { href: "/pronostici",  label: "Pronostici", icon: DiceIcon,       color: "#f5a623" },     // giallo
+  { href: "/bacheca",     label: "Bacheca",    icon: MegaphoneIcon,  color: "#1fb083" },     // verde
+];
+```
+
+Per aggiungere/modificare tab: edit `NAV_ITEMS` array e update gli icon component (o importa nuove icone SVG).
+
 ## Note di sviluppo
 
-- **Trasferimenti lenti in dev**: primo caricamento fetch 44 richieste a TM (~20-30s). Dalla cache in-memory (5 min TTL) risposta istantanea.
+- **HTTPS in dev per PWA**: Se testi l'installazione mobile in localhost, devi aprire con HTTPS (`https://localhost:3004`).
+- **Trasferimenti lenti al primo caricamento**: ~20-30s per 44 richieste a Transfermarkt. Dalla cache in-memory (5 min TTL) è istantaneo.
 - **HTML Transfermarkt instabile**: regex scraping possono rompersi se TM cambia struttura.
-- **Lega Leghe FC**: URL classifica configurato in `src/app/api/standings/route.ts`.
-- **Calendario mock**: attualmente non aggiornato in tempo reale — in lista TODO.
+- **Lega Leghe FC**: URL classifica in `src/app/api/standings/route.ts`.
+- **Pronostici**: Admin escluso automaticamente dalla classifica crediti.
+- **Badge system**: Gestito in `src/components/Badges`. Full-color, illustrati, con verifiche (es. Instagram).
