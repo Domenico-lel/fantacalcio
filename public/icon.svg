@@ -9,6 +9,7 @@
     </filter>
   </defs>
   <rect width="84" height="84" rx="20" fill="#05080f"/>
+  <rect x="3.5" y="3.5" width="77" height="77" rx="17" fill="none" stroke="#34d399" stroke-width="2" filter="url(#ng)"/>
   <circle cx="42" cy="42" r="23" fill="none" stroke="#34d399" stroke-width="2.5" filter="url(#ng)"/>
   <polygon points="42,31 51.5,37.9 47.9,49.1 36.1,49.1 32.5,37.9" fill="none" stroke="#3b8eea" stroke-width="2" filter="url(#ng)"/>
   <g stroke="#34d399" stroke-width="2" stroke-linecap="round" filter="url(#ng)">
