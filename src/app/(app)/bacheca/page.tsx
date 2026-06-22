@@ -283,10 +283,10 @@ function PostCard({ post, viewer, reload, setPosts }: {
             : <span>{post.authorLogo}</span>}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm leading-tight flex items-center gap-1.5">
-            <span className="truncate">{post.authorName}</span>
-            <BadgeRow ids={post.authorBadges} compact />
-          </p>
+          <p className="text-white font-semibold text-sm leading-tight truncate">{post.authorName}</p>
+          {post.authorBadges?.length > 0 && (
+            <div className="mt-1 mb-0.5"><BadgeRow ids={post.authorBadges} compact size={16} /></div>
+          )}
           <p className="text-white/40 text-xs">{timeAgo(post.createdAt)} fa</p>
         </div>
         {viewer?.isAdmin ? (

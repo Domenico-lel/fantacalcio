@@ -26,7 +26,7 @@ export default function BadgeRow({ ids, compact = false, size }: { ids: string[]
   if (compact) {
     const px = size ?? 22;
     return (
-      <span className="inline-flex items-center gap-1 align-middle">
+      <span className="flex flex-wrap items-center gap-1.5 align-middle">
         {valid.map((b) => (
           <span key={b.id} title={`${b.label} — ${b.description}`} className="inline-flex">
             <BadgeImg id={b.id} size={px} />
