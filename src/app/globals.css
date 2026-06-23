@@ -34,6 +34,8 @@
               --accent-grad:linear-gradient(135deg,#00ffd0,#2bff88); --accent-glow:rgba(0,255,200,0.5); }
 .sec-bet    { --accent:#ffb31a; --accent-soft:#ffe08a; --accent-ink:#2e2400; --accent-bg:#3a2c0c;
               --accent-grad:linear-gradient(135deg,#ffe600,#ff7a1a); --accent-glow:rgba(255,170,20,0.5); }
+.sec-trophy { --accent:#f5c518; --accent-soft:#ffe08a; --accent-ink:#2e2400; --accent-bg:#3a2c0c;
+              --accent-grad:linear-gradient(135deg,#ffe600,#f5b820); --accent-glow:rgba(245,197,24,0.5); }
 
 * {
   -webkit-tap-highlight-color: transparent;

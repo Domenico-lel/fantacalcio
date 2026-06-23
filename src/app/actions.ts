@@ -11,7 +11,7 @@ export interface Trophy {
   display_name: string;
   year: number;
   season: string;
-  position: 1 | 2 | 3;
+  position: number;
   team_name: string;
   points: number | null;
 }

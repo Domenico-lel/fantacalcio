@@ -12,7 +12,7 @@ import { getCurrentViewer } from "@/app/social-actions";
 import { isImageAvatar } from "@/lib/avatar";
 
 const NAV_ITEMS = [
-  { href: "/news",        label: "Notizie",    icon: NewsIcon,       color: "#2e9dff" },
+  { href: "/trofei",      label: "Trofei",     icon: TrophyIcon,     color: "#f5c518" },
   { href: "/players",     label: "Mercato",    icon: TransferIcon,   color: "#ff9b2f" },
   { href: "/standings",   label: "Classifica", icon: StandingsIcon,  color: "#d24dff" },
   { href: "/pronostici",  label: "Pronostici", icon: DiceIcon,       color: "#ffb31a" },
@@ -117,12 +117,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function NewsIcon({ active }: { active: boolean }) {
+function TrophyIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
-        fill={active ? "currentColor" : "none"} fillOpacity={0.1} />
-      <path d="M7 9h10M7 13h6M7 17h4" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round"/>
+      <path d="M7 4h10v5a5 5 0 01-10 0V4z" stroke="currentColor" strokeWidth={active ? 2 : 1.5}
+        fill={active ? "currentColor" : "none"} fillOpacity={0.12} strokeLinejoin="round" />
+      <path d="M7 6H4v2a3 3 0 003 3M17 6h3v2a3 3 0 01-3 3" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round"/>
+      <path d="M12 14v3m-3 4h6m-5 0a3 3 0 013-3 3 3 0 013 3" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }

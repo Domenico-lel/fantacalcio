@@ -5,7 +5,7 @@ import { BrandCrest, BrandWordmark } from "@/components/BrandLogo";
 
 export default async function LandingPage() {
   const { userId } = await auth();
-  if (userId) redirect("/news");
+  if (userId) redirect("/trofei");
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-10 relative overflow-hidden pitch-bg">
