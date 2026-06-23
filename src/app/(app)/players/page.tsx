@@ -157,8 +157,7 @@ function VociTab() {
         const title = lines[0] ?? "";
         const body = lines.slice(1).join("\n").trim();
         return (
-          <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer"
-            className="pop-in block rounded-2xl overflow-hidden active:opacity-80 transition-opacity"
+          <div key={item.id} className="pop-in rounded-2xl overflow-hidden"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
             {item.imageUrl && (
               <img src={item.imageUrl} alt="" className="w-full max-h-52 object-cover" loading="lazy"
@@ -176,12 +175,12 @@ function VociTab() {
                 )}
                 <span className="text-white/30 text-[10px] ml-auto flex-none">{timeAgo(item.postedAt)}</span>
               </div>
-              <p className="text-white font-bold text-[14px] leading-snug line-clamp-2">{title}</p>
+              <p className="text-white font-bold text-[14px] leading-snug">{title}</p>
               {body && (
-                <p className="text-white/55 text-[12.5px] leading-snug mt-1 whitespace-pre-line line-clamp-4">{body}</p>
+                <p className="text-white/55 text-[12.5px] leading-snug mt-1 whitespace-pre-line">{body}</p>
               )}
             </div>
-          </a>
+          </div>
         );
       })}
 
