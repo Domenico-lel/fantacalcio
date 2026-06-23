@@ -33,13 +33,13 @@ export function BrandCrest({
   className?: string;
   style?: CSSProperties;
 }) {
-  const height = (size * 280) / 240;
+  const height = (size * 232) / 240;
   const navyShield = "M120 70 L198 88 L198 165 C198 212 165 244 120 260 C75 244 42 212 42 165 L42 88 Z";
   return (
     <svg
       width={size}
       height={height}
-      viewBox="0 0 240 280"
+      viewBox="0 48 240 232"
       fill="none"
       role="img"
       aria-label="Stemma FNB Fantacalcio"
@@ -75,18 +75,6 @@ export function BrandCrest({
       <Laurel />
       <g transform="translate(240 0) scale(-1 1)">
         <Laurel />
-      </g>
-
-      {/* Pallone in alto */}
-      <circle cx={120} cy={50} r={34} fill="#ffffff" />
-      <circle cx={120} cy={50} r={34} fill="none" stroke="#14233a" strokeWidth={1.5} />
-      <polygon points="120,37 132.4,46 127.6,60.5 112.4,60.5 107.6,46" fill="#14233a" />
-      <g stroke="#14233a" strokeWidth={2}>
-        <line x1={120} y1={37} x2={120} y2={16} />
-        <line x1={132.4} y1={46} x2={152.3} y2={39.5} />
-        <line x1={127.6} y1={60.5} x2={140} y2={77.5} />
-        <line x1={112.4} y1={60.5} x2={100} y2={77.5} />
-        <line x1={107.6} y1={46} x2={87.7} y2={39.5} />
       </g>
 
       {/* Monogramma FNB */}

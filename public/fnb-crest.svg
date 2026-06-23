@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="232" viewBox="0 48 240 232" role="img" aria-label="Stemma FNB Fantacalcio">
+  <defs><clipPath id="sc"><path d="M120 70 L198 88 L198 165 C198 212 165 244 120 260 C75 244 42 212 42 165 L42 88 Z"/></clipPath></defs>
+  <path d="M120 60 L208 80 L208 166 C208 218 171 252 120 270 C69 252 32 218 32 166 L32 80 Z" fill="#c8342a" stroke="#7e1d16" stroke-width="2"/>
+  <path d="M120 70 L198 88 L198 165 C198 212 165 244 120 260 C75 244 42 212 42 165 L42 88 Z" fill="#163a5c"/>
+  <path d="M120 70 L198 88 L198 165 C198 212 165 244 120 260 C75 244 42 212 42 165 L42 88 Z" fill="none" stroke="#f0b429" stroke-width="1.4" opacity="0.7"/>
+  <g clip-path="url(#sc)">
+    <rect x="34" y="208" width="172" height="70" fill="#3f8a32"/>
+    <line x1="44" y1="210" x2="196" y2="210" stroke="#fff" stroke-width="1.6" opacity="0.85"/>
+    <path d="M104 210 A16 16 0 0 0 136 210" fill="none" stroke="#fff" stroke-width="1.6" opacity="0.85"/>
+    <line x1="120" y1="210" x2="120" y2="236" stroke="#fff" stroke-width="1.4" opacity="0.7"/>
+  </g>
+  <g fill="#f0b429">
+    <path d="M90 168 C70 158 60 128 84 84" fill="none" stroke="#d99a1c" stroke-width="2.4" stroke-linecap="round"/>
+    <ellipse cx="74" cy="158" rx="8.5" ry="4" transform="rotate(-12 74 158)"/>
+    <ellipse cx="69" cy="142" rx="8.5" ry="4" transform="rotate(-26 69 142)"/>
+    <ellipse cx="66" cy="124" rx="8.5" ry="4" transform="rotate(-42 66 124)"/>
+    <ellipse cx="67" cy="106" rx="8.5" ry="4" transform="rotate(-58 67 106)"/>
+    <ellipse cx="73" cy="91" rx="8.5" ry="4" transform="rotate(-74 73 91)"/>
+    <ellipse cx="83" cy="80" rx="8.5" ry="4" transform="rotate(-90 83 80)"/>
+  </g>
+  <g transform="translate(240 0) scale(-1 1)" fill="#f0b429">
+    <path d="M90 168 C70 158 60 128 84 84" fill="none" stroke="#d99a1c" stroke-width="2.4" stroke-linecap="round"/>
+    <ellipse cx="74" cy="158" rx="8.5" ry="4" transform="rotate(-12 74 158)"/>
+    <ellipse cx="69" cy="142" rx="8.5" ry="4" transform="rotate(-26 69 142)"/>
+    <ellipse cx="66" cy="124" rx="8.5" ry="4" transform="rotate(-42 66 124)"/>
+    <ellipse cx="67" cy="106" rx="8.5" ry="4" transform="rotate(-58 67 106)"/>
+    <ellipse cx="73" cy="91" rx="8.5" ry="4" transform="rotate(-74 73 91)"/>
+    <ellipse cx="83" cy="80" rx="8.5" ry="4" transform="rotate(-90 83 80)"/>
+  </g>
+  <text x="120" y="158" text-anchor="middle" font-size="62" font-weight="900" letter-spacing="1" fill="#f5b820" stroke="#7e1d16" stroke-width="1.5" font-family="'Arial Black',Arial,sans-serif">FNB</text>
+  <path d="M48 176 L32 182 L40 200 L52 195 Z" fill="#9e2b20"/>
+  <path d="M192 176 L208 182 L200 200 L188 195 Z" fill="#9e2b20"/>
+  <path d="M46 174 H194 L188 200 H52 Z" fill="#c8342a" stroke="#7e1d16" stroke-width="1.4"/>
+  <text x="120" y="193" text-anchor="middle" font-size="15" font-weight="800" letter-spacing="2" fill="#f3e2bf">FANTACALCIO</text>
+</svg>
