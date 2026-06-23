@@ -26,14 +26,24 @@ function dealStatus(probability: number, trend: TransferItem["trend"]) {
   return { color: "#eab308", label: "Probabilità bassa" };
 }
 
-// Badge automatico dedotto dal testo del post stile Romano
+// Tag automatico dedotto dal testo del post (terminologia mercato italiana).
+// Ordine = priorità: dal segnale più forte (ufficiale) al più debole (trattativa).
 function newsBadge(text: string): { label: string; color: string } | null {
   const t = text.toLowerCase();
   if (/here we go/.test(t)) return { label: "🟢 Here we go!", color: "#22c55e" };
-  if (/ufficiale|official|✅/.test(t)) return { label: "Ufficiale", color: "#22c55e" };
   if (/visite mediche|medical/.test(t)) return { label: "Visite mediche", color: "#38bdf8" };
-  if (/salta|saltat|sfumat|naufragat|niente da fare|si complica/.test(t)) return { label: "A rischio", color: "#ef4444" };
-  if (/goal|gol!|inizio|intervallo|fine partita|fischio/.test(t)) return { label: "Live", color: "#f59e0b" };
+  if (/ufficiale|official|ha firmato|firma con|è un nuovo|nuovo giocatore del|comunicato ufficiale|annuncio ufficiale/.test(t))
+    return { label: "Ufficiale", color: "#22c55e" };
+  if (/accordo[^.!?]{0,15}(raggiunt|verbale|totale|trovat|di massima|tra i club)|fumata bianca|affare fatto|intesa raggiunta|ha chiuso|chiusura|chiude per|fumata|torna al|torna alla|passa al|passa alla|colpo/.test(t))
+    return { label: "Affare fatto", color: "#16a34a" };
+  if (/rinnov|prolung|proroga|firma sul (rinnovo|nuovo)/.test(t)) return { label: "Rinnovo", color: "#a855f7" };
+  if (/salta|saltat|sfumat|naufragat|si complica|niente da fare|rottura|frena|distanza (ampia|importante|notevole)|nodo|in stallo|si raffredda|complica/.test(t))
+    return { label: "A rischio", color: "#ef4444" };
+  if (/in prestito|prestito (con|secco|gratuito|oneroso)/.test(t)) return { label: "Prestito", color: "#3b82f6" };
+  if (/lasciare il|lasciare la|può lasciare|pronto a lasciare|addio|cedibile|in uscita|messo sul mercato|in vendita|via da|saluta/.test(t))
+    return { label: "In uscita", color: "#fb923c" };
+  if (/interess|ha chiesto|chiesto informazioni|sondagg|contatt|piace|obiettivo|nel mirino|offert|trattativ|incontro|vuole|pronto a|idea|sulle tracce|priorità|sogno|tentativo|provare a chiudere|monitora|seguon|seguito|taccuino|pressing/.test(t))
+    return { label: "Trattativa", color: "#f59e0b" };
   return null;
 }
 
