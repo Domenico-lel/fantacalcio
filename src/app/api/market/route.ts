@@ -1,0 +1,114 @@
+import { NextResponse } from "next/server";
+
+/* Feed "Voci di mercato": legge in diretta la pagina web pubblica del canale
+   Telegram @vocidicalciomercato (t.me/s/...). Nessun bot, token o DB: ogni post
+   pubblicato sul canale compare qui da solo, con cache breve. */
+
+export interface MarketNewsItem {
+  id: string;
+  text: string;
+  url: string;
+  imageUrl?: string;
+  postedAt: string;
+}
+
+const CHANNEL = "vocidicalciomercato";
+const SRC = `https://t.me/s/${CHANNEL}`;
+
+function decodeEntities(str: string): string {
+  return str
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&[a-z]+;/gi, "");
+}
+
+/* Trasforma il blocco HTML del testo del messaggio in testo pulito. */
+function cleanText(html: string): string {
+  return decodeEntities(
+    html
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+  )
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]*\n[ \t]*/g, "\n")
+    .trim();
+}
+
+function parseChannel(html: string): MarketNewsItem[] {
+  const items: MarketNewsItem[] = [];
+
+  // Indici di inizio di ogni messaggio, poi slice tra uno e il successivo
+  const starts: number[] = [];
+  const wrapRe = /<div class="tgme_widget_message_wrap/g;
+  let m: RegExpExecArray | null;
+  while ((m = wrapRe.exec(html)) !== null) starts.push(m.index);
+  starts.push(html.length);
+
+  for (let i = 0; i < starts.length - 1; i++) {
+    const block = html.slice(starts[i], starts[i + 1]);
+
+    const idMatch = block.match(/data-post="([^"]+)"/);
+    if (!idMatch) continue;
+    const id = idMatch[1]; // es. "vocidicalciomercato/88345"
+
+    const textMatch = block.match(
+      /<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/
+    );
+    const text = textMatch ? cleanText(textMatch[1]) : "";
+
+    const photoMatch = block.match(
+      /tgme_widget_message_photo_wrap[^"]*"[^>]*style="[^"]*background-image:url\('([^']+)'\)/
+    );
+    const imageUrl = photoMatch ? photoMatch[1].replace(/\\\//g, "/") : undefined;
+
+    // Salta i messaggi senza contenuto utile (es. servizi/video puri senza testo)
+    if (!text && !imageUrl) continue;
+
+    const timeMatch = block.match(/<time[^>]+datetime="([^"]+)"/);
+    const postedAt = timeMatch ? timeMatch[1] : "";
+
+    items.push({
+      id,
+      text,
+      url: `https://t.me/${id}`,
+      imageUrl,
+      postedAt,
+    });
+  }
+
+  // Più recenti in cima
+  items.sort((a, b) => {
+    const da = a.postedAt ? new Date(a.postedAt).getTime() : 0;
+    const db = b.postedAt ? new Date(b.postedAt).getTime() : 0;
+    return db - da;
+  });
+
+  return items.slice(0, 30);
+}
+
+export async function GET() {
+  try {
+    const res = await fetch(SRC, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Accept-Language": "it-IT,it;q=0.9",
+      },
+      next: { revalidate: 120 }, // cache 2 min
+    });
+    if (!res.ok) {
+      return NextResponse.json({ items: [], error: true }, { status: 200 });
+    }
+    const items = parseChannel(await res.text());
+    return NextResponse.json(
+      { items },
+      { headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=60" } }
+    );
+  } catch {
+    return NextResponse.json({ items: [], error: true }, { status: 200 });
+  }
+}
