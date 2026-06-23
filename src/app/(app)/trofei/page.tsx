@@ -13,13 +13,19 @@ const MEDAL: Record<number, { label: string; color: string }> = {
   3: { label: "BRONZO", color: "#cd7f32" },
 };
 
+/* Albo d'oro della Coppa — competizione a parte (solo il vincitore di ogni edizione).
+   Il primo elemento è l'edizione più recente. */
+const COPPA: { season: string; winner: string }[] = [
+  { season: "2025/26", winner: "Damiano" },
+  { season: "2024/25", winner: "Matteo" },
+];
+
 interface SeasonGroup {
   year: number;
   season: string;
   rows: Trophy[];
   podium: Trophy[];
   champion?: Trophy;
-  spoon?: Trophy;
 }
 
 function initial(name: string) {
@@ -36,14 +42,12 @@ function groupSeasons(trophies: Trophy[]): SeasonGroup[] {
   const groups: SeasonGroup[] = [];
   for (const rows of map.values()) {
     const sorted = [...rows].sort((a, b) => a.position - b.position);
-    const maxPos = Math.max(...rows.map((r) => r.position));
     groups.push({
       year: rows[0].year,
       season: rows[0].season,
       rows: sorted,
       podium: sorted.filter((r) => r.position >= 1 && r.position <= 3),
       champion: rows.find((r) => r.position === 1),
-      spoon: maxPos > 3 ? rows.find((r) => r.position === maxPos) : undefined,
     });
   }
   return groups.sort((a, b) => b.year - a.year);
@@ -113,17 +117,6 @@ function FeaturedSeason({ g }: { g: SeasonGroup }) {
         <Step row={p1} place={1} h={92} color={MEDAL[1].color} />
         <Step row={p3} place={3} h={48} color={MEDAL[3].color} />
       </div>
-
-      {/* Cucchiaio */}
-      {g.spoon && (
-        <div className="mt-3 pt-3 flex items-center gap-3" style={{ borderTop: "1px solid var(--border)" }}>
-          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg"
-            style={{ background: "rgba(205,127,50,0.12)", color: "#cd9a6a", border: "1px solid rgba(205,127,50,0.3)" }}>
-            🥄 Cucchiaio
-          </span>
-          <span className="text-white/80 text-sm font-semibold flex-1 truncate">{g.spoon.display_name}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -146,20 +139,48 @@ function SeasonRow({ g, myName }: { g: SeasonGroup; myName: string }) {
       <div className="flex-1 min-w-0">
         <p className="text-white text-[13px] font-semibold truncate">🏆 {champ?.display_name ?? "—"}</p>
       </div>
-      {champ?.points != null && (
-        <span className="text-white/45 text-xs font-semibold flex-none tabular-nums">{champ.points} pt</span>
-      )}
     </div>
+  );
+}
+
+/* ─── La Coppa: competizione separata, solo il vincitore per edizione ───────── */
+function CoppaSection({ myName }: { myName: string }) {
+  return (
+    <>
+      <div className="flex items-center justify-between mt-1 px-1">
+        <span className="text-white/40 text-[11px] font-bold uppercase tracking-widest">🏆 La Coppa</span>
+        <span className="text-white/30 text-[11px] tabular-nums">{COPPA.length} edizioni</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {COPPA.map((c, i) => {
+          const current = i === 0;
+          const mine = sameName(c.winner, myName);
+          return (
+            <div key={c.season} className="flex items-center gap-3 rounded-2xl px-3 py-3"
+              style={{ background: "var(--surface)", border: "1px solid var(--border)", borderLeft: `3px solid ${current ? "#f5c518" : "var(--border)"}` }}>
+              <Avatar name={c.winner} size={40} ring={current ? "#f5c518" : "rgba(255,255,255,0.25)"} />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-bold truncate">
+                  {c.winner}{mine && <span className="text-white/40 font-semibold"> · tu</span>}
+                </p>
+                <p className="text-white/40 text-[11px] font-semibold">{current ? "Vincitore in carica" : "Campione"}</p>
+              </div>
+              <span className="text-[13px] font-bold tabular-nums flex-none" style={{ color: "var(--accent-soft)" }}>{c.season}</span>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
 /* ─── Tab Manager: classifica per persona ──────────────────────────────────── */
 function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
   const stats = useMemo(() => {
-    const map = new Map<string, { name: string; titles: number; podiums: number; spoons: number; seasons: number }>();
+    const map = new Map<string, { name: string; titles: number; podiums: number; seasons: number }>();
     const get = (name: string) => {
       const k = name.trim().toLowerCase();
-      if (!map.has(k)) map.set(k, { name, titles: 0, podiums: 0, spoons: 0, seasons: 0 });
+      if (!map.has(k)) map.set(k, { name, titles: 0, podiums: 0, seasons: 0 });
       return map.get(k)!;
     };
     for (const g of groups) {
@@ -169,7 +190,6 @@ function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
         if (r.position === 1) s.titles++;
         if (r.position <= 3) s.podiums++;
       }
-      if (g.spoon) get(g.spoon.display_name).spoons++;
     }
     return [...map.values()].sort((a, b) => b.titles - a.titles || b.podiums - a.podiums);
   }, [groups]);
@@ -184,7 +204,7 @@ function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
           <Avatar name={s.name} size={38} ring={i === 0 ? "#f5c518" : "rgba(255,255,255,0.25)"} />
           <div className="flex-1 min-w-0">
             <p className="text-white text-sm font-bold truncate">{s.name}</p>
-            <p className="text-white/40 text-[11px]">{s.podiums} podi · {s.seasons} stagioni{s.spoons > 0 ? ` · ${s.spoons} 🥄` : ""}</p>
+            <p className="text-white/40 text-[11px]">{s.podiums} podi · {s.seasons} stagioni</p>
           </div>
           <div className="flex items-center gap-1 flex-none">
             <span className="text-lg">🏆</span>
@@ -200,20 +220,16 @@ function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
 function RecordTab({ groups }: { groups: SeasonGroup[] }) {
   const rec = useMemo(() => {
     const titleMap = new Map<string, number>();
-    const spoonMap = new Map<string, number>();
-    let bestPoints: { name: string; pts: number; season: string } | null = null;
     for (const g of groups) {
       const champ = g.champion;
       if (champ) titleMap.set(champ.display_name, (titleMap.get(champ.display_name) ?? 0) + 1);
-      if (g.spoon) spoonMap.set(g.spoon.display_name, (spoonMap.get(g.spoon.display_name) ?? 0) + 1);
-      for (const r of g.rows) {
-        if (r.points != null && (!bestPoints || r.points > bestPoints.pts))
-          bestPoints = { name: r.display_name, pts: r.points, season: r.season };
-      }
     }
     const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1])[0];
-    return { mostTitles: top(titleMap), mostSpoons: top(spoonMap), bestPoints, seasons: groups.length };
+    return { mostTitles: top(titleMap), seasons: groups.length };
   }, [groups]);
+
+  const currentChamp = groups[0]?.champion;
+  const currentCup = COPPA[0];
 
   const Card = ({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) => (
     <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
@@ -230,8 +246,8 @@ function RecordTab({ groups }: { groups: SeasonGroup[] }) {
     <div className="px-4 py-4 flex flex-col gap-3">
       <Card icon="📚" label="Stagioni giocate" value={`${rec.seasons}`} />
       {rec.mostTitles && <Card icon="👑" label="Più titoli" value={rec.mostTitles[0]} sub={`${rec.mostTitles[1]} scudetti`} />}
-      {rec.mostSpoons && <Card icon="🥄" label="Re del cucchiaio" value={rec.mostSpoons[0]} sub={`${rec.mostSpoons[1]} cucchiai`} />}
-      {rec.bestPoints && <Card icon="🔥" label="Record punti" value={`${rec.bestPoints.pts} pt`} sub={`${rec.bestPoints.name} · ${rec.bestPoints.season}`} />}
+      {currentChamp && <Card icon="🛡️" label="Campione in carica" value={currentChamp.display_name} sub={`Stagione ${groups[0].season}`} />}
+      {currentCup && <Card icon="🏆" label="Coppa in carica" value={currentCup.winner} sub={`Stagione ${currentCup.season}`} />}
     </div>
   );
 }
@@ -321,6 +337,8 @@ export default function TrofeiPage() {
               )}
             </>
           )}
+
+          <CoppaSection myName={myName} />
           <div className="h-4" />
         </div>
       )}
