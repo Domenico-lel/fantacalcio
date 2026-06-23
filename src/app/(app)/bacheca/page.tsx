@@ -16,6 +16,7 @@ import {
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
 import { isImageAvatar } from "@/lib/avatar";
+import SegmentedTabs from "@/components/SegmentedTabs";
 
 type TabKey = "scoop" | "cedibili" | "gestione";
 
@@ -76,19 +77,15 @@ export default function BachecaPage() {
       <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>La lega</p>
         <h1 className="text-white font-bold text-2xl leading-tight mb-3">Bacheca</h1>
-        <div className="flex gap-1 p-1 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
-          {(([["scoop", "Scoop"], ["cedibili", "Cedibili"],
-              ...(viewer?.isAdmin ? [["gestione", "Gestione"]] : [])] as [TabKey, string][])).map(([key, label]) => (
-            <button key={key} onClick={() => setTab(key)}
-              className="flex-1 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
-              style={{
-                background: tab === key ? "var(--accent)" : "transparent",
-                color: tab === key ? "var(--accent-ink)" : "rgba(255,255,255,0.55)",
-              }}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: "scoop" as TabKey, label: "Scoop" },
+            { key: "cedibili" as TabKey, label: "Cedibili" },
+            ...(viewer?.isAdmin ? [{ key: "gestione" as TabKey, label: "Gestione" }] : []),
+          ]}
+        />
       </div>
 
       {tab === "scoop" && <ScoopTab viewer={viewer} posts={posts} loading={loading} reload={loadFeed} setPosts={setPosts} />}

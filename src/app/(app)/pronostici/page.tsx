@@ -10,6 +10,7 @@ import {
 import { fetchTeams, type Team } from "@/app/teams-actions";
 import { STARTING_CREDITS, REWARD_WIN, REWARD_DRAW } from "@/lib/bet-constants";
 import { isImageAvatar } from "@/lib/avatar";
+import SegmentedTabs from "@/components/SegmentedTabs";
 
 type Pick = "1" | "X" | "2";
 type TabKey = "bet" | "rank" | "admin";
@@ -59,18 +60,16 @@ export default function PronosticiPage() {
           )}
         </div>
 
-        <div className="flex gap-1 p-1 rounded-2xl mt-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
-          {(([["bet", "Scommetti"], ["rank", "Classifica"],
-              ...(isAdmin ? [["admin", "Gestione"]] : [])] as [TabKey, string][])).map(([key, label]) => (
-            <button key={key} onClick={() => setTab(key)}
-              className="flex-1 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
-              style={{
-                background: tab === key ? "var(--accent)" : "transparent",
-                color: tab === key ? "var(--accent-ink)" : "rgba(255,255,255,0.55)",
-              }}>
-              {label}
-            </button>
-          ))}
+        <div className="mt-3">
+          <SegmentedTabs
+            value={tab}
+            onChange={setTab}
+            items={[
+              { key: "bet" as TabKey, label: "Scommetti" },
+              { key: "rank" as TabKey, label: "Classifica" },
+              ...(isAdmin ? [{ key: "admin" as TabKey, label: "Gestione" }] : []),
+            ]}
+          />
         </div>
       </div>
 
