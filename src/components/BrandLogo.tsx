@@ -1,8 +1,29 @@
 import type { CSSProperties } from "react";
 
-/* ─── Stemma Soccer Dick Club ──────────────────────────────────────────────
-   Scudo navy + bordo emerald, pallone classico e razzo (il tocco goliardico,
-   allusivo ma non esplicito). Il testo eredita il font della pagina. */
+/* Foglie d'alloro di un lato; il lato opposto è speculare (vedi render). */
+const LAUREL_LEAVES = [
+  { x: 74, y: 158, r: -12 },
+  { x: 69, y: 142, r: -26 },
+  { x: 66, y: 124, r: -42 },
+  { x: 67, y: 106, r: -58 },
+  { x: 73, y: 91, r: -74 },
+  { x: 83, y: 80, r: -90 },
+];
+
+function Laurel() {
+  return (
+    <g fill="#f0b429">
+      <path d="M90 168 C70 158 60 128 84 84" fill="none" stroke="#d99a1c" strokeWidth={2.4} strokeLinecap="round" />
+      {LAUREL_LEAVES.map((l, i) => (
+        <ellipse key={i} cx={l.x} cy={l.y} rx={8.5} ry={4} transform={`rotate(${l.r} ${l.x} ${l.y})`} />
+      ))}
+    </g>
+  );
+}
+
+/* ─── Stemma FNB Fantacalcio ────────────────────────────────────────────────
+   Scudo rosso + interno navy, pallone classico, alloro dorato, monogramma
+   "FNB", cartiglio "FANTACALCIO" e campo verde sul fondo. */
 export function BrandCrest({
   size = 120,
   className,
@@ -12,61 +33,84 @@ export function BrandCrest({
   className?: string;
   style?: CSSProperties;
 }) {
-  const height = (size * 132) / 120;
+  const height = (size * 280) / 240;
+  const navyShield = "M120 70 L198 88 L198 165 C198 212 165 244 120 260 C75 244 42 212 42 165 L42 88 Z";
   return (
     <svg
       width={size}
       height={height}
-      viewBox="0 0 120 132"
+      viewBox="0 0 240 280"
       fill="none"
       role="img"
-      aria-label="Stemma Soccer Dick Club"
+      aria-label="Stemma FNB Fantacalcio"
       className={className}
       style={style}
     >
+      <defs>
+        <clipPath id="fnbShieldClip">
+          <path d={navyShield} />
+        </clipPath>
+      </defs>
+
+      {/* Scudo rosso (bordo) */}
       <path
-        d="M60 6 L108 21 L108 60 C108 93 86 114 60 122 C34 114 12 93 12 60 L12 21 Z"
-        fill="#0e1528"
-        stroke="#34d399"
-        strokeWidth={3.5}
+        d="M120 60 L208 80 L208 166 C208 218 171 252 120 270 C69 252 32 218 32 166 L32 80 Z"
+        fill="#c8342a"
+        stroke="#7e1d16"
+        strokeWidth={2}
       />
-      <path
-        d="M60 14 L101 27 L101 60 C101 88 82 106 60 113 C38 106 19 88 19 60 L19 27 Z"
-        fill="none"
-        stroke="rgba(110,231,183,0.35)"
-        strokeWidth={1.2}
-      />
-      {/* stella */}
-      <path
-        d="M60 24 l2.2 4.6 5 0.7 -3.6 3.5 0.9 5 -4.5 -2.4 -4.5 2.4 0.9 -5 -3.6 -3.5 5 -0.7 Z"
-        fill="#f5a623"
-      />
-      {/* razzo */}
-      <g transform="rotate(-22 78 44)">
-        <path d="M78 30 C84 34 84 46 84 50 L72 50 C72 46 72 34 78 30 Z" fill="#ffffff" />
-        <circle cx={78} cy={40} r={2.6} fill="#3b8eea" />
-        <path d="M72 49 l-5 6 6 -1 Z" fill="#f5a623" />
-        <path d="M84 49 l5 6 -6 -1 Z" fill="#f5a623" />
-        <path d="M75 52 l3 8 3 -8 Z" fill="#f0a43a" />
+      {/* Interno navy */}
+      <path d={navyShield} fill="#163a5c" />
+      <path d={navyShield} fill="none" stroke="#f0b429" strokeWidth={1.4} opacity={0.7} />
+
+      {/* Campo verde sul fondo, ritagliato nello scudo */}
+      <g clipPath="url(#fnbShieldClip)">
+        <rect x={34} y={208} width={172} height={70} fill="#3f8a32" />
+        <line x1={44} y1={210} x2={196} y2={210} stroke="#ffffff" strokeWidth={1.6} opacity={0.85} />
+        <path d="M104 210 A16 16 0 0 0 136 210" fill="none" stroke="#ffffff" strokeWidth={1.6} opacity={0.85} />
+        <line x1={120} y1={210} x2={120} y2={236} stroke="#ffffff" strokeWidth={1.4} opacity={0.7} />
       </g>
-      {/* pallone */}
-      <circle cx={52} cy={72} r={18} fill="#ffffff" />
-      <circle cx={52} cy={72} r={18} fill="none" stroke="#0e1528" strokeWidth={1} />
-      <polygon points="52,65 58.7,69.8 56.1,77.7 47.9,77.7 45.3,69.8" fill="#0e1528" />
-      <g stroke="#0e1528" strokeWidth={1.4}>
-        <line x1={52} y1={65} x2={52} y2={55} />
-        <line x1={58.7} y1={69.8} x2={68.5} y2={66.8} />
-        <line x1={56.1} y1={77.7} x2={63} y2={85} />
-        <line x1={47.9} y1={77.7} x2={41} y2={85} />
-        <line x1={45.3} y1={69.8} x2={35.5} y2={66.8} />
+
+      {/* Alloro (sinistra + specchiato a destra) */}
+      <Laurel />
+      <g transform="translate(240 0) scale(-1 1)">
+        <Laurel />
       </g>
-      {/* cartiglio */}
-      <path d="M16 96 H104 L98 108 H22 Z" fill="#34d399" />
-      <text x={60} y={105} textAnchor="middle" fontSize={8.5} fontWeight={800} letterSpacing={0.5} fill="#04241a">
-        SOCCER DICK CLUB
+
+      {/* Pallone in alto */}
+      <circle cx={120} cy={50} r={34} fill="#ffffff" />
+      <circle cx={120} cy={50} r={34} fill="none" stroke="#14233a" strokeWidth={1.5} />
+      <polygon points="120,37 132.4,46 127.6,60.5 112.4,60.5 107.6,46" fill="#14233a" />
+      <g stroke="#14233a" strokeWidth={2}>
+        <line x1={120} y1={37} x2={120} y2={16} />
+        <line x1={132.4} y1={46} x2={152.3} y2={39.5} />
+        <line x1={127.6} y1={60.5} x2={140} y2={77.5} />
+        <line x1={112.4} y1={60.5} x2={100} y2={77.5} />
+        <line x1={107.6} y1={46} x2={87.7} y2={39.5} />
+      </g>
+
+      {/* Monogramma FNB */}
+      <text
+        x={120}
+        y={158}
+        textAnchor="middle"
+        fontSize={62}
+        fontWeight={900}
+        letterSpacing={1}
+        fill="#f5b820"
+        stroke="#7e1d16"
+        strokeWidth={1.5}
+        fontFamily="'Arial Black', Arial, sans-serif"
+      >
+        FNB
       </text>
-      <text x={60} y={119} textAnchor="middle" fontSize={7} fontWeight={700} letterSpacing={1.5} fill="rgba(255,255,255,0.5)">
-        EST. 2026
+
+      {/* Cartiglio FANTACALCIO */}
+      <path d="M48 176 L32 182 L40 200 L52 195 Z" fill="#9e2b20" />
+      <path d="M192 176 L208 182 L200 200 L188 195 Z" fill="#9e2b20" />
+      <path d="M46 174 H194 L188 200 H52 Z" fill="#c8342a" stroke="#7e1d16" strokeWidth={1.4} />
+      <text x={120} y={193} textAnchor="middle" fontSize={15} fontWeight={800} letterSpacing={2} fill="#f3e2bf">
+        FANTACALCIO
       </text>
     </svg>
   );

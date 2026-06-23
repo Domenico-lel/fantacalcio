@@ -9,13 +9,6 @@ export default async function LandingPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-10 relative overflow-hidden pitch-bg">
-      {/* Field lines */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ opacity: 0.07 }}>
-        <div className="w-72 h-72 rounded-full border-2 border-white" />
-        <div className="absolute w-full h-px bg-white top-1/2" />
-        <div className="absolute w-28 h-28 rounded-full border-2 border-white" />
-      </div>
-
       <div className="relative z-10 flex flex-col items-center gap-7 max-w-sm w-full">
         <BrandCrest size={132} style={{ filter: "drop-shadow(0 10px 30px rgba(0,0,0,0.45))" }} />
 
