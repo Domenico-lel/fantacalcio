@@ -1,0 +1,98 @@
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="cBg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#3a2e0a"/>
+      <stop offset="60%" stop-color="#1c1404"/>
+      <stop offset="100%" stop-color="#0c0900"/>
+    </radialGradient>
+    <linearGradient id="cGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff3c4"/>
+      <stop offset="35%" stop-color="#f5c518"/>
+      <stop offset="70%" stop-color="#d99a1c"/>
+      <stop offset="100%" stop-color="#9a6a0a"/>
+    </linearGradient>
+    <linearGradient id="cGoldDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b8860b"/>
+      <stop offset="100%" stop-color="#6e4708"/>
+    </linearGradient>
+    <radialGradient id="cHub" cx="42%" cy="34%" r="80%">
+      <stop offset="0%" stop-color="#3a2c08"/>
+      <stop offset="100%" stop-color="#140d01"/>
+    </radialGradient>
+    <filter id="cSh" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0c0900" flood-opacity="0.6"/>
+    </filter>
+    <filter id="cGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    @keyframes commGlow {
+      0%, 100% { opacity: 0.5; stroke-width: 3; }
+      50%      { opacity: 1;   stroke-width: 5; }
+    }
+    .c-ring { animation: commGlow 2.4s ease-in-out infinite; transform-origin: 120px 120px; }
+    @keyframes commSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .c-spin { animation: commSpin 9s linear infinite; transform-origin: 120px 120px; }
+    @keyframes commTwk { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+    .c-twk { animation: commTwk 1.7s ease-in-out infinite; transform-origin: center; }
+  </style>
+
+  <!-- base disc -->
+  <circle cx="120" cy="120" r="116" fill="url(#cBg)"/>
+
+  <!-- glowing gold ring all around -->
+  <circle class="c-ring" cx="120" cy="120" r="114" fill="none"
+          stroke="#f5c518" stroke-width="4" filter="url(#cGlow)"/>
+  <circle cx="120" cy="120" r="116" fill="none" stroke="#7a5a0a" stroke-opacity="0.5" stroke-width="2"/>
+
+  <!-- rotating gold sunburst (12 rays) -->
+  <g class="c-spin" filter="url(#cSh)">
+    <g fill="url(#cGold)" stroke="#9a6a0a" stroke-width="1">
+      <polygon points="120,18 127,54 113,54"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(30 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(60 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(90 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(120 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(150 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(180 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(210 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(240 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(270 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(300 120 120)"/>
+      <polygon points="120,18 127,54 113,54" transform="rotate(330 120 120)"/>
+    </g>
+    <!-- toothed gold ring binding the rays -->
+    <circle cx="120" cy="120" r="70" fill="none" stroke="url(#cGold)" stroke-width="9"/>
+    <circle cx="120" cy="120" r="70" fill="none" stroke="#9a6a0a" stroke-opacity="0.6" stroke-width="1"/>
+  </g>
+
+  <!-- static central medallion -->
+  <circle cx="120" cy="120" r="60" fill="url(#cHub)" stroke="url(#cGold)" stroke-width="4" filter="url(#cSh)"/>
+  <circle cx="120" cy="120" r="55" fill="none" stroke="#f5c518" stroke-opacity="0.25" stroke-width="1"/>
+
+  <!-- gavel emblem (fa le regole) -->
+  <g filter="url(#cSh)">
+    <!-- sound block / base -->
+    <rect x="98" y="150" width="44" height="9" rx="4" fill="url(#cGold)" stroke="#7a5a0a" stroke-width="1"/>
+    <g transform="rotate(-32 120 116)">
+      <!-- handle -->
+      <rect x="115" y="112" width="10" height="46" rx="5" fill="url(#cGold)" stroke="#7a5a0a" stroke-width="1"/>
+      <!-- head (mallet) -->
+      <rect x="96" y="92" width="48" height="24" rx="7" fill="url(#cGold)" stroke="#7a5a0a" stroke-width="1.5"/>
+      <rect x="104" y="92" width="4" height="24" fill="#7a5a0a" opacity="0.55"/>
+      <rect x="132" y="92" width="4" height="24" fill="#7a5a0a" opacity="0.55"/>
+      <rect x="98" y="95" width="44" height="6" rx="3" fill="#ffffff" opacity="0.30"/>
+    </g>
+  </g>
+
+  <!-- sparkles -->
+  <circle class="c-twk" cx="176" cy="78" r="3.5" fill="#fff3c4"/>
+  <circle class="c-twk" cx="66" cy="92" r="3" fill="#fff3c4" style="animation-delay:.4s"/>
+  <circle class="c-twk" cx="158" cy="160" r="3" fill="#fff3c4" style="animation-delay:.9s"/>
+</svg>
