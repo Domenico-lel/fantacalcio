@@ -12,7 +12,7 @@ import BadgeRow from "@/components/Badges";
 import {
   fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
   addRosterPlayer, deleteRosterPlayer, searchPlayers,
-  adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminDeleteProfile, adminSetProfileBadges,
+  adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminAssignTeam, adminDeleteProfile, adminSetProfileBadges,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
 import { isImageAvatar } from "@/lib/avatar";
@@ -514,6 +514,9 @@ function GestioneTab() {
   const profileByTeam = new Map<string, AdminProfile>();
   for (const p of profiles) if (p.teamRef) profileByTeam.set(p.teamRef, p);
 
+  const unassignedManagers = profiles.filter((p) => !p.teamRef);
+  const freeTeams = teams.filter((t) => !t.claimed);
+
   async function sync() {
     setSyncing(true); setMsg("");
     const res = await syncTeams();
@@ -531,6 +534,10 @@ function GestioneTab() {
       </button>
       {msg && <p className="text-white/60 text-xs text-center">{msg}</p>}
 
+      {!loading && unassignedManagers.length > 0 && (
+        <UnassignedManagers managers={unassignedManagers} freeTeams={freeTeams} reload={load} />
+      )}
+
       {loading && Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="rounded-xl animate-pulse" style={{ height: 56, background: "rgba(255,255,255,0.05)" }} />
       ))}
@@ -541,6 +548,68 @@ function GestioneTab() {
       )}
       {teams.map((t) => <TeamAdminCard key={t.id} team={t} profile={profileByTeam.get(t.id) ?? null} onTeamsChange={load} />)}
       <div className="h-4" />
+    </div>
+  );
+}
+
+/* Manager iscritti ma senza squadra: l'admin li assegna manualmente a una squadra libera. */
+function UnassignedManagers({ managers, freeTeams, reload }: {
+  managers: AdminProfile[];
+  freeTeams: Team[];
+  reload: () => Promise<void>;
+}) {
+  return (
+    <div className="rounded-xl p-3 flex flex-col gap-2.5"
+      style={{ background: "rgba(255,177,26,0.08)", border: "1px solid rgba(255,177,26,0.25)" }}>
+      <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "#ffd479" }}>
+        Manager senza squadra ({managers.length})
+      </p>
+      {managers.map((m) => (
+        <AssignRow key={m.userId} manager={m} freeTeams={freeTeams} reload={reload} />
+      ))}
+      <p className="text-white/35 text-[10px]">
+        Per spostare un manager già assegnato, prima &quot;Libera squadra&quot; dalla sua scheda: ricomparirà qui.
+      </p>
+    </div>
+  );
+}
+
+function AssignRow({ manager, freeTeams, reload }: {
+  manager: AdminProfile;
+  freeTeams: Team[];
+  reload: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const label = `${manager.firstName} ${manager.lastName}`.trim() || manager.teamName || "Manager";
+  const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
+
+  async function assign(teamRef: string) {
+    if (!teamRef) return;
+    setBusy(true); setErr("");
+    const res = await adminAssignTeam(manager.userId, teamRef);
+    setBusy(false);
+    if (res.error) { setErr(res.error); return; }
+    await reload();
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <span className="text-white text-sm font-semibold flex-1 min-w-0 truncate">{label}</span>
+        <select value="" disabled={busy || freeTeams.length === 0}
+          onChange={(e) => assign(e.target.value)}
+          className="rounded-lg px-2 py-1.5 text-white text-xs outline-none disabled:opacity-50 flex-none max-w-[55%]"
+          style={inputStyle}>
+          <option value="" style={{ background: "#141d33" }}>
+            {freeTeams.length === 0 ? "Nessuna squadra libera" : busy ? "Assegno…" : "Assegna a…"}
+          </option>
+          {freeTeams.map((t) => (
+            <option key={t.id} value={t.id} style={{ background: "#141d33" }}>{t.name}</option>
+          ))}
+        </select>
+      </div>
+      {err && <p className="text-red-400 text-[11px]">{err}</p>}
     </div>
   );
 }

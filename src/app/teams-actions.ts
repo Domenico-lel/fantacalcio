@@ -244,6 +244,35 @@ export async function adminReleaseTeam(userId: string): Promise<{ error: string 
   return { error: error?.message ?? null };
 }
 
+// Assegna manualmente una squadra a un manager (versione admin di claimTeam).
+// Se il manager ne aveva già un'altra, quella torna libera automaticamente.
+export async function adminAssignTeam(userId: string, teamRef: string): Promise<{ error: string | null }> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) return { error: "Solo l'admin" };
+  if (!userId || !teamRef) return { error: "Dati mancanti" };
+
+  const db = createAdminClient();
+  // la squadra è già di un altro manager?
+  const { data: taken } = await db
+    .from("fanta_profiles")
+    .select("user_id")
+    .eq("team_ref", teamRef)
+    .maybeSingle();
+  if (taken && taken.user_id !== userId) {
+    return { error: "Questa squadra è già assegnata a un altro manager" };
+  }
+
+  const { data: team } = await db.from("fanta_teams").select("name").eq("id", teamRef).maybeSingle();
+  const patch: { team_ref: string; team_name?: string; updated_at: string } = {
+    team_ref: teamRef,
+    updated_at: new Date().toISOString(),
+  };
+  if (team?.name) patch.team_name = team.name;
+
+  const { error } = await db.from("fanta_profiles").update(patch as never).eq("user_id", userId);
+  return { error: error?.message ?? null };
+}
+
 // Elimina del tutto un profilo manager (es. account doppio/cancellato) — libera la squadra
 export async function adminDeleteProfile(userId: string): Promise<{ error: string | null }> {
   const viewer = await getCurrentViewer();
