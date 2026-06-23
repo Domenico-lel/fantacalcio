@@ -29,8 +29,8 @@ export default function SegmentedTabs<T extends string>({
           bottom: 4,
           left: 4,
           width: `calc((100% - 8px) / ${n})`,
-          background: "var(--accent)",
-          boxShadow: "0 0 18px var(--accent)",
+          background: "var(--accent-grad)",
+          boxShadow: "0 0 18px var(--accent-glow)",
           transform: `translateX(calc(${activeIndex} * (100% + 4px)))`,
           transition: "transform 320ms cubic-bezier(0.34,1.4,0.5,1)",
         }}

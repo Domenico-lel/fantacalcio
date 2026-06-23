@@ -230,7 +230,7 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
             style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }} />
           <button onClick={submit} disabled={busy || !pick || stakeNum <= 0}
             className="flex-1 py-2 rounded-xl text-sm font-bold disabled:opacity-40"
-            style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>
+            style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
             {busy ? "…" : match.myBet ? `Modifica${potential ? ` · vinci ${potential}` : ""}` : `Punta${potential ? ` · vinci ${potential}` : ""}`}
           </button>
           {match.myBet && (
@@ -306,7 +306,7 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo (facoltativo)"
             className="flex-1 rounded-xl px-3 py-2 text-white text-sm outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }} />
           <button onClick={create} disabled={busy} className="px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
-            style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>+</button>
+            style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>+</button>
         </div>
         {msg && <p className="text-white/60 text-xs mt-2">{msg}</p>}
       </div>
@@ -382,7 +382,7 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
           <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="w-full rounded-lg px-2 py-2 text-white text-xs outline-none text-center" style={selStyle} />
           <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="w-full rounded-lg px-2 py-2 text-white text-xs outline-none text-center" style={selStyle} />
           <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="w-full rounded-lg px-2 py-2 text-white text-xs outline-none text-center" style={selStyle} />
-          <button onClick={add} disabled={busy} className="px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50" style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>+</button>
+          <button onClick={add} disabled={busy} className="px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>+</button>
         </div>
         {err && <p className="text-red-400 text-xs">{err}</p>}
       </div>
@@ -423,7 +423,7 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
           <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
           <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
           <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
-          <button onClick={saveOdds} className="px-2.5 py-1.5 rounded-lg text-xs font-bold" style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>✓</button>
+          <button onClick={saveOdds} className="px-2.5 py-1.5 rounded-lg text-xs font-bold" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>✓</button>
         </div>
       )}
 
@@ -498,7 +498,7 @@ function AdminCreditsCard({ leaderboard, reload }: { leaderboard: CreditRow[]; r
         <div className="flex gap-2">
           <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="±crediti"
             className="flex-1 rounded-xl px-3 py-2 text-white text-sm outline-none" style={selStyle} />
-          <button onClick={apply} disabled={busy} className="px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50" style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>OK</button>
+          <button onClick={apply} disabled={busy} className="px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>OK</button>
         </div>
       </div>
       <p className="text-white/35 text-[10px] mt-2">Usa valori negativi per togliere crediti. Es. +100 ricarica, -50 multa.</p>

@@ -226,7 +226,7 @@ function Composer({ viewer, onPublished }: { viewer: Viewer; onPublished: () => 
           onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
         <button onClick={publish} disabled={busy}
           className="px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
-          style={{ background: "#34d399", color: "#052e16" }}>
+          style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
           {busy ? "Pubblico…" : "Pubblica"}
         </button>
       </div>
@@ -355,7 +355,7 @@ function PostCard({ post, viewer, reload, setPosts }: {
             />
             <button onClick={send} disabled={sending || !comment.trim()}
               className="px-3 py-2 rounded-xl text-sm font-bold disabled:opacity-40"
-              style={{ background: "#34d399", color: "#052e16" }}>
+              style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
               Invia
             </button>
           </div>
@@ -418,7 +418,7 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
           {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
           <button onClick={add} disabled={busy}
             className="w-full mt-3 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50"
-            style={{ background: "#34d399", color: "#052e16" }}>
+            style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
             {busy ? "Aggiungo…" : "Rendi cedibile"}
           </button>
         </div>
@@ -636,7 +636,7 @@ function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Pro
         </div>
         <button onClick={add} disabled={busy || !query.trim()}
           className="px-3 py-2 rounded-lg text-sm font-bold disabled:opacity-40 flex-none"
-          style={{ background: "#34d399", color: "#052e16" }}>+</button>
+          style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>+</button>
       </div>
       <p className="text-white/30 text-[10px] mt-1">
         {picked ? "Foto associata ✓" : "Scrivi e seleziona dal menu per avere la foto."}
@@ -692,7 +692,7 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={save} disabled={busy || !dirty}
             className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40"
-            style={{ background: "#34d399", color: "#052e16" }}>Salva</button>
+            style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>Salva</button>
           <button onClick={async () => { if (confirm("Liberare la squadra di questo manager? Potrà sceglierne un'altra.")) { await adminReleaseTeam(profile.userId); await reload(); } }}
             className="px-3 py-2 rounded-lg text-xs font-semibold text-white/70"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>Libera squadra</button>

@@ -12,11 +12,11 @@ import { getCurrentViewer } from "@/app/social-actions";
 import { isImageAvatar } from "@/lib/avatar";
 
 const NAV_ITEMS = [
-  { href: "/news",        label: "Notizie",    icon: NewsIcon,       color: "#3b8eea" },
-  { href: "/players",     label: "Mercato",    icon: TransferIcon,   color: "#f0a43a" },
-  { href: "/standings",   label: "Classifica", icon: StandingsIcon,  color: "#857cf0" },
-  { href: "/pronostici",  label: "Pronostici", icon: DiceIcon,       color: "#f5a623" },
-  { href: "/bacheca",     label: "Bacheca",    icon: MegaphoneIcon,  color: "#1fb083" },
+  { href: "/news",        label: "Notizie",    icon: NewsIcon,       color: "#2e9dff" },
+  { href: "/players",     label: "Mercato",    icon: TransferIcon,   color: "#ff9b2f" },
+  { href: "/standings",   label: "Classifica", icon: StandingsIcon,  color: "#d24dff" },
+  { href: "/pronostici",  label: "Pronostici", icon: DiceIcon,       color: "#ffb31a" },
+  { href: "/bacheca",     label: "Bacheca",    icon: MegaphoneIcon,  color: "#1fe8a4" },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -90,6 +90,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                   style={{
                     width: 44, height: 30,
                     background: active ? `${color}22` : "transparent",
+                    boxShadow: active ? `0 0 14px ${color}66` : "none",
                   }}>
                   <Icon active={active} />
                 </div>

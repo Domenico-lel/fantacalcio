@@ -14,19 +14,26 @@
   --text-dim: rgba(255, 255, 255, 0.55);
   --text-faint: rgba(255, 255, 255, 0.34);
 
-  /* Default accent (emerald) */
-  --accent: #34d399;
-  --accent-soft: #6ee7b7;
-  --accent-ink: #04241a;
-  --accent-bg: #0e3329;
+  /* Default accent (neon mint) */
+  --accent: #1fe8a4;
+  --accent-soft: #9bffd9;
+  --accent-ink: #013027;
+  --accent-bg: #07332a;
+  --accent-grad: linear-gradient(135deg, #00ffd0, #2bff88);
+  --accent-glow: rgba(0, 255, 200, 0.5);
 }
 
-/* Per-section accent themes */
-.sec-news   { --accent:#3b8eea; --accent-soft:#8fc0f4; --accent-ink:#06294f; --accent-bg:#10243f; }
-.sec-market { --accent:#f0a43a; --accent-soft:#f9c878; --accent-ink:#3f2509; --accent-bg:#3a2912; }
-.sec-rank   { --accent:#857cf0; --accent-soft:#bbb6f6; --accent-ink:#1f1a4a; --accent-bg:#1d1840; }
-.sec-board  { --accent:#34d399; --accent-soft:#6ee7b7; --accent-ink:#04241a; --accent-bg:#0e3329; }
-.sec-bet    { --accent:#f5a623; --accent-soft:#fbcb6a; --accent-ink:#3a2407; --accent-bg:#3a2a10; }
+/* Per-section accent themes — neon "Cyber" con gradient + glow */
+.sec-news   { --accent:#25b6ff; --accent-soft:#9fe3ff; --accent-ink:#021b33; --accent-bg:#06243f;
+              --accent-grad:linear-gradient(135deg,#2e7bff,#00d4ff); --accent-glow:rgba(0,212,255,0.55); }
+.sec-market { --accent:#ff9b2f; --accent-soft:#ffce85; --accent-ink:#2e1500; --accent-bg:#3a2310;
+              --accent-grad:linear-gradient(135deg,#ff6b35,#ffd60a); --accent-glow:rgba(255,140,30,0.5); }
+.sec-rank   { --accent:#d24dff; --accent-soft:#ecb3ff; --accent-ink:#2a0a3a; --accent-bg:#2a0f3a;
+              --accent-grad:linear-gradient(135deg,#ff1fa8,#b026ff); --accent-glow:rgba(199,60,255,0.5); }
+.sec-board  { --accent:#1fe8a4; --accent-soft:#9bffd9; --accent-ink:#013027; --accent-bg:#07332a;
+              --accent-grad:linear-gradient(135deg,#00ffd0,#2bff88); --accent-glow:rgba(0,255,200,0.5); }
+.sec-bet    { --accent:#ffb31a; --accent-soft:#ffe08a; --accent-ink:#2e2400; --accent-bg:#3a2c0c;
+              --accent-grad:linear-gradient(135deg,#ffe600,#ff7a1a); --accent-glow:rgba(255,170,20,0.5); }
 
 * {
   -webkit-tap-highlight-color: transparent;
@@ -79,12 +86,13 @@ main {
 
 /* Primary pill button */
 .btn-accent {
-  background: var(--accent);
+  background: var(--accent-grad);
   color: var(--accent-ink);
   font-weight: 700;
+  box-shadow: 0 0 18px var(--accent-glow);
   transition: transform 0.12s ease, filter 0.12s ease;
 }
-.btn-accent:active { transform: scale(0.97); filter: brightness(1.05); }
+.btn-accent:active { transform: scale(0.97); filter: brightness(1.1); }
 
 /* Onboarding / auth backdrop */
 .pitch-bg {
