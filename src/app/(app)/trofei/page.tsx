@@ -70,20 +70,36 @@ function Avatar({ name, size, ring }: { name: string; size: number; ring: string
   );
 }
 
-/* ─── Card stagione in evidenza con podio ──────────────────────────────────── */
-function FeaturedSeason({ g }: { g: SeasonGroup }) {
-  const p1 = g.podium.find((r) => r.position === 1);
-  const p2 = g.podium.find((r) => r.position === 2);
-  const p3 = g.podium.find((r) => r.position === 3);
+/* ─── Podio storico: i manager con più trofei di sempre ────────────────────── */
+interface ChampStat { name: string; titles: number }
 
-  const Step = ({ row, place, h, color }: { row?: Trophy; place: number; h: number; color: string }) => (
+function topChampions(groups: SeasonGroup[]): ChampStat[] {
+  const map = new Map<string, ChampStat>();
+  for (const g of groups) {
+    if (!g.champion) continue;
+    const k = g.champion.display_name.trim().toLowerCase();
+    const cur = map.get(k) ?? { name: g.champion.display_name, titles: 0 };
+    cur.titles++;
+    map.set(k, cur);
+  }
+  return [...map.values()].sort((a, b) => b.titles - a.titles || a.name.localeCompare(b.name));
+}
+
+function AllTimePodium({ groups }: { groups: SeasonGroup[] }) {
+  const ranked = useMemo(() => topChampions(groups), [groups]);
+  const p1 = ranked[0];
+  const p2 = ranked[1];
+  const p3 = ranked[2];
+
+  const Step = ({ row, place, h, color }: { row?: ChampStat; place: number; h: number; color: string }) => (
     <div className="flex-1 flex flex-col items-center justify-end">
       <span className="text-white/90 text-[12px] font-semibold truncate max-w-full mb-2 px-1">
-        {row?.display_name ?? "—"}
+        {row?.name ?? "—"}
       </span>
-      <div className="w-full rounded-t-xl flex items-start justify-center pt-2 font-black"
+      <div className="w-full rounded-t-xl flex flex-col items-center justify-start pt-2 gap-0.5 font-black"
         style={{ height: h, background: `${color}22`, border: `1px solid ${color}55`, borderBottom: "none", color }}>
         <span style={{ fontSize: place === 1 ? 26 : 20 }}>{place}°</span>
+        {row && <span className="text-[11px] font-bold whitespace-nowrap">{row.titles} 🏆</span>}
       </div>
     </div>
   );
@@ -92,26 +108,26 @@ function FeaturedSeason({ g }: { g: SeasonGroup }) {
     <div className="rounded-2xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
       <div className="flex items-center justify-between mb-4">
         <span className="text-[12px] font-bold uppercase tracking-widest" style={{ color: "var(--accent-soft)" }}>
-          Stagione {g.season}
+          Classifica trofei
         </span>
-        <span className="text-white/35 text-[11px] font-semibold uppercase tracking-wider">Conclusa</span>
+        <span className="text-white/35 text-[11px] font-semibold uppercase tracking-wider">Tutti i tempi</span>
       </div>
 
       {/* Avatar row con corona sul 1° */}
       <div className="flex items-end justify-center gap-6 mb-3">
         <div className="flex flex-col items-center gap-1.5">
-          <Avatar name={p2?.display_name ?? "—"} size={54} ring={MEDAL[2].color} />
+          <Avatar name={p2?.name ?? "—"} size={54} ring={MEDAL[2].color} />
         </div>
         <div className="flex flex-col items-center gap-1.5 relative">
           <span className="absolute -top-6 text-2xl">👑</span>
-          <Avatar name={p1?.display_name ?? "—"} size={66} ring={MEDAL[1].color} />
+          <Avatar name={p1?.name ?? "—"} size={66} ring={MEDAL[1].color} />
         </div>
         <div className="flex flex-col items-center gap-1.5">
-          <Avatar name={p3?.display_name ?? "—"} size={54} ring={MEDAL[3].color} />
+          <Avatar name={p3?.name ?? "—"} size={54} ring={MEDAL[3].color} />
         </div>
       </div>
 
-      {/* Podio a blocchi */}
+      {/* Podio a blocchi — l'altezza indica la posizione, il numero i trofei vinti */}
       <div className="flex items-end gap-2 mb-1" style={{ minHeight: 96 }}>
         <Step row={p2} place={2} h={64} color={MEDAL[2].color} />
         <Step row={p1} place={1} h={92} color={MEDAL[1].color} />
@@ -269,10 +285,8 @@ export default function TrofeiPage() {
   }, []);
 
   const groups = useMemo(() => groupSeasons(trophies), [trophies]);
-  const featured = groups[0];
-  const previous = groups.slice(1);
   const minYear = groups.length ? Math.min(...groups.map((g) => g.year)) : null;
-  const shownPrev = showAll ? previous : previous.slice(0, 5);
+  const shownSeasons = showAll ? groups : groups.slice(0, 5);
 
   return (
     <div className="screen sec-trophy">
@@ -320,18 +334,18 @@ export default function TrofeiPage() {
 
       {!loading && groups.length > 0 && tab === "stagioni" && (
         <div className="px-4 py-4 flex flex-col gap-4">
-          {featured && <FeaturedSeason g={featured} />}
+          <AllTimePodium groups={groups} />
 
-          {previous.length > 0 && (
+          {groups.length > 0 && (
             <>
               <div className="flex items-center justify-between mt-1 px-1">
-                <span className="text-white/40 text-[11px] font-bold uppercase tracking-widest">Stagioni precedenti</span>
-                <span className="text-white/30 text-[11px] tabular-nums">{previous.length} / {groups.length}</span>
+                <span className="text-white/40 text-[11px] font-bold uppercase tracking-widest">Stagione per stagione</span>
+                <span className="text-white/30 text-[11px] tabular-nums">{groups.length} stagioni</span>
               </div>
               <div className="flex flex-col gap-2">
-                {shownPrev.map((g) => <SeasonRow key={g.season} g={g} myName={myName} />)}
+                {shownSeasons.map((g) => <SeasonRow key={g.season} g={g} myName={myName} />)}
               </div>
-              {previous.length > 5 && (
+              {groups.length > 5 && (
                 <button onClick={() => setShowAll((v) => !v)}
                   className="self-start text-sm font-bold mt-1" style={{ color: "var(--accent)" }}>
                   {showAll ? "Mostra meno" : `Mostra tutte le ${groups.length} stagioni →`}
