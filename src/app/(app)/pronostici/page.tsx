@@ -220,7 +220,7 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
           }}>
           <span className="text-xs text-white/70">
             Giocata: <b className="text-white">{PICK_LABELS[match.myBet.pick]}</b>
-            <span className="text-white/45"> ({PICK_NAME[match.myBet.pick]})</span> · {match.myBet.stake} cr @ quota {fmtOdd(match.myBet.odd)}
+            <span className="text-white/45"> ({PICK_NAME[match.myBet.pick]})</span> · {match.myBet.stake} cr · quota {fmtOdd(match.myBet.odd)}
           </span>
           {match.myBet.status === "won" && <span className="text-emerald-400 text-xs font-bold">Vinta +{match.myBet.payout}</span>}
           {match.myBet.status === "lost" && <span className="text-red-400 text-xs font-bold">Persa</span>}
