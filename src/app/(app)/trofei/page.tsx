@@ -174,24 +174,26 @@ function CoppaSection({ myName }: { myName: string }) {
   );
 }
 
-/* ─── Tab Manager: classifica per persona ──────────────────────────────────── */
+/* ─── Tab Manager: albo dei campioni (solo primi posti) ────────────────────── */
 function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
   const stats = useMemo(() => {
-    const map = new Map<string, { name: string; titles: number; podiums: number; seasons: number }>();
+    // Contiamo solo i titoli (1° posto): è l'unico dato disponibile per tutte le stagioni.
+    const map = new Map<string, { name: string; titles: number; seasonsWon: string[] }>();
     const get = (name: string) => {
       const k = name.trim().toLowerCase();
-      if (!map.has(k)) map.set(k, { name, titles: 0, podiums: 0, seasons: 0 });
+      if (!map.has(k)) map.set(k, { name, titles: 0, seasonsWon: [] });
       return map.get(k)!;
     };
-    for (const g of groups) {
-      for (const r of g.rows) {
-        const s = get(r.display_name);
-        s.seasons++;
-        if (r.position === 1) s.titles++;
-        if (r.position <= 3) s.podiums++;
-      }
+    // groups è ordinato dal più recente al più vecchio: ribaltiamo per elencare le vittorie in ordine cronologico
+    for (const g of [...groups].reverse()) {
+      if (!g.champion) continue;
+      const s = get(g.champion.display_name);
+      s.titles++;
+      s.seasonsWon.push(g.season || String(g.year));
     }
-    return [...map.values()].sort((a, b) => b.titles - a.titles || b.podiums - a.podiums);
+    return [...map.values()]
+      .filter((s) => s.titles > 0)
+      .sort((a, b) => b.titles - a.titles || a.name.localeCompare(b.name));
   }, [groups]);
 
   return (
@@ -204,7 +206,7 @@ function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
           <Avatar name={s.name} size={38} ring={i === 0 ? "#f5c518" : "rgba(255,255,255,0.25)"} />
           <div className="flex-1 min-w-0">
             <p className="text-white text-sm font-bold truncate">{s.name}</p>
-            <p className="text-white/40 text-[11px]">{s.podiums} {s.podiums === 1 ? "podio" : "podi"}</p>
+            <p className="text-white/40 text-[11px] truncate">{s.seasonsWon.join(" · ")}</p>
           </div>
           <div className="flex items-center gap-1 flex-none">
             <span className="text-lg">🏆</span>
