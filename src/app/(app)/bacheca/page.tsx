@@ -15,6 +15,7 @@ import {
   adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminAssignTeam, adminDeleteProfile, adminSetProfileBadges,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
+import { isAppOpen, setAppOpen } from "@/app/release-actions";
 import { isImageAvatar } from "@/lib/avatar";
 import SegmentedTabs from "@/components/SegmentedTabs";
 
@@ -501,6 +502,59 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
 
 /* ─── TAB GESTIONE (solo admin) ─────────────────────────────────────────── */
 
+/* Interruttore di rilascio: apre l'app a tutti o la rimette in "arrivo".
+   Stato salvato in DB (fanta_settings.app_open), nessun deploy necessario. */
+function AppReleaseToggle() {
+  const [open, setOpen] = useState<boolean | null>(null); // null = in caricamento
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { isAppOpen().then(setOpen).catch(() => setOpen(null)); }, []);
+
+  async function toggle() {
+    if (open === null || busy) return;
+    const next = !open;
+    const msg = next
+      ? "Aprire l'app a TUTTI i manager? Da ora ognuno vedrà l'app completa."
+      : "Rimettere l'app in modalità \"in arrivo\"? I manager (non admin) vedranno solo la pagina di attesa.";
+    if (!confirm(msg)) return;
+    setBusy(true);
+    const res = await setAppOpen(next);
+    setBusy(false);
+    if (res.error) { alert(res.error); return; }
+    setOpen(res.open);
+  }
+
+  const loading = open === null;
+  const live = open === true;
+
+  return (
+    <div className="rounded-xl p-4 flex items-center gap-3"
+      style={{
+        background: live ? "rgba(52,211,153,0.1)" : "rgba(255,177,26,0.1)",
+        border: `1px solid ${live ? "rgba(52,211,153,0.3)" : "rgba(255,177,26,0.3)"}`,
+      }}>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: live ? "#34d399" : "#ffd479" }}>
+          Stato app
+        </p>
+        <p className="text-white font-bold text-sm leading-tight">
+          {loading ? "…" : live ? "Aperta a tutti" : "In arrivo (solo admin)"}
+        </p>
+        <p className="text-white/40 text-[11px] mt-0.5">
+          {live ? "I manager vedono l'app completa." : "I manager vedono la pagina “in arrivo”."}
+        </p>
+      </div>
+      <button onClick={toggle} disabled={loading || busy}
+        className="px-4 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50 flex-none active:scale-95 transition-transform"
+        style={live
+          ? { background: "rgba(255,177,26,0.15)", border: "1px solid rgba(255,177,26,0.35)", color: "#ffd479" }
+          : { background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
+        {busy ? "…" : live ? "Metti in arrivo" : "Apri a tutti"}
+      </button>
+    </div>
+  );
+}
+
 function GestioneTab() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [profiles, setProfiles] = useState<AdminProfile[]>([]);
@@ -532,6 +586,8 @@ function GestioneTab() {
 
   return (
     <div className="px-4 py-4 flex flex-col gap-3">
+      <AppReleaseToggle />
+
       <button onClick={sync} disabled={syncing}
         className="w-full py-3 rounded-xl text-sm font-bold disabled:opacity-50"
         style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399" }}>

@@ -112,6 +112,23 @@ export interface Database {
         };
         Relationships: [];
       };
+      fanta_settings: {
+        Row: {
+          key: string;
+          value: string;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value: string;
+          updated_at?: string;
+        };
+        Update: {
+          value?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       fanta_posts: {
         Row: {
           id: string;

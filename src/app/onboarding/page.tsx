@@ -7,11 +7,13 @@ import { upsertProfile } from "@/app/actions";
 import { getCurrentViewer } from "@/app/social-actions";
 import { fetchTeams, claimTeam, type Team } from "@/app/teams-actions";
 import { useAppUser } from "@/lib/app-user-context";
+import { isAppOpen } from "@/app/release-actions";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const user = useAppUser();
   const [checking, setChecking] = useState(true);
+  const [comingSoon, setComingSoon] = useState(true); // fase "in arrivo": si raccoglie solo nome/cognome
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -24,8 +26,12 @@ export default function OnboardingPage() {
 
   // L'admin non ha una squadra: salta l'onboarding e va alla bacheca
   useEffect(() => {
-    getCurrentViewer().then((v) => {
+    Promise.all([getCurrentViewer(), isAppOpen()]).then(([v, open]) => {
+      const cs = !open;
+      setComingSoon(cs);
       if (v?.isAdmin) { router.replace("/bacheca"); return; }
+      // in fase "in arrivo" non si sceglie la squadra: niente lista da caricare
+      if (cs) { setChecking(false); return; }
       fetchTeams().then((t) => setTeams(t)).finally(() => setChecking(false));
     }).catch(() => setChecking(false));
   }, [router]);
@@ -33,22 +39,13 @@ export default function OnboardingPage() {
   const available = teams.filter((t) => !t.claimed);
   const hasTeams = teams.length > 0;
 
-  async function handleNext() {
-    if (step === 1) {
-      if (!firstName.trim() || !lastName.trim()) { setError("Inserisci nome e cognome"); return; }
-      setError(""); setStep(2);
-      return;
-    }
-
-    // step 2: la squadra si sceglie sempre dalla lista (niente testo libero)
-    if (!selectedTeam) { setError("Seleziona la tua squadra"); return; }
-
+  async function saveProfile(team: Team | null) {
     setSaving(true); setError("");
 
     const profile = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      teamName: selectedTeam.name,
+      teamName: team?.name ?? "",
       logo: "⚽",
       budget: 500,
     };
@@ -57,12 +54,29 @@ export default function OnboardingPage() {
     if (user.id) {
       const res = await upsertProfile(profile);
       if (res.error) { setError("Errore nel salvataggio: " + res.error); setSaving(false); return; }
-      const claim = await claimTeam(selectedTeam.id);
-      if (claim.error) { setError(claim.error); setSaving(false); return; }
+      if (team) {
+        const claim = await claimTeam(team.id);
+        if (claim.error) { setError(claim.error); setSaving(false); return; }
+      }
     }
 
     setSaving(false);
-    router.push("/standings");
+    // finché l'app è "in arrivo", l'utente normale finisce sulla pagina di attesa
+    router.push(comingSoon ? "/registrato" : "/standings");
+  }
+
+  async function handleNext() {
+    if (step === 1) {
+      if (!firstName.trim() || !lastName.trim()) { setError("Inserisci nome e cognome"); return; }
+      // in fase "in arrivo" basta nome e cognome: la squadra la assegna l'admin
+      if (comingSoon) { await saveProfile(null); return; }
+      setError(""); setStep(2);
+      return;
+    }
+
+    // step 2: la squadra si sceglie sempre dalla lista (niente testo libero)
+    if (!selectedTeam) { setError("Seleziona la tua squadra"); return; }
+    await saveProfile(selectedTeam);
   }
 
   if (checking) {
@@ -78,7 +92,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-sm">
         {/* Progress */}
         <div className="flex gap-2 mb-8">
-          {[1, 2].map((s) => (
+          {(comingSoon ? [1] : [1, 2]).map((s) => (
             <div key={s} className="h-1.5 flex-1 rounded-full transition-colors"
               style={{ background: s <= step ? "#34d399" : "rgba(255,255,255,0.2)" }} />
           ))}
@@ -158,7 +172,7 @@ export default function OnboardingPage() {
                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 Salvataggio…
               </span>
-            ) : step === 2 ? "Inizia a giocare! 🚀" : "Continua →"}
+            ) : step === 2 ? "Inizia a giocare! 🚀" : comingSoon ? "Conferma registrazione 🚀" : "Continua →"}
           </button>
           {step > 1 && !saving && (
             <button onClick={() => { setStep(step - 1); setError(""); }} className="w-full py-3 text-white/40 text-sm">
