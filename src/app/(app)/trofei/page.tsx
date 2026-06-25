@@ -70,39 +70,82 @@ function Avatar({ name, size, ring }: { name: string; size: number; ring: string
   );
 }
 
-/* ─── Podio storico: i manager con più trofei di sempre ────────────────────── */
-interface ChampStat { name: string; titles: number }
-
-function topChampions(groups: SeasonGroup[]): ChampStat[] {
-  const map = new Map<string, ChampStat>();
-  for (const g of groups) {
-    if (!g.champion) continue;
-    const k = g.champion.display_name.trim().toLowerCase();
-    const cur = map.get(k) ?? { name: g.champion.display_name, titles: 0 };
-    cur.titles++;
-    map.set(k, cur);
-  }
-  return [...map.values()].sort((a, b) => b.titles - a.titles || a.name.localeCompare(b.name));
+/* ─── Statistiche per manager: scudetti (1° posto) + coppe ─────────────────── */
+interface ManagerStat {
+  name: string;
+  titles: number;       // scudetti (1° in classifica)
+  cups: number;         // coppe vinte
+  titleSeasons: string[];
+  cupSeasons: string[];
+  total: number;        // scudetti + coppe
 }
 
-function AllTimePodium({ groups }: { groups: SeasonGroup[] }) {
-  const ranked = useMemo(() => topChampions(groups), [groups]);
-  const p1 = ranked[0];
-  const p2 = ranked[1];
-  const p3 = ranked[2];
+function computeManagerStats(groups: SeasonGroup[]): ManagerStat[] {
+  const map = new Map<string, ManagerStat>();
+  const get = (name: string) => {
+    const k = name.trim().toLowerCase();
+    let s = map.get(k);
+    if (!s) { s = { name, titles: 0, cups: 0, titleSeasons: [], cupSeasons: [], total: 0 }; map.set(k, s); }
+    return s;
+  };
+  // Scudetti (1° posto), in ordine cronologico
+  for (const g of [...groups].reverse()) {
+    if (!g.champion) continue;
+    const s = get(g.champion.display_name);
+    s.titles++;
+    s.titleSeasons.push(g.season || String(g.year));
+  }
+  // Coppe (competizione separata), dalla più vecchia alla più recente
+  for (const c of [...COPPA].reverse()) {
+    const s = get(c.winner);
+    s.cups++;
+    s.cupSeasons.push(c.season);
+  }
+  for (const s of map.values()) s.total = s.titles + s.cups;
+  // Ordine: trofei totali, poi scudetti, poi nome
+  return [...map.values()].sort((a, b) => b.total - a.total || b.titles - a.titles || a.name.localeCompare(b.name));
+}
 
-  const Step = ({ row, place, h, color }: { row?: ChampStat; place: number; h: number; color: string }) => (
-    <div className="flex-1 flex flex-col items-center justify-end">
-      <span className="text-white/90 text-[12px] font-semibold truncate max-w-full mb-2 px-1">
-        {row?.name ?? "—"}
-      </span>
-      <div className="w-full rounded-t-xl flex flex-col items-center justify-start pt-2 gap-0.5 font-black"
+/* Conteggio trofei: "N🏆" per gli scudetti e "+N🏅" per le coppe.
+   Chi ha vinto solo la coppa (es. Matteo) mostra solo "N🏅". */
+function TrophyTally({ titles, cups, size = 11 }: { titles: number; cups: number; size?: number }) {
+  if (titles === 0 && cups === 0) return null;
+  return (
+    <span className="font-bold whitespace-nowrap leading-none" style={{ fontSize: size }}>
+      {titles > 0 && `${titles}🏆`}
+      {cups > 0 && (titles > 0 ? ` +${cups}🏅` : `${cups}🏅`)}
+    </span>
+  );
+}
+
+/* Testa del podio: corona (solo 1°) + avatar + nome, allineati alla stessa base. */
+function PodiumHead({ row, size, ring, crown = false }: { row?: ManagerStat; size: number; ring: string; crown?: boolean }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-end gap-1.5">
+      {/* placeholder corona su tutte le colonne → avatar allineati */}
+      <span className="text-xl leading-none" style={{ visibility: crown ? "visible" : "hidden" }}>👑</span>
+      <Avatar name={row?.name ?? "—"} size={size} ring={ring} />
+      <span className="text-white/90 text-[12px] font-semibold truncate max-w-full text-center px-1">{row?.name ?? "—"}</span>
+    </div>
+  );
+}
+
+/* Blocco del podio: solo numero posizione + conteggio trofei (niente nome → niente sfalsamenti). */
+function PodiumBlock({ row, place, h, color }: { row?: ManagerStat; place: number; h: number; color: string }) {
+  return (
+    <div className="flex-1 flex flex-col justify-end">
+      <div className="w-full rounded-t-xl flex flex-col items-center justify-center gap-1 font-black"
         style={{ height: h, background: `${color}22`, border: `1px solid ${color}55`, borderBottom: "none", color }}>
-        <span style={{ fontSize: place === 1 ? 26 : 20 }}>{place}°</span>
-        {row && <span className="text-[11px] font-bold whitespace-nowrap">{row.titles} 🏆</span>}
+        <span style={{ fontSize: place === 1 ? 24 : 18 }}>{place}°</span>
+        {row && <TrophyTally titles={row.titles} cups={row.cups} />}
       </div>
     </div>
   );
+}
+
+function AllTimePodium({ groups }: { groups: SeasonGroup[] }) {
+  const ranked = useMemo(() => computeManagerStats(groups), [groups]);
+  const [p1, p2, p3] = ranked;
 
   return (
     <div className="rounded-2xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
@@ -113,25 +156,18 @@ function AllTimePodium({ groups }: { groups: SeasonGroup[] }) {
         <span className="text-white/35 text-[11px] font-semibold uppercase tracking-wider">Tutti i tempi</span>
       </div>
 
-      {/* Avatar row con corona sul 1° */}
-      <div className="flex items-end justify-center gap-6 mb-3">
-        <div className="flex flex-col items-center gap-1.5">
-          <Avatar name={p2?.name ?? "—"} size={54} ring={MEDAL[2].color} />
-        </div>
-        <div className="flex flex-col items-center gap-1.5 relative">
-          <span className="absolute -top-6 text-2xl">👑</span>
-          <Avatar name={p1?.name ?? "—"} size={66} ring={MEDAL[1].color} />
-        </div>
-        <div className="flex flex-col items-center gap-1.5">
-          <Avatar name={p3?.name ?? "—"} size={54} ring={MEDAL[3].color} />
-        </div>
+      {/* Teste del podio (corona sul 1°) */}
+      <div className="flex items-end justify-center gap-3 mb-3">
+        <PodiumHead row={p2} size={54} ring={MEDAL[2].color} />
+        <PodiumHead row={p1} size={66} ring={MEDAL[1].color} crown />
+        <PodiumHead row={p3} size={54} ring={MEDAL[3].color} />
       </div>
 
       {/* Podio a blocchi — l'altezza indica la posizione, il numero i trofei vinti */}
-      <div className="flex items-end gap-2 mb-1" style={{ minHeight: 96 }}>
-        <Step row={p2} place={2} h={64} color={MEDAL[2].color} />
-        <Step row={p1} place={1} h={92} color={MEDAL[1].color} />
-        <Step row={p3} place={3} h={48} color={MEDAL[3].color} />
+      <div className="flex items-end gap-2" style={{ minHeight: 92 }}>
+        <PodiumBlock row={p2} place={2} h={64} color={MEDAL[2].color} />
+        <PodiumBlock row={p1} place={1} h={92} color={MEDAL[1].color} />
+        <PodiumBlock row={p3} place={3} h={48} color={MEDAL[3].color} />
       </div>
     </div>
   );
@@ -190,46 +226,42 @@ function CoppaSection({ myName }: { myName: string }) {
   );
 }
 
-/* ─── Tab Manager: albo dei campioni (solo primi posti) ────────────────────── */
+/* ─── Tab Manager: albo dei campioni (scudetti + coppe) ────────────────────── */
 function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
-  const stats = useMemo(() => {
-    // Contiamo solo i titoli (1° posto): è l'unico dato disponibile per tutte le stagioni.
-    const map = new Map<string, { name: string; titles: number; seasonsWon: string[] }>();
-    const get = (name: string) => {
-      const k = name.trim().toLowerCase();
-      if (!map.has(k)) map.set(k, { name, titles: 0, seasonsWon: [] });
-      return map.get(k)!;
-    };
-    // groups è ordinato dal più recente al più vecchio: ribaltiamo per elencare le vittorie in ordine cronologico
-    for (const g of [...groups].reverse()) {
-      if (!g.champion) continue;
-      const s = get(g.champion.display_name);
-      s.titles++;
-      s.seasonsWon.push(g.season || String(g.year));
-    }
-    return [...map.values()]
-      .filter((s) => s.titles > 0)
-      .sort((a, b) => b.titles - a.titles || a.name.localeCompare(b.name));
-  }, [groups]);
+  const stats = useMemo(() => computeManagerStats(groups), [groups]);
 
   return (
     <div className="px-4 py-4 flex flex-col gap-2">
-      {stats.map((s, i) => (
-        <div key={s.name} className="flex items-center gap-3 rounded-2xl px-3 py-3"
-          style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <span className="w-6 text-center font-black text-sm flex-none"
-            style={{ color: i < 3 ? "var(--accent)" : "rgba(255,255,255,0.4)" }}>{i + 1}</span>
-          <Avatar name={s.name} size={38} ring={i === 0 ? "#f5c518" : "rgba(255,255,255,0.25)"} />
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-bold truncate">{s.name}</p>
-            <p className="text-white/40 text-[11px] truncate">{s.seasonsWon.join(" · ")}</p>
+      {stats.map((s, i) => {
+        // Sottotitolo: stagioni degli scudetti + edizioni di coppa (con 🏅)
+        const lines = [...s.titleSeasons, ...s.cupSeasons.map((x) => `🏅 ${x}`)];
+        return (
+          <div key={s.name} className="flex items-center gap-3 rounded-2xl px-3 py-3"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <span className="w-6 text-center font-black text-sm flex-none"
+              style={{ color: i < 3 ? "var(--accent)" : "rgba(255,255,255,0.4)" }}>{i + 1}</span>
+            <Avatar name={s.name} size={38} ring={i === 0 ? "#f5c518" : "rgba(255,255,255,0.25)"} />
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-sm font-bold truncate">{s.name}</p>
+              <p className="text-white/40 text-[11px] truncate">{lines.join(" · ")}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-none">
+              {s.titles > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="text-lg">🏆</span>
+                  <span className="text-white font-black text-lg tabular-nums">{s.titles}</span>
+                </span>
+              )}
+              {s.cups > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="text-lg">🏅</span>
+                  <span className="text-white font-black text-lg tabular-nums">{s.cups}</span>
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1 flex-none">
-            <span className="text-lg">🏆</span>
-            <span className="text-white font-black text-lg tabular-nums">{s.titles}</span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
