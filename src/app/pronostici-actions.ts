@@ -2,7 +2,7 @@
 
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import { getCurrentViewer, type Viewer } from "@/app/social-actions";
-import { STARTING_CREDITS, REWARD_WIN, REWARD_DRAW, REWARD_LOSS } from "@/lib/bet-constants";
+import { STARTING_CREDITS } from "@/lib/bet-constants";
 
 type Pick = "1" | "X" | "2";
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -85,12 +85,6 @@ async function addBalance(db: AdminClient, userId: string, delta: number): Promi
     .from("fanta_credits")
     .update({ balance: Math.max(0, bal + delta), updated_at: new Date().toISOString() })
     .eq("user_id", userId);
-}
-
-async function teamManager(db: AdminClient, teamId: string | null): Promise<string | null> {
-  if (!teamId) return null;
-  const { data } = await db.from("fanta_profiles").select("user_id").eq("team_ref", teamId).maybeSingle();
-  return data?.user_id ?? null;
 }
 
 function oddFor(match: { odd_1: number; odd_x: number; odd_2: number }, pick: Pick): number {
@@ -294,12 +288,6 @@ export async function cancelBet(matchId: string): Promise<{ error: string | null
 
 // ─── Settlement (admin) ──────────────────────────────────────────────────────
 
-function rewardFor(result: Pick, side: "home" | "away"): number {
-  if (result === "X") return REWARD_DRAW;
-  const winner = result === "1" ? "home" : "away";
-  return side === winner ? REWARD_WIN : REWARD_LOSS;
-}
-
 type MatchRow = {
   id: string;
   home_team: string | null;
@@ -315,11 +303,6 @@ async function reverseMatch(db: AdminClient, match: MatchRow): Promise<void> {
     if (b.status === "won" && b.payout) await addBalance(db, b.user_id, -b.payout);
     await db.from("fanta_bets").update({ status: "pending", payout: 0 }).eq("id", b.id);
   }
-  // annulla bonus partecipazione
-  const homeMgr = await teamManager(db, match.home_team);
-  const awayMgr = await teamManager(db, match.away_team);
-  if (homeMgr) await addBalance(db, homeMgr, -rewardFor(match.result, "home"));
-  if (awayMgr) await addBalance(db, awayMgr, -rewardFor(match.result, "away"));
 }
 
 async function settleMatch(db: AdminClient, matchId: string, result: Pick): Promise<void> {
@@ -357,11 +340,6 @@ export async function setMatchResult(matchId: string, result: Pick | null): Prom
   }
 
   await settleMatch(db, matchId, result);
-  // bonus partecipazione alla giornata
-  const homeMgr = await teamManager(db, match.home_team);
-  const awayMgr = await teamManager(db, match.away_team);
-  if (homeMgr) await addBalance(db, homeMgr, rewardFor(result, "home"));
-  if (awayMgr) await addBalance(db, awayMgr, rewardFor(result, "away"));
 
   await db.from("fanta_bet_matches").update({ result, settled_at: new Date().toISOString() }).eq("id", matchId);
   await refreshRoundStatus(db, match.round_id);

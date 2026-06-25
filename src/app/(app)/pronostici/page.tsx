@@ -8,7 +8,7 @@ import {
   type BetCenter, type BetRound, type BetMatch, type CreditRow,
 } from "@/app/pronostici-actions";
 import { fetchTeams, type Team } from "@/app/teams-actions";
-import { STARTING_CREDITS, REWARD_WIN, REWARD_DRAW } from "@/lib/bet-constants";
+import { STARTING_CREDITS } from "@/lib/bet-constants";
 import { isImageAvatar } from "@/lib/avatar";
 import SegmentedTabs from "@/components/SegmentedTabs";
 
@@ -256,7 +256,7 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
 function RankTab({ leaderboard, loading }: { leaderboard: CreditRow[]; loading: boolean }) {
   return (
     <div className="px-4 py-4 flex flex-col gap-2">
-      <p className="text-white/40 text-xs mb-1">Saldo crediti dei manager. Si parte da {STARTING_CREDITS}; bonus giornata +{REWARD_WIN} se vinci, +{REWARD_DRAW} se pareggi.</p>
+      <p className="text-white/40 text-xs mb-1">Saldo crediti dei manager. Si parte da {STARTING_CREDITS} crediti; si guadagna e si perde scommettendo sulle giornate.</p>
       {loading && Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="rounded-xl animate-pulse" style={{ height: 56, background: "rgba(255,255,255,0.05)" }} />
       ))}
