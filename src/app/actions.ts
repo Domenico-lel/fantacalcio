@@ -1,5 +1,6 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import type { TeamProfile } from "@/lib/store";
 
@@ -16,7 +17,8 @@ export interface Trophy {
   points: number | null;
 }
 
-export async function claimTrophies(userId: string, firstName: string): Promise<void> {
+export async function claimTrophies(firstName: string): Promise<void> {
+  const { userId } = await auth();
   if (!isSupabaseConfigured() || !userId || !firstName) return;
   try {
     const db = createAdminClient();
@@ -46,9 +48,10 @@ export async function fetchAllTrophies(): Promise<{ data: Trophy[]; error: strin
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
 export async function upsertProfile(
-  userId: string,
   profile: TeamProfile
 ): Promise<{ error: string | null }> {
+  const { userId } = await auth();
+  if (!userId) return { error: "Non autenticato" };
   if (!isSupabaseConfigured()) return { error: null }; // no-op se Supabase non è configurato
 
   try {
@@ -72,9 +75,9 @@ export async function upsertProfile(
   }
 }
 
-export async function fetchProfile(
-  userId: string
-): Promise<{ data: TeamProfile | null; error: string | null }> {
+export async function fetchProfile(): Promise<{ data: TeamProfile | null; error: string | null }> {
+  const { userId } = await auth();
+  if (!userId) return { data: null, error: null };
   if (!isSupabaseConfigured()) return { data: null, error: null };
 
   try {

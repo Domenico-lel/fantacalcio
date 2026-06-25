@@ -77,7 +77,7 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
     saveState(updated);
 
     // Sync Supabase in background
-    if (user.id) upsertProfile(user.id, updated).catch(console.error);
+    if (user.id) upsertProfile(updated).catch(console.error);
 
     onProfileSaved(updated);
     setSaving(false);

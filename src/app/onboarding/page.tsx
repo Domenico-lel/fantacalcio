@@ -57,7 +57,7 @@ export default function OnboardingPage() {
     saveState(profile);
 
     if (user.id) {
-      const res = await upsertProfile(user.id, profile);
+      const res = await upsertProfile(profile);
       if (res.error) { setError("Errore nel salvataggio: " + res.error); setSaving(false); return; }
       if (selectedTeam) {
         const claim = await claimTeam(selectedTeam.id);
