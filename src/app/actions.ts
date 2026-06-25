@@ -75,6 +75,33 @@ export async function upsertProfile(
   }
 }
 
+// Aggiorna SOLO nome e cognome del manager, senza toccare la squadra/logo
+// (la squadra è scelta alla registrazione o assegnata dall'admin, non si modifica qui).
+export async function updateProfileNames(
+  firstName: string,
+  lastName: string
+): Promise<{ error: string | null }> {
+  const { userId } = await auth();
+  if (!userId) return { error: "Non autenticato" };
+  if (!isSupabaseConfigured()) return { error: null };
+
+  const fn = firstName.trim();
+  const ln = lastName.trim();
+  if (!fn || !ln) return { error: "Inserisci nome e cognome" };
+
+  try {
+    const db = createAdminClient();
+    const { error } = await db
+      .from("fanta_profiles")
+      .update({ first_name: fn, last_name: ln, updated_at: new Date().toISOString() } as never)
+      .eq("user_id", userId);
+    if (error) return { error: error.message };
+    return { error: null };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
 export async function fetchProfile(): Promise<{ data: TeamProfile | null; error: string | null }> {
   const { userId } = await auth();
   if (!userId) return { data: null, error: null };

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useAppUser } from "@/lib/app-user-context";
-import { upsertProfile } from "@/app/actions";
+import { updateProfileNames } from "@/app/actions";
 import { saveState } from "@/lib/store";
 import type { TeamProfile } from "@/lib/store";
 import BadgeRow from "@/components/Badges";
@@ -41,7 +41,6 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [teamName, setTeamName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,7 +49,6 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
     if (open && profile) {
       setFirstName(profile.firstName ?? "");
       setLastName(profile.lastName ?? "");
-      setTeamName(profile.teamName ?? "");
     }
     if (!open) {
       setEditing(false);
@@ -60,25 +58,26 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
 
   async function handleSave() {
     if (!firstName.trim() || !lastName.trim()) { setError("Inserisci nome e cognome"); return; }
-    if (!teamName.trim()) { setError("Inserisci il nome della squadra"); return; }
 
     setSaving(true);
     setError("");
 
+    // La squadra/logo non si modificano da qui: si scelgono alla registrazione
+    // e le gestisce l'admin. Aggiorniamo solo nome e cognome, mantenendo il resto.
     const updated: TeamProfile = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      teamName: teamName.trim(),
+      teamName: profile?.teamName ?? "",
       logo: profile?.logo ?? "⚽",
       budget: profile?.budget ?? 500,
     };
 
-    // Aggiorna localStorage
+    // Sync Supabase: aggiorna solo nome/cognome (non tocca la squadra)
+    const res = await updateProfileNames(updated.firstName, updated.lastName);
+    if (res.error) { setError(res.error); setSaving(false); return; }
+
+    // Aggiorna localStorage solo dopo il successo
     saveState(updated);
-
-    // Sync Supabase in background
-    if (user.id) upsertProfile(updated).catch(console.error);
-
     onProfileSaved(updated);
     setSaving(false);
     setEditing(false);
@@ -228,7 +227,6 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
                 {[
                   { label: "Nome", value: firstName, onChange: setFirstName, placeholder: "Es. Marco" },
                   { label: "Cognome", value: lastName, onChange: setLastName, placeholder: "Es. Rossi" },
-                  { label: "Nome squadra", value: teamName, onChange: setTeamName, placeholder: "Es. I Fenomeni" },
                 ].map(({ label, value, onChange, placeholder }) => (
                   <div key={label}>
                     <label className="text-white/50 text-xs font-semibold uppercase tracking-wide block mb-1.5">
