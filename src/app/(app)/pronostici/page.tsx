@@ -34,9 +34,14 @@ export default function PronosticiPage() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const d = await fetchBetCenter();
-    setData(d);
-    setLoading(false);
+    try {
+      const d = await fetchBetCenter();
+      setData(d);
+    } catch {
+      // network/server error — lascia data null
+    } finally {
+      setLoading(false);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 

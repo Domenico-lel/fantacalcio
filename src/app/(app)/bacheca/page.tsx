@@ -63,10 +63,15 @@ export default function BachecaPage() {
   const [loading, setLoading] = useState(true);
 
   const loadFeed = useCallback(async () => {
-    const { posts, viewer } = await fetchFeed();
-    setPosts(posts);
-    setViewer(viewer);
-    setLoading(false);
+    try {
+      const { posts, viewer } = await fetchFeed();
+      setPosts(posts);
+      setViewer(viewer);
+    } catch {
+      // network/server error — mantieni stato vuoto
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
