@@ -204,7 +204,7 @@ function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
           <Avatar name={s.name} size={38} ring={i === 0 ? "#f5c518" : "rgba(255,255,255,0.25)"} />
           <div className="flex-1 min-w-0">
             <p className="text-white text-sm font-bold truncate">{s.name}</p>
-            <p className="text-white/40 text-[11px]">{s.podiums} podi · {s.seasons} stagioni</p>
+            <p className="text-white/40 text-[11px]">{s.podiums} {s.podiums === 1 ? "podio" : "podi"}</p>
           </div>
           <div className="flex items-center gap-1 flex-none">
             <span className="text-lg">🏆</span>
