@@ -16,6 +16,8 @@ type Pick = "1" | "X" | "2";
 type TabKey = "bet" | "rank" | "admin";
 
 const PICK_LABELS: Record<Pick, string> = { "1": "1", X: "X", "2": "2" };
+// Significato del segno, per evitare che "1 · 3 cr" si legga come un risultato (1-3)
+const PICK_NAME: Record<Pick, string> = { "1": "Casa", X: "Pareggio", "2": "Ospite" };
 
 function Avatar({ src, size }: { src: string; size: number }) {
   if (isImageAvatar(src)) {
@@ -217,7 +219,8 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
             border: "1px solid var(--border)",
           }}>
           <span className="text-xs text-white/70">
-            Giocata: <b className="text-white">{PICK_LABELS[match.myBet.pick]}</b> · {match.myBet.stake} cr @ {fmtOdd(match.myBet.odd)}
+            Giocata: <b className="text-white">{PICK_LABELS[match.myBet.pick]}</b>
+            <span className="text-white/45"> ({PICK_NAME[match.myBet.pick]})</span> · {match.myBet.stake} cr @ quota {fmtOdd(match.myBet.odd)}
           </span>
           {match.myBet.status === "won" && <span className="text-emerald-400 text-xs font-bold">Vinta +{match.myBet.payout}</span>}
           {match.myBet.status === "lost" && <span className="text-red-400 text-xs font-bold">Persa</span>}
@@ -374,11 +377,11 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
       {/* nuovo scontro */}
       <div className="rounded-xl px-3 py-3 flex flex-col gap-2" style={{ background: "rgba(240,164,58,0.06)", border: "1px solid rgba(240,164,58,0.2)" }}>
         <div className="flex gap-2">
-          <select value={home} onChange={(e) => setHome(e.target.value)} className="flex-1 rounded-lg px-2 py-2 text-white text-xs outline-none" style={selStyle}>
+          <select value={home} onChange={(e) => setHome(e.target.value)} className="flex-1 min-w-0 rounded-lg px-2 py-2 text-white text-xs outline-none" style={selStyle}>
             <option value="" style={{ background: "#141d33" }}>Casa…</option>
             {teams.map((t) => <option key={t.id} value={t.id} style={{ background: "#141d33" }}>{t.name}</option>)}
           </select>
-          <select value={away} onChange={(e) => setAway(e.target.value)} className="flex-1 rounded-lg px-2 py-2 text-white text-xs outline-none" style={selStyle}>
+          <select value={away} onChange={(e) => setAway(e.target.value)} className="flex-1 min-w-0 rounded-lg px-2 py-2 text-white text-xs outline-none" style={selStyle}>
             <option value="" style={{ background: "#141d33" }}>Ospite…</option>
             {teams.map((t) => <option key={t.id} value={t.id} style={{ background: "#141d33" }}>{t.name}</option>)}
           </select>
