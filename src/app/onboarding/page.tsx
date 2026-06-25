@@ -18,7 +18,6 @@ export default function OnboardingPage() {
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [freeName, setFreeName] = useState(""); // fallback se non ci sono squadre sincronizzate
 
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -41,16 +40,15 @@ export default function OnboardingPage() {
       return;
     }
 
-    // step 2: scelta squadra
-    const teamName = hasTeams ? (selectedTeam?.name ?? "") : freeName.trim();
-    if (!teamName) { setError(hasTeams ? "Seleziona la tua squadra" : "Inserisci il nome della squadra"); return; }
+    // step 2: la squadra si sceglie sempre dalla lista (niente testo libero)
+    if (!selectedTeam) { setError("Seleziona la tua squadra"); return; }
 
     setSaving(true); setError("");
 
     const profile = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      teamName,
+      teamName: selectedTeam.name,
       logo: "⚽",
       budget: 500,
     };
@@ -59,10 +57,8 @@ export default function OnboardingPage() {
     if (user.id) {
       const res = await upsertProfile(profile);
       if (res.error) { setError("Errore nel salvataggio: " + res.error); setSaving(false); return; }
-      if (selectedTeam) {
-        const claim = await claimTeam(selectedTeam.id);
-        if (claim.error) { setError(claim.error); setSaving(false); return; }
-      }
+      const claim = await claimTeam(selectedTeam.id);
+      if (claim.error) { setError(claim.error); setSaving(false); return; }
     }
 
     setSaving(false);
@@ -119,49 +115,42 @@ export default function OnboardingPage() {
             <div className="text-center mb-6">
               <div className="text-5xl mb-3">🏟️</div>
               <h2 className="text-2xl font-bold text-white">La tua squadra</h2>
-              <p className="text-white/50 text-sm mt-1">
-                {hasTeams ? "Seleziona la squadra che ti appartiene" : "Inserisci il nome della tua squadra"}
-              </p>
+              <p className="text-white/50 text-sm mt-1">Seleziona la squadra che ti appartiene</p>
             </div>
 
-            {hasTeams ? (
-              <div className="flex flex-col gap-2 max-h-[46vh] overflow-y-auto pr-1">
-                {available.length === 0 && (
-                  <p className="text-white/50 text-sm text-center py-4">
-                    Tutte le squadre risultano già assegnate. Contatta l&apos;admin.
-                  </p>
-                )}
-                {available.map((t) => {
-                  const sel = selectedTeam?.id === t.id;
-                  return (
-                    <button key={t.id} onClick={() => setSelectedTeam(t)}
-                      className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all"
-                      style={{
-                        background: sel ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.06)",
-                        border: `1px solid ${sel ? "#34d399" : "rgba(255,255,255,0.1)"}`,
-                      }}>
-                      {t.logoUrl
-                        ? <img src={t.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-none" />
-                        : <span className="w-9 h-9 rounded-full flex items-center justify-center text-xl flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
-                      <span className={`font-semibold text-sm ${sel ? "text-emerald-400" : "text-white"}`}>{t.name}</span>
-                      {sel && <span className="ml-auto text-emerald-400">✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <input
-                className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none"
-                style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
-                placeholder="es. I Gladiatori" value={freeName} onChange={(e) => setFreeName(e.target.value)} maxLength={40} />
-            )}
+            <div className="flex flex-col gap-2 max-h-[46vh] overflow-y-auto pr-1">
+              {available.length === 0 && (
+                <p className="text-white/50 text-sm text-center py-4">
+                  {hasTeams
+                    ? "Tutte le squadre risultano già assegnate. Contatta l'admin."
+                    : "Nessuna squadra disponibile: l'admin deve ancora sincronizzare le squadre della lega."}
+                </p>
+              )}
+              {available.map((t) => {
+                const sel = selectedTeam?.id === t.id;
+                return (
+                  <button key={t.id} onClick={() => setSelectedTeam(t)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all"
+                    style={{
+                      background: sel ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.06)",
+                      border: `1px solid ${sel ? "#34d399" : "rgba(255,255,255,0.1)"}`,
+                    }}>
+                    {t.logoUrl
+                      ? <img src={t.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-none" />
+                      : <span className="w-9 h-9 rounded-full flex items-center justify-center text-xl flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
+                    <span className={`font-semibold text-sm ${sel ? "text-emerald-400" : "text-white"}`}>{t.name}</span>
+                    {sel && <span className="ml-auto text-emerald-400">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
         {error && <p className="text-red-400 text-sm text-center mt-3">{error}</p>}
 
         <div className="mt-8 flex flex-col gap-3">
-          <button onClick={handleNext} disabled={saving}
+          <button onClick={handleNext} disabled={saving || (step === 2 && !selectedTeam)}
             className="w-full py-4 font-bold rounded-2xl text-lg transition-all active:scale-95 disabled:opacity-60"
             style={{ background: "#34d399", color: "#052e16" }}>
             {saving ? (
