@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadState } from "@/lib/store";
+import { loadViewerCache } from "@/lib/store";
+import { getCurrentViewer } from "@/app/social-actions";
 import { fetchTeams } from "@/app/teams-actions";
+import { isImageAvatar } from "@/lib/avatar";
 
 interface StandingEntryWithLogo {
   position: number;
@@ -40,11 +42,17 @@ export default function StandingsPage() {
   const [teamLogos, setTeamLogos] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const s = loadState();
-    if (s.profile) {
-      setMyTeamName(s.profile.teamName);
-      setMyLogo(s.profile.logo);
-    }
+    // Identità autorevole dal server (stessa fonte dell'header), con paint immediato dalla cache.
+    // localStorage da solo era inaffidabile: il nome squadra non combaciava con la classifica
+    // e la "tua posizione" non veniva evidenziata.
+    const cached = loadViewerCache();
+    if (cached?.displayName) setMyTeamName(cached.displayName);
+    if (cached?.logo && !isImageAvatar(cached.logo)) setMyLogo(cached.logo);
+    getCurrentViewer().then((v) => {
+      if (!v?.displayName) return;
+      setMyTeamName(v.displayName);
+      setMyLogo(isImageAvatar(v.logo) ? "⭐" : v.logo || "⭐");
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
