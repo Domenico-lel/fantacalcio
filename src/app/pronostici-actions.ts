@@ -235,55 +235,28 @@ export async function placeBet(matchId: string, pick: Pick, stake: number): Prom
   const { data: round } = await db.from("fanta_bet_rounds").select("status").eq("id", match.round_id).maybeSingle();
   if (round?.status !== "open") return { error: "Scommesse chiuse per questa giornata" };
 
-  // crediti spendibili = saldo attuale + eventuale puntata già piazzata su questo scontro (la rimpiazziamo)
-  const balance = await getBalance(db, viewer.userId);
+  // una giocata già piazzata non si può più modificare
   const { data: existing } = await db
     .from("fanta_bets")
-    .select("id, stake, status")
+    .select("id")
     .eq("match_id", matchId)
     .eq("user_id", viewer.userId)
     .maybeSingle();
+  if (existing) return { error: "Hai già piazzato la giocata, non puoi modificarla" };
 
-  const refundable = existing && existing.status === "pending" ? existing.stake : 0;
-  const spendable = balance + refundable;
-  if (spendable < stake) return { error: `Crediti insufficienti (hai ${balance})` };
+  const balance = await getBalance(db, viewer.userId);
+  if (balance < stake) return { error: `Crediti insufficienti (hai ${balance})` };
 
   const odd = Number(oddFor(match, pick));
-  const newBalance = spendable - stake;
+  const newBalance = balance - stake;
   await db
     .from("fanta_credits")
     .update({ balance: newBalance, updated_at: new Date().toISOString() })
     .eq("user_id", viewer.userId);
 
-  if (existing) {
-    await db.from("fanta_bets").update({ pick, stake, odd, status: "pending", payout: 0 }).eq("id", existing.id);
-  } else {
-    await db.from("fanta_bets").insert({ match_id: matchId, user_id: viewer.userId, pick, stake, odd });
-  }
+  await db.from("fanta_bets").insert({ match_id: matchId, user_id: viewer.userId, pick, stake, odd });
 
   return { error: null, balance: newBalance };
-}
-
-export async function cancelBet(matchId: string): Promise<{ error: string | null }> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { error: "Non autenticato" };
-
-  const db = createAdminClient();
-  const { data: match } = await db.from("fanta_bet_matches").select("round_id, result").eq("id", matchId).maybeSingle();
-  if (!match || match.result) return { error: "Non puoi più annullare" };
-  const { data: round } = await db.from("fanta_bet_rounds").select("status").eq("id", match.round_id).maybeSingle();
-  if (round?.status !== "open") return { error: "Scommesse chiuse" };
-
-  const { data: bet } = await db
-    .from("fanta_bets")
-    .select("id, stake, status")
-    .eq("match_id", matchId)
-    .eq("user_id", viewer.userId)
-    .maybeSingle();
-  if (!bet) return { error: "Nessuna scommessa da annullare" };
-  if (bet.status === "pending") await addBalance(db, viewer.userId, bet.stake);
-  await db.from("fanta_bets").delete().eq("id", bet.id);
-  return { error: null };
 }
 
 // ─── Settlement (admin) ──────────────────────────────────────────────────────

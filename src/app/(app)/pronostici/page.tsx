@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  fetchBetCenter, placeBet, cancelBet, setMatchResult,
+  fetchBetCenter, placeBet, setMatchResult,
   createBetRound, setRoundStatus, deleteBetRound, addBetMatch, deleteBetMatch, adjustCredits,
   updateMatchOdds, adminDeleteBet,
   type BetCenter, type BetRound, type BetMatch, type CreditRow,
@@ -149,7 +149,8 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const locked = !!match.result || roundStatus !== "open" || !canBet;
+  // una volta piazzata, la giocata non è più modificabile
+  const locked = !!match.result || roundStatus !== "open" || !canBet || !!match.myBet;
   const stakeNum = parseInt(stake || "0", 10);
   const odd = pick === "1" ? match.odd1 : pick === "X" ? match.oddX : pick === "2" ? match.odd2 : 0;
   const potential = pick && stakeNum > 0 ? Math.round(stakeNum * odd) : 0;
@@ -161,15 +162,6 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
     const res = await placeBet(match.id, pick, stakeNum);
     setBusy(false);
     if (res.error) { setError(res.error); return; }
-    await reload();
-  }
-
-  async function cancel() {
-    setBusy(true); setError("");
-    const res = await cancelBet(match.id);
-    setBusy(false);
-    if (res.error) { setError(res.error); return; }
-    setPick(null); setStake("");
     await reload();
   }
 
@@ -239,12 +231,8 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
           <button onClick={submit} disabled={busy || !pick || stakeNum <= 0}
             className="flex-1 py-2 rounded-xl text-sm font-bold disabled:opacity-40"
             style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
-            {busy ? "…" : match.myBet ? `Modifica${potential ? ` · vinci ${potential}` : ""}` : `Punta${potential ? ` · vinci ${potential}` : ""}`}
+            {busy ? "…" : `Punta${potential ? ` · vinci ${potential}` : ""}`}
           </button>
-          {match.myBet && (
-            <button onClick={cancel} disabled={busy} className="px-3 py-2 rounded-xl text-xs text-red-400/80"
-              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>✕</button>
-          )}
         </div>
       )}
 
