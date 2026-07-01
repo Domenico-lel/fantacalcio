@@ -108,7 +108,7 @@ function computeManagerStats(groups: SeasonGroup[]): ManagerStat[] {
 
 /* Conteggio trofei: "N🏆" per gli scudetti e "+N🏅" per le coppe.
    Chi ha vinto solo la coppa (es. Matteo) mostra solo "N🏅". */
-function TrophyTally({ titles, cups, size = 11 }: { titles: number; cups: number; size?: number }) {
+function TrophyTally({ titles, cups, size = 12 }: { titles: number; cups: number; size?: number }) {
   if (titles === 0 && cups === 0) return null;
   return (
     <span className="font-bold whitespace-nowrap leading-none" style={{ fontSize: size }}>
@@ -125,7 +125,7 @@ function PodiumHead({ row, size, ring, crown = false }: { row?: ManagerStat; siz
       {/* placeholder corona su tutte le colonne → avatar allineati */}
       <span className="text-xl leading-none" style={{ visibility: crown ? "visible" : "hidden" }}>👑</span>
       <Avatar name={row?.name ?? "—"} size={size} ring={ring} />
-      <span className="text-white/90 text-[12px] font-semibold truncate max-w-full text-center px-1">{row?.name ?? "—"}</span>
+      <span className="text-white/90 text-[13px] font-semibold truncate max-w-full text-center px-1">{row?.name ?? "—"}</span>
     </div>
   );
 }
@@ -150,10 +150,10 @@ function AllTimePodium({ groups }: { groups: SeasonGroup[] }) {
   return (
     <div className="rounded-2xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
       <div className="flex items-center justify-between mb-4">
-        <span className="text-[12px] font-bold uppercase tracking-widest" style={{ color: "var(--accent-soft)" }}>
+        <span className="text-[13px] font-bold uppercase tracking-widest" style={{ color: "var(--accent-soft)" }}>
           Classifica trofei
         </span>
-        <span className="text-white/35 text-[11px] font-semibold uppercase tracking-wider">Tutti i tempi</span>
+        <span className="text-white/45 text-[11px] font-semibold uppercase tracking-wider">Tutti i tempi</span>
       </div>
 
       {/* Teste del podio (corona sul 1°) */}
@@ -181,15 +181,15 @@ function SeasonRow({ g, myName }: { g: SeasonGroup; myName: string }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl px-3 py-3"
       style={{ background: "var(--surface)", border: "1px solid var(--border)", borderLeft: `3px solid ${medal?.color ?? "var(--border)"}` }}>
-      <span className="text-[13px] font-bold tabular-nums" style={{ color: "var(--accent-soft)" }}>{g.season}</span>
+      <span className="text-[14px] font-bold tabular-nums" style={{ color: "var(--accent-soft)" }}>{g.season}</span>
       {medal && (
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-none"
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-none"
           style={{ background: `${medal.color}1f`, color: medal.color, border: `1px solid ${medal.color}66` }}>
           {medal.label}
         </span>
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-white text-[13px] font-semibold truncate">🏆 {champ?.display_name ?? "—"}</p>
+        <p className="text-white text-[14px] font-semibold truncate">🏆 {champ?.display_name ?? "—"}</p>
       </div>
     </div>
   );
@@ -200,8 +200,8 @@ function CoppaSection({ myName }: { myName: string }) {
   return (
     <>
       <div className="flex items-center justify-between mt-1 px-1">
-        <span className="text-white/40 text-[11px] font-bold uppercase tracking-widest">🏆 La Coppa</span>
-        <span className="text-white/30 text-[11px] tabular-nums">{COPPA.length} edizioni</span>
+        <span className="text-white/50 text-[12px] font-bold uppercase tracking-widest">🏆 La Coppa</span>
+        <span className="text-white/40 text-[11px] tabular-nums">{COPPA.length} edizioni</span>
       </div>
       <div className="flex flex-col gap-2">
         {COPPA.map((c, i) => {
@@ -213,11 +213,11 @@ function CoppaSection({ myName }: { myName: string }) {
               <Avatar name={c.winner} size={40} ring={current ? "#f5c518" : "rgba(255,255,255,0.25)"} />
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-bold truncate">
-                  {c.winner}{mine && <span className="text-white/40 font-semibold"> · tu</span>}
+                  {c.winner}{mine && <span className="text-white/50 font-semibold"> · tu</span>}
                 </p>
-                <p className="text-white/40 text-[11px] font-semibold">{current ? "Vincitore in carica" : "Campione"}</p>
+                <p className="text-white/50 text-[12px] font-semibold">{current ? "Vincitore in carica" : "Campione"}</p>
               </div>
-              <span className="text-[13px] font-bold tabular-nums flex-none" style={{ color: "var(--accent-soft)" }}>{c.season}</span>
+              <span className="text-[14px] font-bold tabular-nums flex-none" style={{ color: "var(--accent-soft)" }}>{c.season}</span>
             </div>
           );
         })}
@@ -239,11 +239,11 @@ function ManagerTab({ groups }: { groups: SeasonGroup[] }) {
           <div key={s.name} className="flex items-center gap-3 rounded-2xl px-3 py-3"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
             <span className="w-6 text-center font-black text-sm flex-none"
-              style={{ color: i < 3 ? "var(--accent)" : "rgba(255,255,255,0.4)" }}>{i + 1}</span>
+              style={{ color: i < 3 ? "var(--accent)" : "rgba(255,255,255,0.45)" }}>{i + 1}</span>
             <Avatar name={s.name} size={38} ring={i === 0 ? "#f5c518" : "rgba(255,255,255,0.25)"} />
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-bold truncate">{s.name}</p>
-              <p className="text-white/40 text-[11px] truncate">{lines.join(" · ")}</p>
+              <p className="text-white/50 text-[12px] truncate">{lines.join(" · ")}</p>
             </div>
             <div className="flex items-center gap-2 flex-none">
               {s.titles > 0 && (
@@ -285,9 +285,9 @@ function RecordTab({ groups }: { groups: SeasonGroup[] }) {
     <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
       <span className="text-3xl flex-none">{icon}</span>
       <div className="min-w-0">
-        <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wide">{label}</p>
+        <p className="text-white/50 text-[12px] font-semibold uppercase tracking-wide">{label}</p>
         <p className="text-white font-black text-lg leading-tight truncate">{value}</p>
-        {sub && <p className="text-white/45 text-xs truncate">{sub}</p>}
+        {sub && <p className="text-white/55 text-[13px] truncate">{sub}</p>}
       </div>
     </div>
   );
@@ -302,7 +302,9 @@ function RecordTab({ groups }: { groups: SeasonGroup[] }) {
   );
 }
 
-export default function TrofeiPage() {
+/* Albo d'oro del club — vive dentro la sezione Classifica, con il proprio
+   tema "oro" (sec-trophy) e le sotto-linguette Stagioni / Record / Manager. */
+export default function TrofeiContent() {
   const [tab, setTab] = useState<TabKey>("stagioni");
   const [trophies, setTrophies] = useState<Trophy[]>([]);
   const [loading, setLoading] = useState(true);
@@ -321,30 +323,22 @@ export default function TrofeiPage() {
   const shownSeasons = showAll ? groups : groups.slice(0, 5);
 
   return (
-    <div className="screen sec-trophy">
-      {/* Header */}
-      <div className="sec-header px-4 pt-12 pb-3">
-        <div className="flex items-center gap-3 mb-1">
-          <span className="text-3xl">🏆</span>
-          <h1 className="text-white font-bold text-3xl leading-none">Trofei</h1>
-        </div>
-        <p className="text-white/55 text-sm">L&apos;albo d&apos;oro del Soccer Dick Club</p>
+    <div className="sec-trophy">
+      <div className="px-4 pt-4">
+        <SegmentedTabs
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: "stagioni" as TabKey, label: "Stagioni" },
+            { key: "record" as TabKey, label: "Record" },
+            { key: "manager" as TabKey, label: "Manager" },
+          ]}
+        />
         {groups.length > 0 && (
-          <p className="text-[12px] font-semibold tracking-wide mt-0.5" style={{ color: "var(--accent-soft)" }}>
-            {groups.length} stagioni · dal {minYear}
+          <p className="text-[13px] font-semibold tracking-wide mt-3 px-1" style={{ color: "var(--accent-soft)" }}>
+            L&apos;albo d&apos;oro del Soccer Dick Club · {groups.length} stagioni dal {minYear}
           </p>
         )}
-        <div className="mt-3">
-          <SegmentedTabs
-            value={tab}
-            onChange={setTab}
-            items={[
-              { key: "stagioni" as TabKey, label: "Stagioni" },
-              { key: "record" as TabKey, label: "Record" },
-              { key: "manager" as TabKey, label: "Manager" },
-            ]}
-          />
-        </div>
       </div>
 
       {loading && (
@@ -358,7 +352,7 @@ export default function TrofeiPage() {
       {!loading && groups.length === 0 && (
         <div className="flex flex-col items-center py-20 gap-3">
           <span className="text-5xl">🏆</span>
-          <p className="text-white/50 text-sm text-center px-8">
+          <p className="text-white/55 text-sm text-center px-8">
             L&apos;albo d&apos;oro è ancora vuoto.<br />I trofei delle stagioni passate appariranno qui.
           </p>
         </div>
@@ -371,8 +365,8 @@ export default function TrofeiPage() {
           {groups.length > 0 && (
             <>
               <div className="flex items-center justify-between mt-1 px-1">
-                <span className="text-white/40 text-[11px] font-bold uppercase tracking-widest">Stagione per stagione</span>
-                <span className="text-white/30 text-[11px] tabular-nums">{groups.length} stagioni</span>
+                <span className="text-white/50 text-[12px] font-bold uppercase tracking-widest">Stagione per stagione</span>
+                <span className="text-white/40 text-[11px] tabular-nums">{groups.length} stagioni</span>
               </div>
               <div className="flex flex-col gap-2">
                 {shownSeasons.map((g) => <SeasonRow key={g.season} g={g} myName={myName} />)}

@@ -12,7 +12,7 @@ export default async function RegistratoPage() {
   const [viewer, open] = await Promise.all([getCurrentViewer(), isAppOpen()]);
   if (!viewer) redirect("/sign-in");
   // app già aperta, oppure sei l'admin → vai dritto all'app
-  if (open || viewer.isAdmin) redirect("/trofei");
+  if (open || viewer.isAdmin) redirect("/standings");
   // non hai ancora completato l'onboarding → fallo prima (così raccogliamo i dati)
   if (!viewer.hasProfile) redirect("/onboarding");
 

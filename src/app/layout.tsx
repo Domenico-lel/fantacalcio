@@ -1,7 +1,16 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ClerkUserBridge } from "@/components/ClerkUserBridge";
 import "./globals.css";
+
+// Inter: font da UI ad alta leggibilità sugli schermi piccoli (cellulare).
+// Esposto come --font-inter, che tailwind usa già per `font-sans`.
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +40,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
-      <html lang="it" suppressHydrationWarning>
+      <html lang="it" className={inter.variable} suppressHydrationWarning>
         <head />
         <body className="font-sans antialiased">
           <ClerkUserBridge>{children}</ClerkUserBridge>

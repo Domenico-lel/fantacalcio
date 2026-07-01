@@ -14,12 +14,13 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.clerk.dev" },
     ],
   },
-  // La vecchia pagina /news (Notizie) è stata sostituita da /trofei. Qualche
-  // configurazione Clerk legacy (env "after sign-in URL") e i bookmark/PWA
-  // puntano ancora a /news: reindirizziamo per evitare il 404 post-login.
+  // La sezione Trofei ora vive dentro /standings (Classifica). Le vecchie
+  // pagine /news e /trofei sono linkate da config Clerk legacy, bookmark e
+  // PWA: reindirizziamo a /standings per evitare il 404 post-login.
   async redirects() {
     return [
-      { source: "/news", destination: "/trofei", permanent: false },
+      { source: "/news", destination: "/standings", permanent: false },
+      { source: "/trofei", destination: "/standings", permanent: false },
     ];
   },
 };

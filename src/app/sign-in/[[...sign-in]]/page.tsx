@@ -16,7 +16,7 @@ export default function SignInPage() {
 
       <div style={{ width: "25rem", maxWidth: "calc(100vw - 2rem)" }}>
       <SignIn
-        fallbackRedirectUrl="/registrato"
+        fallbackRedirectUrl="/standings"
         appearance={{
           variables: {
             colorPrimary: "#34d399",

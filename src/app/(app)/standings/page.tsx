@@ -5,6 +5,10 @@ import { loadViewerCache } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
 import { fetchTeams } from "@/app/teams-actions";
 import { isImageAvatar } from "@/lib/avatar";
+import SegmentedTabs from "@/components/SegmentedTabs";
+import TrofeiContent from "@/components/TrofeiContent";
+
+type TabKey = "classifica" | "trofei";
 
 interface StandingEntryWithLogo {
   position: number;
@@ -35,6 +39,7 @@ function assignLogoToTeam(teamName: string): string {
 const MEDAL = ["🥇", "🥈", "🥉"];
 
 export default function StandingsPage() {
+  const [tab, setTab] = useState<TabKey>("classifica");
   const [myTeamName, setMyTeamName] = useState("La tua Squadra");
   const [myLogo, setMyLogo] = useState("⭐");
   const [standings, setStandings] = useState<StandingEntryWithLogo[]>([]);
@@ -101,18 +106,34 @@ export default function StandingsPage() {
   return (
     <div className="screen sec-rank">
       {/* Header */}
-      <div className="sec-header px-4 pt-12 pb-5">
+      <div className="sec-header px-4 pt-12 pb-3">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[11px] font-semibold tracking-widest" style={{ color: "var(--accent-soft)" }}>STAGIONE 2025/26</p>
-            <h1 className="text-white font-bold text-2xl leading-tight">Classifica</h1>
+            <p className="text-[11px] font-semibold tracking-widest" style={{ color: "var(--accent-soft)" }}>
+              {tab === "classifica" ? "STAGIONE 2025/26" : "SOCCER DICK CLUB"}
+            </p>
+            <h1 className="text-white font-bold text-2xl leading-tight">
+              {tab === "classifica" ? "Classifica" : "Albo d'oro"}
+            </h1>
           </div>
           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
             style={{ background: "rgba(133,124,240,0.18)", color: "var(--accent)" }}>🏆</div>
         </div>
+        <div className="mt-3">
+          <SegmentedTabs
+            value={tab}
+            onChange={setTab}
+            items={[
+              { key: "classifica" as TabKey, label: "Classifica" },
+              { key: "trofei" as TabKey, label: "Trofei" },
+            ]}
+          />
+        </div>
       </div>
 
-      <div className="px-4 pb-24 pt-4 flex flex-col gap-3">
+      {tab === "trofei" && <TrofeiContent />}
+
+      <div className="px-4 pb-24 pt-4 flex flex-col gap-3" style={{ display: tab === "classifica" ? undefined : "none" }}>
 
         {loading && standings.length === 0 && Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="rounded-2xl animate-pulse" style={{ height: i === 0 ? 88 : 56, background: "rgba(255,255,255,0.05)" }} />
@@ -192,7 +213,7 @@ export default function StandingsPage() {
                       <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMe ? "var(--accent)" : "rgba(255,255,255,0.3)" }} />
                       </div>
-                      <span className="text-white/35 text-[10px] flex-none">
+                      <span className="text-white/55 text-[11px] flex-none tabular-nums">
                         {entry.won}-{entry.drawn}-{entry.lost} · {entry.goalDiff > 0 ? `+${entry.goalDiff}` : entry.goalDiff}
                       </span>
                     </div>

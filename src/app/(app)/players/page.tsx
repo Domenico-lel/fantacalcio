@@ -183,11 +183,11 @@ function VociTab() {
                     {badge.label}
                   </span>
                 )}
-                <span className="text-white/30 text-[10px] ml-auto flex-none">{timeAgo(item.postedAt)}</span>
+                <span className="text-white/45 text-[11px] ml-auto flex-none">{timeAgo(item.postedAt)}</span>
               </div>
-              <p className="text-white font-bold text-[14px] leading-snug">{title}</p>
+              <p className="text-white font-bold text-[15.5px] leading-snug">{title}</p>
               {body && (
-                <p className="text-white/55 text-[12.5px] leading-snug mt-1 whitespace-pre-line">{body}</p>
+                <p className="text-white/75 text-[14px] leading-relaxed mt-1.5 whitespace-pre-line">{body}</p>
               )}
             </div>
           </div>
@@ -274,8 +274,8 @@ function TrattativeTab() {
               <div>
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <div className="min-w-0">
-                    <p className="text-white/50 text-[10px] font-medium leading-tight">{item.player.position}</p>
-                    <p className="text-white font-black text-base leading-tight truncate">{item.player.name}</p>
+                    <p className="text-white/60 text-[11px] font-medium leading-tight">{item.player.position}</p>
+                    <p className="text-white font-black text-[17px] leading-tight truncate">{item.player.name}</p>
                   </div>
                   <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full"
                     style={{ background: `${ds.color}1f`, border: `1px solid ${ds.color}55` }}>
@@ -290,7 +290,7 @@ function TrattativeTab() {
                       <img src={item.fromClub.logoUrl} alt={item.fromClub.name}
                         className="w-6 h-6 object-contain flex-shrink-0" loading="lazy" />
                     )}
-                    <span className="text-white/60 text-[11px] font-semibold truncate max-w-16">
+                    <span className="text-white/65 text-[12px] font-semibold truncate max-w-16">
                       {item.fromClub.name}
                     </span>
                   </div>
@@ -302,7 +302,7 @@ function TrattativeTab() {
                       <img src={item.toClub.logoUrl} alt={item.toClub.name}
                         className="w-6 h-6 object-contain flex-shrink-0" loading="lazy" />
                     )}
-                    <span className="text-white font-bold text-[11px] truncate max-w-16">
+                    <span className="text-white font-bold text-[12px] truncate max-w-16">
                       {item.toClub.name}
                     </span>
                   </div>
