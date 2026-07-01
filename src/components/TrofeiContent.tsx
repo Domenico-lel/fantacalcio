@@ -303,8 +303,8 @@ function RecordTab({ groups }: { groups: SeasonGroup[] }) {
   );
 }
 
-/* Albo d'oro del club — vive dentro la sezione Classifica, con il proprio
-   tema "oro" (sec-trophy) e le sotto-linguette Stagioni / Record / Manager. */
+/* Albo d'oro del club — vive dentro la sezione Classifica e ne eredita il
+   tema (viola), con le sotto-linguette Stagioni / Record / Manager. */
 export default function TrofeiContent() {
   const [tab, setTab] = useState<TabKey>("stagioni");
   const [trophies, setTrophies] = useState<Trophy[]>([]);
@@ -329,7 +329,7 @@ export default function TrofeiContent() {
   const shownSeasons = showAll ? groups : groups.slice(0, 5);
 
   return (
-    <div className="sec-trophy">
+    <div>
       <div className="px-4 pt-4">
         <SegmentedTabs
           value={tab}

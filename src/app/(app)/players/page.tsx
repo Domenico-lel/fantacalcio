@@ -7,7 +7,6 @@ import type { MarketNewsItem } from "@/app/api/market/route";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
 import { useRegisterRefresh } from "@/components/PullToRefresh";
-import { useSwipeTabs } from "@/lib/use-swipe";
 
 type TabKey = "voci" | "trattative";
 const TAB_KEYS: TabKey[] = ["voci", "trattative"];
@@ -358,10 +357,9 @@ function TrattativeTab() {
 
 export default function MercatoPage() {
   const [tab, setTab] = useState<TabKey>("voci");
-  const swipe = useSwipeTabs(TAB_KEYS, tab, setTab);
 
   return (
-    <div className="screen sec-market" {...swipe}>
+    <div className="screen sec-market">
       {/* Header */}
       <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>Calciomercato</p>

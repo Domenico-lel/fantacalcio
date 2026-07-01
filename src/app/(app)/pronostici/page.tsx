@@ -14,7 +14,6 @@ import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
 import { useConfirm } from "@/components/Dialog";
 import { useRegisterRefresh } from "@/components/PullToRefresh";
-import { useSwipeTabs } from "@/lib/use-swipe";
 
 type Pick = "1" | "X" | "2";
 type TabKey = "bet" | "rank" | "admin";
@@ -54,10 +53,9 @@ export default function PronosticiPage() {
 
   const isAdmin = !!data?.viewer?.isAdmin;
   const tabKeys: TabKey[] = isAdmin ? ["bet", "rank", "admin"] : ["bet", "rank"];
-  const swipe = useSwipeTabs(tabKeys, tab, setTab);
 
   return (
-    <div className="screen sec-bet" {...swipe}>
+    <div className="screen sec-bet">
       <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <div className="flex items-center justify-between">
           <div>

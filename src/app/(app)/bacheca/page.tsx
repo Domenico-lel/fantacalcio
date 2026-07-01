@@ -21,7 +21,6 @@ import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
 import { useConfirm, useToast } from "@/components/Dialog";
 import { useRegisterRefresh } from "@/components/PullToRefresh";
-import { useSwipeTabs } from "@/lib/use-swipe";
 
 type TabKey = "scoop" | "cedibili" | "gestione";
 
@@ -82,10 +81,9 @@ export default function BachecaPage() {
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
   const tabKeys: TabKey[] = viewer?.isAdmin ? ["scoop", "cedibili", "gestione"] : ["scoop", "cedibili"];
-  const swipe = useSwipeTabs(tabKeys, tab, setTab);
 
   return (
-    <div className="screen sec-board" {...swipe}>
+    <div className="screen sec-board">
       {/* Header + tabs */}
       <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>La lega</p>

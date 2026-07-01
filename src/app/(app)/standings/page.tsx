@@ -9,7 +9,6 @@ import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
 import TrofeiContent from "@/components/TrofeiContent";
 import { useRegisterRefresh } from "@/components/PullToRefresh";
-import { useSwipeTabs } from "@/lib/use-swipe";
 
 type TabKey = "classifica" | "trofei";
 const TAB_KEYS: TabKey[] = ["classifica", "trofei"];
@@ -110,10 +109,9 @@ export default function StandingsPage() {
   const myEntry = standings.find((e) => e.teamName === myTeamName);
   const leader = standings[0];
   const maxPoints = leader?.points || 1;
-  const swipe = useSwipeTabs(TAB_KEYS, tab, setTab);
 
   return (
-    <div className="screen sec-rank" {...swipe}>
+    <div className="screen sec-rank">
       {/* Header */}
       <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <div className="flex items-start justify-between">
