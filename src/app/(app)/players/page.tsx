@@ -1,12 +1,16 @@
 "use client";
 
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { TransferItem } from "@/app/api/transfers/route";
 import type { MarketNewsItem } from "@/app/api/market/route";
 import SegmentedTabs from "@/components/SegmentedTabs";
+import TabPanel from "@/components/TabPanel";
+import { useRegisterRefresh } from "@/components/PullToRefresh";
+import { useSwipeTabs } from "@/lib/use-swipe";
 
 type TabKey = "voci" | "trattative";
+const TAB_KEYS: TabKey[] = ["voci", "trattative"];
 
 function timeAgo(dateStr: string): string {
   if (!dateStr) return "";
@@ -53,6 +57,21 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
     ? `https://www.transfermarkt.it/${item.player.playerSlug}/profil/spieler/${item.player.playerId}`
     : null;
 
+  // Trascina la maniglia verso il basso per chiudere (gesto nativo)
+  const [dragY, setDragY] = useState(0);
+  const dragStart = useRef<number | null>(null);
+  const onHandleStart = (e: React.TouchEvent) => { dragStart.current = e.touches[0].clientY; };
+  const onHandleMove = (e: React.TouchEvent) => {
+    if (dragStart.current == null) return;
+    setDragY(Math.max(0, e.touches[0].clientY - dragStart.current));
+  };
+  const onHandleEnd = () => {
+    if (dragStart.current == null) return;
+    dragStart.current = null;
+    if (dragY > 120) onClose();
+    else setDragY(0);
+  };
+
   return (
     <>
       {/* Overlay */}
@@ -61,10 +80,16 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
 
       {/* Sheet */}
       <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-hidden"
-        style={{ background: "var(--bg)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "90dvh" }}>
+        style={{
+          background: "var(--bg)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "90dvh",
+          transform: `translateY(${dragY}px)`,
+          transition: dragStart.current == null ? "transform .25s ease" : "none",
+        }}>
 
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1">
+        {/* Handle — zona di trascinamento */}
+        <div className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing"
+          style={{ touchAction: "none" }}
+          onTouchStart={onHandleStart} onTouchMove={onHandleMove} onTouchEnd={onHandleEnd}>
           <div className="rounded-full" style={{ width: 36, height: 4, background: "rgba(255,255,255,0.2)" }} />
         </div>
 
@@ -145,6 +170,7 @@ function VociTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useRegisterRefresh(load);
 
   return (
     <div className="px-4 py-4 flex flex-col gap-3">
@@ -218,6 +244,7 @@ function TrattativeTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useRegisterRefresh(load);
 
   return (
     <div className="px-4 py-4 flex flex-col gap-4">
@@ -331,11 +358,12 @@ function TrattativeTab() {
 
 export default function MercatoPage() {
   const [tab, setTab] = useState<TabKey>("voci");
+  const swipe = useSwipeTabs(TAB_KEYS, tab, setTab);
 
   return (
-    <div className="screen sec-market">
+    <div className="screen sec-market" {...swipe}>
       {/* Header */}
-      <div className="sec-header px-4 pt-12 pb-3">
+      <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>Calciomercato</p>
         <h1 className="text-white font-bold text-2xl leading-tight mb-3">Mercato</h1>
         <SegmentedTabs
@@ -348,8 +376,9 @@ export default function MercatoPage() {
         />
       </div>
 
-      {tab === "voci" && <VociTab />}
-      {tab === "trattative" && <TrattativeTab />}
+      <TabPanel tabKey={tab} keys={TAB_KEYS}>
+        {tab === "voci" ? <VociTab /> : <TrattativeTab />}
+      </TabPanel>
     </div>
   );
 }

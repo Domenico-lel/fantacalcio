@@ -18,6 +18,10 @@ import {
 import { isAppOpen, setAppOpen } from "@/app/release-actions";
 import { isImageAvatar } from "@/lib/avatar";
 import SegmentedTabs from "@/components/SegmentedTabs";
+import TabPanel from "@/components/TabPanel";
+import { useConfirm, useToast } from "@/components/Dialog";
+import { useRegisterRefresh } from "@/components/PullToRefresh";
+import { useSwipeTabs } from "@/lib/use-swipe";
 
 type TabKey = "scoop" | "cedibili" | "gestione";
 
@@ -77,8 +81,11 @@ export default function BachecaPage() {
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
+  const tabKeys: TabKey[] = viewer?.isAdmin ? ["scoop", "cedibili", "gestione"] : ["scoop", "cedibili"];
+  const swipe = useSwipeTabs(tabKeys, tab, setTab);
+
   return (
-    <div className="screen sec-board">
+    <div className="screen sec-board" {...swipe}>
       {/* Header + tabs */}
       <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>La lega</p>
@@ -94,9 +101,12 @@ export default function BachecaPage() {
         />
       </div>
 
-      {tab === "scoop" && <ScoopTab viewer={viewer} posts={posts} loading={loading} reload={loadFeed} setPosts={setPosts} />}
-      {tab === "cedibili" && <CedibiliTab viewer={viewer} />}
-      {tab === "gestione" && viewer?.isAdmin && <GestioneTab />}
+      <TabPanel tabKey={tab} keys={tabKeys}>
+        {tab === "scoop" ? <ScoopTab viewer={viewer} posts={posts} loading={loading} reload={loadFeed} setPosts={setPosts} />
+          : tab === "cedibili" ? <CedibiliTab viewer={viewer} />
+          : viewer?.isAdmin ? <GestioneTab />
+          : null}
+      </TabPanel>
     </div>
   );
 }
@@ -110,6 +120,7 @@ function ScoopTab({ viewer, posts, loading, reload, setPosts }: {
   reload: () => Promise<void>;
   setPosts: React.Dispatch<React.SetStateAction<FeedPost[]>>;
 }) {
+  useRegisterRefresh(reload);
   return (
     <div className="px-4 py-4 flex flex-col gap-4">
       {viewer && <Composer viewer={viewer} onPublished={reload} />}
@@ -246,6 +257,7 @@ function PostCard({ post, viewer, reload, setPosts }: {
   reload: () => Promise<void>;
   setPosts: React.Dispatch<React.SetStateAction<FeedPost[]>>;
 }) {
+  const confirm = useConfirm();
   const [showComments, setShowComments] = useState(false);
   const [comment, setComment] = useState("");
   const [sending, setSending] = useState(false);
@@ -311,8 +323,8 @@ function PostCard({ post, viewer, reload, setPosts }: {
             style={{ background: `${meta.color}26`, color: meta.color }}>{meta.label}</span>
         )}
         {(viewer?.isAdmin || post.mine) && (
-          <button onClick={async () => { if (confirm("Eliminare questo post?")) { await deletePost(post.id); await reload(); } }}
-            className="text-white/30 text-sm px-1 active:opacity-60 flex-none">🗑️</button>
+          <button onClick={async () => { if (await confirm({ title: "Eliminare questo post?", confirmLabel: "Elimina", danger: true })) { await deletePost(post.id); await reload(); } }}
+            className="tap text-white/40 text-sm active:opacity-60 flex-none">🗑️</button>
         )}
       </div>
 
@@ -388,6 +400,7 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+  useRegisterRefresh(load);
 
   async function add() {
     if (!player.trim()) { setError("Inserisci il nome del giocatore"); return; }
@@ -463,6 +476,7 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
 }
 
 function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => Promise<void> }) {
+  const confirm = useConfirm();
   const isClosed = listing.status === "closed";
   return (
     <div className="flex items-center gap-3 rounded-xl px-3 py-3"
@@ -489,8 +503,8 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
             style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>
             {isClosed ? "Riapri" : "Chiudi"}
           </button>
-          <button onClick={async () => { if (confirm("Eliminare?")) { await deleteListing(listing.id); await onChange(); } }}
-            className="px-2 py-1.5 rounded-lg text-[11px] text-red-400/80"
+          <button onClick={async () => { if (await confirm({ title: "Eliminare l'annuncio?", confirmLabel: "Elimina", danger: true })) { await deleteListing(listing.id); await onChange(); } }}
+            className="tap rounded-lg text-[13px] text-red-400/80"
             style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
             🗑️
           </button>
@@ -505,6 +519,8 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
 /* Interruttore di rilascio: apre l'app a tutti o la rimette in "arrivo".
    Stato salvato in DB (fanta_settings.app_open), nessun deploy necessario. */
 function AppReleaseToggle() {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [open, setOpen] = useState<boolean | null>(null); // null = in caricamento
   const [busy, setBusy] = useState(false);
 
@@ -513,15 +529,16 @@ function AppReleaseToggle() {
   async function toggle() {
     if (open === null || busy) return;
     const next = !open;
-    const msg = next
-      ? "Aprire l'app a TUTTI i manager? Da ora ognuno vedrà l'app completa."
-      : "Rimettere l'app in modalità \"in arrivo\"? I manager (non admin) vedranno solo la pagina di attesa.";
-    if (!confirm(msg)) return;
+    const ok = next
+      ? await confirm({ title: "Aprire l'app a tutti?", message: "Da ora ogni manager vedrà l'app completa.", confirmLabel: "Apri a tutti" })
+      : await confirm({ title: "Rimettere in arrivo?", message: "I manager (non admin) vedranno solo la pagina di attesa.", confirmLabel: "Metti in arrivo", danger: true });
+    if (!ok) return;
     setBusy(true);
     const res = await setAppOpen(next);
     setBusy(false);
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { toast(res.error, "error"); return; }
     setOpen(res.open);
+    toast(res.open ? "App aperta a tutti ✓" : "App rimessa in arrivo", "success");
   }
 
   const loading = open === null;
@@ -569,6 +586,7 @@ function GestioneTab() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+  useRegisterRefresh(load);
 
   const profileByTeam = new Map<string, AdminProfile>();
   for (const p of profiles) if (p.teamRef) profileByTeam.set(p.teamRef, p);
@@ -776,6 +794,7 @@ function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Pro
 }
 
 function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () => Promise<void> }) {
+  const confirm = useConfirm();
   const [firstName, setFirstName] = useState(profile.firstName);
   const [lastName, setLastName] = useState(profile.lastName);
   const [teamName, setTeamName] = useState(profile.teamName);
@@ -823,10 +842,10 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
           <button onClick={save} disabled={busy || !dirty}
             className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40"
             style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>Salva</button>
-          <button onClick={async () => { if (confirm("Liberare la squadra di questo manager? Potrà sceglierne un'altra.")) { await adminReleaseTeam(profile.userId); await reload(); } }}
+          <button onClick={async () => { if (await confirm({ title: "Liberare la squadra?", message: "Il manager potrà sceglierne un'altra.", confirmLabel: "Libera" })) { await adminReleaseTeam(profile.userId); await reload(); } }}
             className="px-3 py-2 rounded-lg text-xs font-semibold text-white/70"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>Libera squadra</button>
-          <button onClick={async () => { if (confirm(`Eliminare il profilo di ${profile.teamName || profile.firstName || "questo manager"}? La squadra tornerà libera.`)) { await adminDeleteProfile(profile.userId); await reload(); } }}
+          <button onClick={async () => { if (await confirm({ title: `Eliminare il profilo di ${profile.teamName || profile.firstName || "questo manager"}?`, message: "La squadra tornerà libera.", confirmLabel: "Elimina", danger: true })) { await adminDeleteProfile(profile.userId); await reload(); } }}
             className="px-3 py-2 rounded-lg text-xs text-red-400/80"
             style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>Elimina profilo</button>
         </div>
@@ -951,7 +970,7 @@ function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: 
                   {p.role && <span className="text-emerald-400/80 text-[10px] font-bold w-4 text-center flex-none">{p.role}</span>}
                   <span className="text-white/85 text-sm flex-1 truncate">{p.playerName}</span>
                   <button onClick={async () => { await deleteRosterPlayer(p.id); await loadRoster(); }}
-                    className="text-red-400/70 text-xs px-1.5 flex-none">✕</button>
+                    className="tap text-red-400/70 text-sm flex-none">✕</button>
                 </div>
               ))}
             </div>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { fetchAllTrophies, type Trophy } from "@/app/actions";
 import { loadState } from "@/lib/store";
 import SegmentedTabs from "@/components/SegmentedTabs";
+import { useRegisterRefresh } from "@/components/PullToRefresh";
 
 type TabKey = "stagioni" | "record" | "manager";
 
@@ -311,12 +312,17 @@ export default function TrofeiContent() {
   const [myName, setMyName] = useState("");
   const [showAll, setShowAll] = useState(false);
 
+  const load = useCallback(async () => {
+    const r = await fetchAllTrophies();
+    setTrophies(r.data);
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     setMyName(loadState().profile?.firstName ?? "");
-    fetchAllTrophies()
-      .then((r) => setTrophies(r.data))
-      .finally(() => setLoading(false));
-  }, []);
+    load();
+  }, [load]);
+  useRegisterRefresh(load);
 
   const groups = useMemo(() => groupSeasons(trophies), [trophies]);
   const minYear = groups.length ? Math.min(...groups.map((g) => g.year)) : null;

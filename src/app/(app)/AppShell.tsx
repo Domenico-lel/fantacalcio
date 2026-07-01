@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useRef, useState, useEffect } from "react";
 import ProfileDrawer from "@/components/ProfileDrawer";
 import BadgeRow from "@/components/Badges";
 import PwaInstallGuide from "@/components/PwaInstallGuide";
+import PullToRefresh from "@/components/PullToRefresh";
+import DialogProvider from "@/components/Dialog";
 import { loadState, loadViewerCache, saveViewerCache } from "@/lib/store";
 import type { TeamProfile, CachedViewer } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
@@ -20,6 +22,7 @@ const NAV_ITEMS = [
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState<TeamProfile | null>(null);
   const [viewer, setViewer] = useState<CachedViewer | null>(null);
@@ -45,9 +48,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const teamLabel = viewer?.displayName ?? "La tua squadra";
 
   return (
+    <DialogProvider>
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
       {/* Top bar — header app-style, piatto, mai scrollabile */}
-      <header className="flex-none flex items-center gap-3 px-4 pt-4 pb-3">
+      <header className="flex-none flex items-center gap-3 px-4 pt-4 pb-3 safe-top">
         <div className="flex flex-col min-w-0 flex-1">
           <span className="text-white/35 text-[10px] font-semibold uppercase tracking-wider leading-none">La tua squadra</span>
           <div className="flex items-center gap-1.5 min-w-0 mt-1">
@@ -70,7 +74,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto pb-20">{children}</div>
+      <PullToRefresh scrollRef={scrollRef}>{children}</PullToRefresh>
 
       {/* Bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
@@ -82,6 +86,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={href}
                 href={href}
+                onClick={(e) => {
+                  // ri-tap sulla tab attiva → torna in cima (pattern iOS)
+                  if (active) { e.preventDefault(); scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }
+                }}
                 className="flex-1 flex flex-col items-center gap-1 pt-2.5 pb-2 transition-colors"
                 style={{ color: active ? color : "rgba(255,255,255,0.35)" }}
               >
@@ -113,6 +121,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       <PwaInstallGuide />
     </div>
+    </DialogProvider>
   );
 }
 

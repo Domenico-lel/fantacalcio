@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { loadViewerCache } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
 import { fetchTeams } from "@/app/teams-actions";
 import { isImageAvatar } from "@/lib/avatar";
 import SegmentedTabs from "@/components/SegmentedTabs";
+import TabPanel from "@/components/TabPanel";
 import TrofeiContent from "@/components/TrofeiContent";
+import { useRegisterRefresh } from "@/components/PullToRefresh";
+import { useSwipeTabs } from "@/lib/use-swipe";
 
 type TabKey = "classifica" | "trofei";
+const TAB_KEYS: TabKey[] = ["classifica", "trofei"];
+// La tab Trofei registra da sé il proprio refresh: qui basta un no-op stabile.
+const NOOP = () => {};
 
 interface StandingEntryWithLogo {
   position: number;
@@ -79,34 +85,37 @@ export default function StandingsPage() {
     );
   }
 
-  useEffect(() => {
-    async function loadStandings() {
-      try {
-        const res = await fetch("/api/standings");
-        if (!res.ok) throw new Error("Failed to fetch standings");
-        const data = await res.json();
-        const withLogos: StandingEntryWithLogo[] = (data.items || []).map((entry: any) => ({
-          ...entry,
-          logoEmoji: entry.teamName === myTeamName ? myLogo : assignLogoToTeam(entry.teamName),
-        }));
-        setStandings(withLogos);
-      } catch {
-        setStandings([]);
-      } finally {
-        setLoading(false);
-      }
+  const loadStandings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/standings");
+      if (!res.ok) throw new Error("Failed to fetch standings");
+      const data = await res.json();
+      const withLogos: StandingEntryWithLogo[] = (data.items || []).map((entry: any) => ({
+        ...entry,
+        logoEmoji: entry.teamName === myTeamName ? myLogo : assignLogoToTeam(entry.teamName),
+      }));
+      setStandings(withLogos);
+    } catch {
+      setStandings([]);
+    } finally {
+      setLoading(false);
     }
-    loadStandings();
   }, [myTeamName, myLogo]);
+
+  useEffect(() => { loadStandings(); }, [loadStandings]);
+
+  // Pull-to-refresh sulla classifica; sulla tab Trofei ci pensa TrofeiContent.
+  useRegisterRefresh(tab === "classifica" ? loadStandings : NOOP);
 
   const myEntry = standings.find((e) => e.teamName === myTeamName);
   const leader = standings[0];
   const maxPoints = leader?.points || 1;
+  const swipe = useSwipeTabs(TAB_KEYS, tab, setTab);
 
   return (
-    <div className="screen sec-rank">
+    <div className="screen sec-rank" {...swipe}>
       {/* Header */}
-      <div className="sec-header px-4 pt-12 pb-3">
+      <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-[11px] font-semibold tracking-widest" style={{ color: "var(--accent-soft)" }}>
@@ -131,9 +140,9 @@ export default function StandingsPage() {
         </div>
       </div>
 
-      {tab === "trofei" && <TrofeiContent />}
-
-      <div className="px-4 pb-24 pt-4 flex flex-col gap-3" style={{ display: tab === "classifica" ? undefined : "none" }}>
+      <TabPanel tabKey={tab} keys={TAB_KEYS}>
+        {tab === "trofei" ? <TrofeiContent /> : (
+      <div className="px-4 pb-24 pt-4 flex flex-col gap-3">
 
         {loading && standings.length === 0 && Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="rounded-2xl animate-pulse" style={{ height: i === 0 ? 88 : 56, background: "rgba(255,255,255,0.05)" }} />
@@ -245,6 +254,8 @@ export default function StandingsPage() {
           </div>
         )}
       </div>
+        )}
+      </TabPanel>
     </div>
   );
 }

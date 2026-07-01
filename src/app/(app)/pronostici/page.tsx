@@ -11,6 +11,10 @@ import { fetchTeams, type Team } from "@/app/teams-actions";
 import { STARTING_CREDITS } from "@/lib/bet-constants";
 import { isImageAvatar } from "@/lib/avatar";
 import SegmentedTabs from "@/components/SegmentedTabs";
+import TabPanel from "@/components/TabPanel";
+import { useConfirm } from "@/components/Dialog";
+import { useRegisterRefresh } from "@/components/PullToRefresh";
+import { useSwipeTabs } from "@/lib/use-swipe";
 
 type Pick = "1" | "X" | "2";
 type TabKey = "bet" | "rank" | "admin";
@@ -46,11 +50,14 @@ export default function PronosticiPage() {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useRegisterRefresh(load);
 
   const isAdmin = !!data?.viewer?.isAdmin;
+  const tabKeys: TabKey[] = isAdmin ? ["bet", "rank", "admin"] : ["bet", "rank"];
+  const swipe = useSwipeTabs(tabKeys, tab, setTab);
 
   return (
-    <div className="screen sec-bet">
+    <div className="screen sec-bet" {...swipe}>
       <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
         <div className="flex items-center justify-between">
           <div>
@@ -80,9 +87,12 @@ export default function PronosticiPage() {
         </div>
       </div>
 
-      {tab === "bet" && <BetTab data={data} loading={loading} reload={load} />}
-      {tab === "rank" && <RankTab leaderboard={data?.leaderboard ?? []} loading={loading} />}
-      {tab === "admin" && isAdmin && <AdminTab rounds={data?.rounds ?? []} leaderboard={data?.leaderboard ?? []} reload={load} />}
+      <TabPanel tabKey={tab} keys={tabKeys}>
+        {tab === "bet" ? <BetTab data={data} loading={loading} reload={load} />
+          : tab === "rank" ? <RankTab leaderboard={data?.leaderboard ?? []} loading={loading} />
+          : isAdmin ? <AdminTab rounds={data?.rounds ?? []} leaderboard={data?.leaderboard ?? []} reload={load} />
+          : null}
+      </TabPanel>
     </div>
   );
 }
@@ -317,6 +327,7 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
 }
 
 function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team[]; reload: () => Promise<void> }) {
+  const confirm = useConfirm();
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
   const [o1, setO1] = useState("2.00");
@@ -354,8 +365,8 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
               {round.status === "open" ? "Chiudi" : "Riapri"}
             </button>
           )}
-          <button onClick={async () => { if (confirm("Eliminare la giornata e rimborsare le giocate?")) { await deleteBetRound(round.id); await reload(); } }}
-            className="px-2 py-1.5 rounded-lg text-[11px] text-red-400/80" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>🗑️</button>
+          <button onClick={async () => { if (await confirm({ title: "Eliminare la giornata?", message: "Le giocate verranno rimborsate.", confirmLabel: "Elimina", danger: true })) { await deleteBetRound(round.id); await reload(); } }}
+            className="tap rounded-lg text-[13px] text-red-400/80" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>🗑️</button>
         </div>
       </div>
 
@@ -387,6 +398,7 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
 }
 
 function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Promise<void> }) {
+  const confirm = useConfirm();
   const selStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
   const [editOdds, setEditOdds] = useState(false);
   const [o1, setO1] = useState(m.odd1.toFixed(2));
@@ -438,8 +450,8 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
           <button onClick={async () => { await setMatchResult(m.id, null); await reload(); }}
             className="px-2 py-1.5 rounded-lg text-[11px] text-white/50" style={selStyle}>annulla</button>
         )}
-        <button onClick={async () => { if (confirm("Eliminare lo scontro?")) { await deleteBetMatch(m.id); await reload(); } }}
-          className="px-2 py-1.5 rounded-lg text-[11px] text-red-400/70" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>✕</button>
+        <button onClick={async () => { if (await confirm({ title: "Eliminare lo scontro?", confirmLabel: "Elimina", danger: true })) { await deleteBetMatch(m.id); await reload(); } }}
+          className="tap rounded-lg text-[13px] text-red-400/70" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>✕</button>
       </div>
 
       {err && <p className="text-red-400 text-xs mt-1.5">{err}</p>}
@@ -457,8 +469,8 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
                 style={{ color: b.status === "won" ? "#34d399" : b.status === "lost" ? "#f87171" : "rgba(255,255,255,0.4)" }}>
                 {b.status === "won" ? `+${b.payout}` : b.status === "lost" ? "persa" : "in gioco"}
               </span>
-              <button onClick={async () => { if (confirm(`Eliminare la giocata di ${b.name}?`)) { await adminDeleteBet(b.betId); await reload(); } }}
-                className="text-red-400/70 text-xs px-1 flex-none">✕</button>
+              <button onClick={async () => { if (await confirm({ title: `Eliminare la giocata di ${b.name}?`, confirmLabel: "Elimina", danger: true })) { await adminDeleteBet(b.betId); await reload(); } }}
+                className="tap text-red-400/70 text-sm flex-none">✕</button>
             </div>
           ))}
         </div>
