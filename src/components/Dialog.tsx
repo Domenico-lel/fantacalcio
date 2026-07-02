@@ -57,9 +57,10 @@ export default function DialogProvider({ children }: { children: ReactNode }) {
           <div key={t.id}
             className="slide-up pointer-events-auto max-w-sm w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-xl"
             style={{
-              background: t.type === "error" ? "rgba(220,38,38,0.96)" : t.type === "success" ? "rgba(16,185,129,0.96)" : "rgba(20,29,51,0.97)",
+              background: t.type === "error" ? "rgba(220,38,38,0.96)" : t.type === "success" ? "rgba(16,185,129,0.96)" : "rgba(24,35,57,0.97)",
               border: "1px solid rgba(255,255,255,0.14)",
               backdropFilter: "blur(8px)",
+              boxShadow: "0 12px 32px -12px rgba(0,0,0,0.7)",
             }}>
             {t.message}
           </div>
@@ -72,24 +73,23 @@ export default function DialogProvider({ children }: { children: ReactNode }) {
           <div className="fixed inset-0 z-[70]" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
             onClick={() => close(false)} />
           <div className="fixed bottom-0 left-0 right-0 z-[71] rounded-t-3xl slide-up"
-            style={{ background: "var(--bg)", border: "1px solid rgba(255,255,255,0.1)", paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)" }}>
+            style={{ background: "var(--bg-soft)", border: "1px solid var(--border-2)", paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)" }}>
             <div className="flex justify-center pt-3 pb-1">
               <div className="rounded-full" style={{ width: 36, height: 4, background: "rgba(255,255,255,0.2)" }} />
             </div>
             <div className="px-5 pt-2 pb-5">
-              <h3 className="text-white font-bold text-lg leading-tight">{dialog.title}</h3>
+              <h3 className="font-display text-white font-bold text-lg leading-tight">{dialog.title}</h3>
               {dialog.message && <p className="text-white/60 text-sm mt-1.5 leading-relaxed">{dialog.message}</p>}
               <div className="flex gap-3 mt-5">
                 <button onClick={() => close(false)}
-                  className="flex-1 py-3 rounded-xl text-sm font-bold text-white/80 active:scale-95 transition-transform"
-                  style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                  className="btn-soft flex-1 py-3 text-sm font-bold">
                   {dialog.cancelLabel ?? "Annulla"}
                 </button>
                 <button onClick={() => close(true)}
-                  className="flex-1 py-3 rounded-xl text-sm font-bold active:scale-95 transition-transform"
+                  className={`flex-1 py-3 rounded-xl text-sm font-bold active:scale-95 transition-transform ${dialog.danger ? "" : "btn-primary"}`}
                   style={dialog.danger
-                    ? { background: "rgba(220,38,38,0.92)", border: "1px solid rgba(239,68,68,0.5)", color: "#fff" }
-                    : { background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
+                    ? { background: "linear-gradient(135deg, #dc2626, #ef4444)", border: "1px solid rgba(239,68,68,0.5)", color: "#fff", boxShadow: "0 8px 20px -8px rgba(239,68,68,0.4)" }
+                    : undefined}>
                   {dialog.confirmLabel ?? "Conferma"}
                 </button>
               </div>

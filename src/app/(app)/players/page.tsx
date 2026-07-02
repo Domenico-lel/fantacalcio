@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { TransferItem } from "@/app/api/transfers/route";
 import type { MarketNewsItem } from "@/app/api/market/route";
+import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
 import { useRegisterRefresh } from "@/components/PullToRefresh";
@@ -74,13 +75,13 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
         onClick={onClose} />
 
       {/* Sheet */}
       <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-hidden"
         style={{
-          background: "var(--bg)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "90dvh",
+          background: "var(--bg-soft)", border: "1px solid var(--border-2)", maxHeight: "90dvh",
           transform: `translateY(${dragY}px)`,
           transition: dragStart.current == null ? "transform .25s ease" : "none",
         }}>
@@ -95,7 +96,7 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
         <div className="overflow-y-auto" style={{ maxHeight: "calc(90dvh - 20px)" }}>
           {/* Hero */}
           <div className="relative flex items-end gap-4 px-5 pb-5 pt-2"
-            style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            style={{ borderBottom: "1px solid var(--border)" }}>
             {/* Foto */}
             <div className="relative flex-shrink-0 rounded-2xl overflow-hidden"
               style={{ width: 90, height: 110, background: "rgba(255,255,255,0.05)" }}>
@@ -110,21 +111,21 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
               <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wide mb-0.5">
                 {item.player.position || ""}
               </p>
-              <h2 className="text-white font-black text-xl leading-tight mb-1">
+              <h2 className="font-display text-white font-bold text-xl leading-tight mb-1">
                 {item.player.name}
               </h2>
               {item.player.value && (
-                <p className="font-bold text-sm mt-1" style={{ color: "var(--accent-soft)" }}>{item.player.value}</p>
+                <p className="font-display font-bold text-sm mt-1" style={{ color: "var(--accent-soft)" }}>{item.player.value}</p>
               )}
             </div>
           </div>
 
           {/* Link profilo */}
-          <div className="px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="px-5 py-4" style={{ borderTop: "1px solid var(--border)" }}>
             {profileUrl ? (
               <a href={profileUrl} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
-                style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)" }}>
+                className="card-accent inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white"
+                style={{ borderRadius: 14 }}>
                 Vedi profilo su Transfermarkt
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path d="M18 6l-12 12M18 6h-5v5M18 6v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -138,9 +139,7 @@ function PlayerSheet({ item, onClose }: { item: TransferItem; onClose: () => voi
           {/* Lega badge + chiudi */}
           <div className="px-5 pb-8 pt-2 flex items-center justify-between">
             <span className="text-white/30 text-xs">{item.league}</span>
-            <button onClick={onClose}
-              className="px-5 py-2 rounded-xl text-sm font-semibold text-white/70 active:opacity-60"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <button onClick={onClose} className="btn-soft px-5 py-2 text-sm">
               Chiudi
             </button>
           </div>
@@ -174,15 +173,14 @@ function VociTab() {
   return (
     <div className="px-4 py-4 flex flex-col gap-3">
       {loading && Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="rounded-2xl animate-pulse" style={{ background: "rgba(255,255,255,0.05)", height: 110 }} />
+        <div key={i} className="skeleton" style={{ height: 110 }} />
       ))}
 
       {!loading && error && (
         <div className="flex flex-col items-center py-16 gap-4">
           <span className="text-4xl">📡</span>
           <p className="text-white/50 text-sm text-center">Impossibile caricare le voci di mercato.</p>
-          <button onClick={load} className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white"
-            style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)" }}>Riprova</button>
+          <button onClick={load} className="btn-soft px-6 py-2.5 text-sm text-white">Riprova</button>
         </div>
       )}
 
@@ -192,23 +190,21 @@ function VociTab() {
         const title = lines[0] ?? "";
         const body = lines.slice(1).join("\n").trim();
         return (
-          <div key={item.id} className="pop-in rounded-2xl overflow-hidden"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+          <div key={item.id} className="card pop-in overflow-hidden">
             {item.imageUrl && (
               <img src={item.imageUrl} alt="" className="w-full max-h-52 object-cover" loading="lazy"
                 onError={(e) => { e.currentTarget.style.display = "none"; }} />
             )}
             <div className="p-3.5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                  style={{ background: "var(--accent-bg)", color: "var(--accent-soft)" }}>Voci di mercato</span>
+                <span className="chip">Voci di mercato</span>
                 {badge && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{ background: `${badge.color}1f`, color: badge.color, border: `1px solid ${badge.color}55` }}>
                     {badge.label}
                   </span>
                 )}
-                <span className="text-white/45 text-[11px] ml-auto flex-none">{timeAgo(item.postedAt)}</span>
+                <span className="text-[11px] ml-auto flex-none" style={{ color: "var(--text-faint)" }}>{timeAgo(item.postedAt)}</span>
               </div>
               <p className="text-white font-bold text-[15.5px] leading-snug">{title}</p>
               {body && (
@@ -248,8 +244,7 @@ function TrattativeTab() {
   return (
     <div className="px-4 py-4 flex flex-col gap-4">
       {loading && Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="rounded-3xl overflow-hidden animate-pulse"
-          style={{ background: "rgba(255,255,255,0.05)", height: 160 }} />
+        <div key={i} className="skeleton" style={{ height: 160 }} />
       ))}
 
       {!loading && error && (
@@ -258,9 +253,7 @@ function TrattativeTab() {
           <p className="text-white/50 text-sm text-center">
             Impossibile caricare le trattative.<br />Controlla la connessione.
           </p>
-          <button onClick={load}
-            className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white"
-            style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)" }}>
+          <button onClick={load} className="btn-soft px-6 py-2.5 text-sm text-white">
             Riprova
           </button>
         </div>
@@ -277,8 +270,8 @@ function TrattativeTab() {
         const ds = dealStatus(item.probability, item.trend);
         return (
           <button key={item.id} onClick={() => setSelected(item)}
-            className="flex rounded-2xl overflow-hidden active:opacity-75 transition-opacity text-left w-full"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", minHeight: 160 }}>
+            className="card flex overflow-hidden active:opacity-75 transition-opacity text-left w-full"
+            style={{ minHeight: 160 }}>
 
             {/* Foto giocatore */}
             <div className="relative flex-shrink-0" style={{ width: 110 }}>
@@ -292,7 +285,7 @@ function TrattativeTab() {
                 <div className="absolute inset-0 flex items-end justify-center pb-2 text-5xl">👤</div>
               )}
               <div className="absolute inset-0"
-                style={{ background: "linear-gradient(to right, transparent 60%, rgba(10,15,29,0.95) 100%)" }} />
+                style={{ background: "linear-gradient(to right, transparent 60%, var(--surface) 100%)" }} />
             </div>
 
             {/* Info */}
@@ -301,7 +294,7 @@ function TrattativeTab() {
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <div className="min-w-0">
                     <p className="text-white/60 text-[11px] font-medium leading-tight">{item.player.position}</p>
-                    <p className="text-white font-black text-[17px] leading-tight truncate">{item.player.name}</p>
+                    <p className="font-display text-white font-bold text-[17px] leading-tight truncate">{item.player.name}</p>
                   </div>
                   <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full"
                     style={{ background: `${ds.color}1f`, border: `1px solid ${ds.color}55` }}>
@@ -341,7 +334,7 @@ function TrattativeTab() {
                   <span className="text-[11px] font-semibold truncate" style={{ color: ds.color }}>{ds.label}</span>
                 </div>
                 {item.player.value && (
-                  <span className="text-white font-bold text-sm flex-none">{item.player.value}</span>
+                  <span className="font-display text-white font-bold text-sm flex-none">{item.player.value}</span>
                 )}
               </div>
             </div>
@@ -360,10 +353,7 @@ export default function MercatoPage() {
 
   return (
     <div className="screen sec-market">
-      {/* Header */}
-      <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>Calciomercato</p>
-        <h1 className="text-white font-bold text-2xl leading-tight mb-3">Mercato</h1>
+      <PageHeader eyebrow="Calciomercato" title="Mercato">
         <SegmentedTabs
           value={tab}
           onChange={setTab}
@@ -372,7 +362,7 @@ export default function MercatoPage() {
             { key: "trattative" as TabKey, label: "Trattative" },
           ]}
         />
-      </div>
+      </PageHeader>
 
       <TabPanel tabKey={tab} keys={TAB_KEYS}>
         {tab === "voci" ? <VociTab /> : <TrattativeTab />}

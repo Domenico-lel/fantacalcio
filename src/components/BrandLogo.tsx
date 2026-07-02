@@ -106,12 +106,13 @@ export function BrandCrest({
 
 /* ─── Wordmark "Soccer Dick / CLUB" ──────────────────────────────────────── */
 export function BrandWordmark({ size = 28, className }: { size?: number; className?: string }) {
+  const display = "var(--font-display), var(--font-inter), system-ui, sans-serif";
   return (
     <div className={className} style={{ textAlign: "center", lineHeight: 1.05 }}>
-      <span style={{ display: "block", fontWeight: 800, fontSize: size, letterSpacing: "-0.5px", color: "#ffffff" }}>
+      <span style={{ display: "block", fontFamily: display, fontWeight: 800, fontSize: size, letterSpacing: "-0.5px", color: "#ffffff" }}>
         Soccer Dick
       </span>
-      <span style={{ display: "block", fontWeight: 800, fontSize: size, letterSpacing: size * 0.21, color: "#34d399", paddingLeft: size * 0.21 }}>
+      <span style={{ display: "block", fontFamily: display, fontWeight: 800, fontSize: size, letterSpacing: size * 0.21, color: "#34d399", paddingLeft: size * 0.21 }}>
         CLUB
       </span>
     </div>

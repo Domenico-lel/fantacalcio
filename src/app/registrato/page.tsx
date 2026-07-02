@@ -31,7 +31,7 @@ export default async function RegistratoPage() {
           >
             In arrivo
           </span>
-          <h1 className="text-white font-bold text-2xl leading-tight">
+          <h1 className="font-display text-white font-bold text-2xl leading-tight">
             Grazie{name ? `, ${name}` : ""}! 🎉
           </h1>
           <p className="text-white/60 text-sm leading-relaxed max-w-[19rem]">

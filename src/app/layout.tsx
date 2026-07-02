@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Sora } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ClerkUserBridge } from "@/components/ClerkUserBridge";
 import "./globals.css";
@@ -10,6 +10,15 @@ const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
+});
+
+// Sora: font display geometrico per titoli e numeri grandi (--font-display,
+// usato da .page-title e .font-display in globals.css).
+const sora = Sora({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+  weight: ["600", "700", "800"],
 });
 
 export const dynamic = 'force-dynamic';
@@ -34,13 +43,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0a0f1d",
+  themeColor: "#070b14",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
-      <html lang="it" className={inter.variable} suppressHydrationWarning>
+      <html lang="it" className={`${inter.variable} ${sora.variable}`} suppressHydrationWarning>
         <head />
         <body className="font-sans antialiased">
           <ClerkUserBridge>{children}</ClerkUserBridge>

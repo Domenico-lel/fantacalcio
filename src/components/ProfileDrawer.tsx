@@ -113,8 +113,8 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
         className="fixed left-0 right-0 z-50 rounded-t-3xl"
         style={{
           bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
-          background: "#141d33",
-          border: "1px solid rgba(255,255,255,0.1)",
+          background: "var(--bg-soft)",
+          border: "1px solid var(--border-2)",
           transform: open ? "translateY(0)" : "translateY(calc(100% + 64px))",
           transition: "transform 220ms cubic-bezier(0.23,1,0.32,1)",
           maxHeight: "calc(100dvh - 64px - env(safe-area-inset-bottom, 0px) - 48px)",
@@ -145,7 +145,7 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
                         <p className="text-red-400 text-xs font-semibold uppercase tracking-wide mb-0.5 truncate">
                           Amministratore della lega
                         </p>
-                        <p className="text-white font-bold text-xl leading-tight truncate">
+                        <p className="font-display text-white font-bold text-xl leading-tight truncate">
                           {adminName || "Admin Lega"}
                         </p>
                       </>
@@ -156,7 +156,7 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
                             ? `${profile.firstName} ${profile.lastName}`
                             : user.fullName || "Allenatore"}
                         </p>
-                        <p className="text-white font-bold text-xl leading-tight truncate">
+                        <p className="font-display text-white font-bold text-xl leading-tight truncate">
                           {profile?.teamName ?? "La tua Squadra"}
                         </p>
                       </>
@@ -172,8 +172,8 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
                 {!isAdmin && (
                   <button
                     onClick={() => setEditing(true)}
-                    className="flex-shrink-0 ml-3 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-400 transition-opacity active:opacity-60"
-                    style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.25)" }}
+                    className="flex-shrink-0 ml-3 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-300 transition-opacity active:opacity-60"
+                    style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.3)" }}
                   >
                     Modifica
                   </button>
@@ -200,7 +200,7 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
           {editing && (
             <>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-white font-bold text-lg">Modifica profilo</h2>
+                <h2 className="font-display text-white font-bold text-lg">Modifica profilo</h2>
                 <button
                   onClick={() => { setEditing(false); setError(""); }}
                   className="text-white/40 text-sm active:opacity-60"
@@ -237,12 +237,7 @@ export default function ProfileDrawer({ open, onClose, profile, avatar, badges =
                       value={value}
                       onChange={(e) => onChange(e.target.value)}
                       placeholder={placeholder}
-                      className="w-full px-4 py-3 rounded-xl text-white text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-400/40"
-                      style={{
-                        background: "rgba(255,255,255,0.07)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        caretColor: "#34d399",
-                      }}
+                      className="input w-full px-4 py-3 text-sm font-medium"
                     />
                   </div>
                 ))}

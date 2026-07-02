@@ -34,8 +34,8 @@ export default async function LandingPage() {
         <div className="w-full flex flex-col gap-3 mt-1">
           <Link
             href="/sign-up"
-            className="w-full py-4 text-center rounded-2xl text-lg font-bold shadow-lg transition-transform active:scale-95"
-            style={{ background: "#34d399", color: "#04241a" }}
+            className="w-full py-4 text-center rounded-2xl text-lg font-bold transition-transform active:scale-95"
+            style={{ background: "linear-gradient(135deg, #0ec98f, #4ae8b8)", color: "#04281e", boxShadow: "0 10px 26px -10px rgba(20,220,160,0.5)" }}
           >
             Entra nel club
           </Link>

@@ -17,6 +17,7 @@ import {
 } from "@/app/teams-actions";
 import { isAppOpen, setAppOpen } from "@/app/release-actions";
 import { isImageAvatar } from "@/lib/avatar";
+import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
 import { useConfirm, useToast } from "@/components/Dialog";
@@ -85,9 +86,7 @@ export default function BachecaPage() {
   return (
     <div className="screen sec-board">
       {/* Header + tabs */}
-      <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>La lega</p>
-        <h1 className="text-white font-bold text-2xl leading-tight mb-3">Bacheca</h1>
+      <PageHeader eyebrow="La lega" title="Bacheca">
         <SegmentedTabs
           value={tab}
           onChange={setTab}
@@ -97,7 +96,7 @@ export default function BachecaPage() {
             ...(viewer?.isAdmin ? [{ key: "gestione" as TabKey, label: "Gestione" }] : []),
           ]}
         />
-      </div>
+      </PageHeader>
 
       <TabPanel tabKey={tab} keys={tabKeys}>
         {tab === "scoop" ? <ScoopTab viewer={viewer} posts={posts} loading={loading} reload={loadFeed} setPosts={setPosts} />
@@ -124,7 +123,7 @@ function ScoopTab({ viewer, posts, loading, reload, setPosts }: {
       {viewer && <Composer viewer={viewer} onPublished={reload} />}
 
       {loading && Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="rounded-2xl animate-pulse" style={{ height: 180, background: "rgba(255,255,255,0.05)" }} />
+        <div key={i} className="skeleton" style={{ height: 180 }} />
       ))}
 
       {!loading && posts.length === 0 && (
@@ -182,10 +181,10 @@ function Composer({ viewer, onPublished }: { viewer: Viewer; onPublished: () => 
   }
 
   return (
-    <div className="rounded-2xl p-4" style={{ background: "rgba(52,211,153,0.06)", border: "1px solid rgba(52,211,153,0.2)" }}>
+    <div className="card-accent p-4">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xl">{viewer.isAdmin ? "📣" : "✍️"}</span>
-        <span className="text-emerald-400 text-xs font-bold uppercase tracking-wide">
+        <span className="eyebrow">
           {viewer.isAdmin ? "Pubblica un post" : "Condividi con la lega"}
         </span>
       </div>
@@ -216,8 +215,7 @@ function Composer({ viewer, onPublished }: { viewer: Viewer; onPublished: () => 
         onChange={(e) => setBody(e.target.value)}
         placeholder={viewer.isAdmin ? "Es. Tizio rende cedibile Lautaro…" : "Cosa vuoi dire alla lega?"}
         rows={3}
-        className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none resize-none focus:ring-2 focus:ring-emerald-400/40"
-        style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }}
+        className="input w-full px-3 py-2.5 text-sm resize-none"
       />
 
       {preview && (
@@ -233,15 +231,12 @@ function Composer({ viewer, onPublished }: { viewer: Viewer; onPublished: () => 
 
       <div className="flex items-center justify-between mt-3">
         <button onClick={() => fileRef.current?.click()}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white/70"
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+          className="btn-soft flex items-center gap-1.5 px-3 py-2 text-xs">
           🖼️ Foto
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden
           onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
-        <button onClick={publish} disabled={busy}
-          className="px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
-          style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
+        <button onClick={publish} disabled={busy} className="btn-primary px-5 py-2 text-sm">
           {busy ? "Pubblico…" : "Pubblica"}
         </button>
       </div>
@@ -287,7 +282,7 @@ function PostCard({ post, viewer, reload, setPosts }: {
   const meta = tagMeta(post.tag);
 
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+    <div className="card overflow-hidden">
       {/* Header autore */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <div className="w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden text-xl flex-none"
@@ -311,9 +306,9 @@ function PostCard({ post, viewer, reload, setPosts }: {
             style={{ background: `${meta.color}26`, color: meta.color, border: `1px solid ${meta.color}55` }}
             aria-label="Cambia tag"
           >
-            <option value="" style={{ background: "#141d33", color: "#fff" }}>— Nessuno</option>
+            <option value="" style={{ background: "var(--surface-2)", color: "#fff" }}>— Nessuno</option>
             {ADMIN_POST_TAGS.map((t) => (
-              <option key={t} value={t} style={{ background: "#141d33", color: "#fff" }}>{TAG_META[t].label}</option>
+              <option key={t} value={t} style={{ background: "var(--surface-2)", color: "#fff" }}>{TAG_META[t].label}</option>
             ))}
           </select>
         ) : (
@@ -346,7 +341,7 @@ function PostCard({ post, viewer, reload, setPosts }: {
 
       {/* Commenti */}
       {showComments && (
-        <div className="px-4 pb-4 flex flex-col gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="px-4 pb-4 flex flex-col gap-3" style={{ borderTop: "1px solid var(--border)" }}>
           <div className="flex flex-col gap-2.5 pt-3">
             {post.comments.length === 0 && <p className="text-white/35 text-xs">Nessun commento. Scrivi il primo!</p>}
             {post.comments.map((c) => (
@@ -366,12 +361,10 @@ function PostCard({ post, viewer, reload, setPosts }: {
               onChange={(e) => setComment(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") send(); }}
               placeholder="Scrivi un commento…"
-              className="flex-1 rounded-xl px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-400/40"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }}
+              className="input flex-1 px-3 py-2 text-sm"
             />
             <button onClick={send} disabled={sending || !comment.trim()}
-              className="px-3 py-2 rounded-xl text-sm font-bold disabled:opacity-40"
-              style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
+              className="btn-primary px-3 py-2 text-sm">
               Invia
             </button>
           </div>
@@ -417,8 +410,8 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
     <div className="px-4 py-4 flex flex-col gap-4">
       {/* Form (solo manager con profilo) */}
       {viewer?.hasProfile ? (
-        <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
-          <p className="text-emerald-400 text-xs font-bold uppercase tracking-wide mb-3">Metti un giocatore sul mercato</p>
+        <div className="card-accent p-4">
+          <p className="eyebrow mb-3">Metti un giocatore sul mercato</p>
           <div className="mb-2">
             <PlayerSearchBox
               value={player}
@@ -430,17 +423,14 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
             </p>
           </div>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota (facoltativa) — es. cerco un centrocampista"
-            className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-400/40"
-            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" }} />
+            className="input w-full px-3 py-2.5 text-sm" />
           {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
-          <button onClick={add} disabled={busy}
-            className="w-full mt-3 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50"
-            style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
+          <button onClick={add} disabled={busy} className="btn-primary w-full mt-3 py-2.5 text-sm">
             {busy ? "Aggiungo…" : "Rendi cedibile"}
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl p-4 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="card-flat p-4 text-center">
           <p className="text-white/50 text-sm">
             {viewer?.isAdmin
               ? "Sei l'admin: la bacheca cedibili è per i manager con una squadra."
@@ -450,7 +440,7 @@ function CedibiliTab({ viewer }: { viewer: Viewer | null }) {
       )}
 
       {loading && Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="rounded-xl animate-pulse" style={{ height: 64, background: "rgba(255,255,255,0.05)" }} />
+        <div key={i} className="skeleton" style={{ height: 64 }} />
       ))}
 
       {!loading && listings.length === 0 && (
@@ -497,13 +487,11 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
       {listing.mine && (
         <div className="flex items-center gap-1.5 flex-none">
           <button onClick={async () => { await setListingStatus(listing.id, isClosed ? "available" : "closed"); await onChange(); }}
-            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white/70"
-            style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>
+            className="btn-soft px-2.5 py-1.5 text-[11px]">
             {isClosed ? "Riapri" : "Chiudi"}
           </button>
           <button onClick={async () => { if (await confirm({ title: "Eliminare l'annuncio?", confirmLabel: "Elimina", danger: true })) { await deleteListing(listing.id); await onChange(); } }}
-            className="tap rounded-lg text-[13px] text-red-400/80"
-            style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            className="btn-danger-soft tap text-[13px]">
             🗑️
           </button>
         </div>
@@ -606,7 +594,7 @@ function GestioneTab() {
 
       <button onClick={sync} disabled={syncing}
         className="w-full py-3 rounded-xl text-sm font-bold disabled:opacity-50"
-        style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399" }}>
+        style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", color: "var(--accent)" }}>
         {syncing ? "Sincronizzo…" : "🔄 Sincronizza squadre dalla classifica"}
       </button>
       {msg && <p className="text-white/60 text-xs text-center">{msg}</p>}
@@ -616,7 +604,7 @@ function GestioneTab() {
       )}
 
       {loading && Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="rounded-xl animate-pulse" style={{ height: 56, background: "rgba(255,255,255,0.05)" }} />
+        <div key={i} className="skeleton" style={{ height: 56 }} />
       ))}
       {!loading && teams.length === 0 && (
         <p className="text-white/50 text-sm text-center py-10">
@@ -659,7 +647,6 @@ function AssignRow({ manager, freeTeams, reload }: {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const label = `${manager.firstName} ${manager.lastName}`.trim() || manager.teamName || "Manager";
-  const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
 
   async function assign(teamRef: string) {
     if (!teamRef) return;
@@ -676,13 +663,12 @@ function AssignRow({ manager, freeTeams, reload }: {
         <span className="text-white text-sm font-semibold flex-1 min-w-0 truncate">{label}</span>
         <select value="" disabled={busy || freeTeams.length === 0}
           onChange={(e) => assign(e.target.value)}
-          className="rounded-lg px-2 py-1.5 text-white text-xs outline-none disabled:opacity-50 flex-none max-w-[55%]"
-          style={inputStyle}>
-          <option value="" style={{ background: "#141d33" }}>
+          className="input px-2 py-1.5 text-xs disabled:opacity-50 flex-none max-w-[55%]">
+          <option value="">
             {freeTeams.length === 0 ? "Nessuna squadra libera" : busy ? "Assegno…" : "Assegna a…"}
           </option>
           {freeTeams.map((t) => (
-            <option key={t.id} value={t.id} style={{ background: "#141d33" }}>{t.name}</option>
+            <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
       </div>
@@ -702,7 +688,6 @@ function PlayerSearchBox({ value, onChange, onPick, placeholder }: {
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const pickedName = useRef("");
-  const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", caretColor: "#34d399" };
 
   useEffect(() => {
     const q = value.trim();
@@ -726,12 +711,11 @@ function PlayerSearchBox({ value, onChange, onPick, placeholder }: {
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => { if (hits.length > 0) setOpen(true); }}
         placeholder={placeholder}
-        className="w-full rounded-lg px-3 py-2 text-white text-sm outline-none"
-        style={inputStyle} />
+        className="input w-full px-3 py-2 text-sm" />
 
       {open && hits.length > 0 && (
         <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl overflow-hidden max-h-60 overflow-y-auto shadow-xl"
-          style={{ background: "#141d33", border: "1px solid rgba(255,255,255,0.18)" }}>
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border-2)" }}>
           {hits.map((h) => (
             <button key={h.id} type="button"
               onClick={() => { pickedName.current = h.name; onPick(h); setOpen(false); setHits([]); }}
@@ -753,7 +737,6 @@ function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Pro
   const [role, setRole] = useState("");
   const [picked, setPicked] = useState<PlayerHit | null>(null);
   const [busy, setBusy] = useState(false);
-  const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
 
   async function add() {
     const name = query.trim();
@@ -769,9 +752,9 @@ function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Pro
     <div className="mb-1">
       <div className="flex gap-2 items-start">
         <select value={role} onChange={(e) => setRole(e.target.value)}
-          className="rounded-lg px-2 py-2 text-white text-sm outline-none flex-none" style={inputStyle}>
-          <option value="" style={{ background: "#141d33" }}>—</option>
-          {["P", "D", "C", "A"].map((r) => <option key={r} value={r} style={{ background: "#141d33" }}>{r}</option>)}
+          className="input px-2 py-2 text-sm flex-none">
+          <option value="">—</option>
+          {["P", "D", "C", "A"].map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <div className="flex-1 min-w-0">
           <PlayerSearchBox
@@ -781,8 +764,7 @@ function RosterAdder({ teamRef, onAdded }: { teamRef: string; onAdded: () => Pro
             placeholder="Cerca un giocatore…" />
         </div>
         <button onClick={add} disabled={busy || !query.trim()}
-          className="px-3 py-2 rounded-lg text-sm font-bold disabled:opacity-40 flex-none"
-          style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>+</button>
+          className="btn-primary px-3 py-2 text-sm flex-none">+</button>
       </div>
       <p className="text-white/30 text-[10px] mt-1">
         {picked ? "Foto associata ✓" : "Scrivi e seleziona dal menu per avere la foto."}
@@ -800,7 +782,6 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
   const [busy, setBusy] = useState(false);
   const [badgeBusy, setBadgeBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const inputStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
 
   const dirty = firstName !== profile.firstName || lastName !== profile.lastName || teamName !== profile.teamName;
   const availableBadges = BADGES.filter((b) => !badges.includes(b.id));
@@ -825,27 +806,24 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
   }
 
   return (
-    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
-      <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-wide mb-2">Manager assegnato</p>
+    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+      <p className="eyebrow text-[10px] mb-2">Manager assegnato</p>
       <div className="flex flex-col gap-2">
         <div className="flex gap-2">
           <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Nome"
-            className="flex-1 min-w-0 rounded-lg px-3 py-2 text-white text-sm outline-none" style={inputStyle} />
+            className="input flex-1 min-w-0 px-3 py-2 text-sm" />
           <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Cognome"
-            className="flex-1 min-w-0 rounded-lg px-3 py-2 text-white text-sm outline-none" style={inputStyle} />
+            className="input flex-1 min-w-0 px-3 py-2 text-sm" />
         </div>
         <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Nome squadra (mostrato)"
-          className="w-full rounded-lg px-3 py-2 text-white text-sm outline-none" style={inputStyle} />
+          className="input w-full px-3 py-2 text-sm" />
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={save} disabled={busy || !dirty}
-            className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40"
-            style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>Salva</button>
+            className="btn-primary px-3 py-2 text-xs">Salva</button>
           <button onClick={async () => { if (await confirm({ title: "Liberare la squadra?", message: "Il manager potrà sceglierne un'altra.", confirmLabel: "Libera" })) { await adminReleaseTeam(profile.userId); await reload(); } }}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-white/70"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>Libera squadra</button>
+            className="btn-soft px-3 py-2 text-xs">Libera squadra</button>
           <button onClick={async () => { if (await confirm({ title: `Eliminare il profilo di ${profile.teamName || profile.firstName || "questo manager"}?`, message: "La squadra tornerà libera.", confirmLabel: "Elimina", danger: true })) { await adminDeleteProfile(profile.userId); await reload(); } }}
-            className="px-3 py-2 rounded-lg text-xs text-red-400/80"
-            style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>Elimina profilo</button>
+            className="btn-danger-soft px-3 py-2 text-xs">Elimina profilo</button>
         </div>
 
         {/* Badge — l'admin assegna onorificenze mostrate nei post e nel profilo */}
@@ -869,12 +847,12 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
           )}
           <select value="" disabled={badgeBusy || availableBadges.length === 0}
             onChange={(e) => { if (e.target.value) applyBadges([...badges, e.target.value]); }}
-            className="w-full rounded-lg px-3 py-2 text-white text-sm outline-none disabled:opacity-50" style={inputStyle}>
-            <option value="" style={{ background: "#141d33" }}>
+            className="input w-full px-3 py-2 text-sm disabled:opacity-50">
+            <option value="">
               {availableBadges.length === 0 ? "Tutti i badge assegnati" : "+ Aggiungi un badge…"}
             </option>
             {availableBadges.map((b) => (
-              <option key={b.id} value={b.id} style={{ background: "#141d33" }}>{b.emoji} {b.label} — {b.description}</option>
+              <option key={b.id} value={b.id}>{b.emoji} {b.label} — {b.description}</option>
             ))}
           </select>
         </div>
@@ -922,7 +900,7 @@ function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: 
 
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
+    <div className="card-flat overflow-hidden">
       <button onClick={toggle} className="w-full flex items-center gap-3 px-3 py-3 text-left">
         {team.logoUrl
           ? <img src={team.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-none" />
@@ -935,12 +913,11 @@ function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: 
       </button>
 
       {open && (
-        <div className="px-3 pb-3 flex flex-col gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="px-3 pb-3 flex flex-col gap-3" style={{ borderTop: "1px solid var(--border)" }}>
           {/* Logo (è anche la foto profilo del manager) */}
           <div className="pt-3">
             <button onClick={() => logoRef.current?.click()} disabled={busy}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-white/70 disabled:opacity-50"
-              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              className="btn-soft px-3 py-2 text-xs disabled:opacity-50">
               {busy ? "Carico…" : team.logoUrl ? "🖼️ Cambia logo / foto" : "🖼️ Carica logo / foto"}
             </button>
             <input ref={logoRef} type="file" accept="image/*" hidden
@@ -954,7 +931,7 @@ function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: 
 
           {/* Rosa */}
           <div>
-            <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-wide mb-2">Rosa</p>
+            <p className="eyebrow text-[10px] mb-2">Rosa</p>
             <RosterAdder teamRef={team.id} onAdded={loadRoster} />
 
             {loadingRoster && <p className="text-white/40 text-xs">Carico rosa…</p>}

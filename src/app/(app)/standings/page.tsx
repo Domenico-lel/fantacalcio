@@ -5,6 +5,7 @@ import { loadViewerCache } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
 import { fetchTeams } from "@/app/teams-actions";
 import { isImageAvatar } from "@/lib/avatar";
+import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
 import TrofeiContent from "@/components/TrofeiContent";
@@ -41,7 +42,20 @@ function assignLogoToTeam(teamName: string): string {
   return EMOJI_POOL[Math.abs(hash) % EMOJI_POOL.length];
 }
 
-const MEDAL = ["🥇", "🥈", "🥉"];
+/* Pallino posizione: oro/argento/bronzo per il podio, neutro per il resto */
+const PODIUM_COLORS = ["#f5c518", "#c8d2dc", "#cd7f32"];
+
+function PositionBadge({ position }: { position: number }) {
+  const podium = position <= 3 ? PODIUM_COLORS[position - 1] : null;
+  return (
+    <span className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-[12px] flex-none"
+      style={podium
+        ? { background: `${podium}22`, color: podium, border: `1px solid ${podium}55` }
+        : { color: "var(--text-faint)" }}>
+      {position}
+    </span>
+  );
+}
 
 export default function StandingsPage() {
   const [tab, setTab] = useState<TabKey>("classifica");
@@ -112,38 +126,32 @@ export default function StandingsPage() {
 
   return (
     <div className="screen sec-rank">
-      {/* Header */}
-      <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-[11px] font-semibold tracking-widest" style={{ color: "var(--accent-soft)" }}>
-              {tab === "classifica" ? "STAGIONE 2025/26" : "SOCCER DICK CLUB"}
-            </p>
-            <h1 className="text-white font-bold text-2xl leading-tight">
-              {tab === "classifica" ? "Classifica" : "Albo d'oro"}
-            </h1>
+      <PageHeader
+        eyebrow={tab === "classifica" ? "Stagione 2025/26" : "Soccer Dick Club"}
+        title={tab === "classifica" ? "Classifica" : "Albo d'oro"}
+        right={
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl"
+            style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)" }}>
+            🏆
           </div>
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
-            style={{ background: "rgba(133,124,240,0.18)", color: "var(--accent)" }}>🏆</div>
-        </div>
-        <div className="mt-3">
-          <SegmentedTabs
-            value={tab}
-            onChange={setTab}
-            items={[
-              { key: "classifica" as TabKey, label: "Classifica" },
-              { key: "trofei" as TabKey, label: "Trofei" },
-            ]}
-          />
-        </div>
-      </div>
+        }
+      >
+        <SegmentedTabs
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: "classifica" as TabKey, label: "Classifica" },
+            { key: "trofei" as TabKey, label: "Trofei" },
+          ]}
+        />
+      </PageHeader>
 
       <TabPanel tabKey={tab} keys={TAB_KEYS}>
         {tab === "trofei" ? <TrofeiContent /> : (
       <div className="px-4 pb-24 pt-4 flex flex-col gap-3">
 
         {loading && standings.length === 0 && Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-2xl animate-pulse" style={{ height: i === 0 ? 88 : 56, background: "rgba(255,255,255,0.05)" }} />
+          <div key={i} className="skeleton" style={{ height: i === 0 ? 96 : 60 }} />
         ))}
 
         {!loading && standings.length === 0 && (
@@ -156,18 +164,22 @@ export default function StandingsPage() {
         {/* HERO capolista */}
         {leader && (
           <div className="pop-in relative overflow-hidden rounded-3xl p-4"
-            style={{ background: "linear-gradient(135deg, #241c52, #181340)", border: "1px solid #463c97" }}>
-            <span className="absolute -top-3 right-1 text-7xl opacity-25 select-none">👑</span>
+            style={{
+              background: "linear-gradient(140deg, color-mix(in srgb, var(--accent) 26%, var(--surface)), var(--surface) 75%)",
+              border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)",
+              boxShadow: "0 16px 40px -24px var(--accent-glow)",
+            }}>
+            <span className="absolute -top-3 right-1 text-7xl opacity-20 select-none">👑</span>
             <div className="flex items-center gap-3 relative">
-              <Logo name={leader.teamName} fallback={leader.logoEmoji} size={52} radius={16} />
+              <Logo name={leader.teamName} fallback={leader.logoEmoji} size={54} radius={16} />
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold tracking-widest" style={{ color: "#cecbf6" }}>CAPOLISTA</p>
-                <p className="text-white font-bold text-lg leading-tight truncate">{leader.teamName}</p>
-                <p className="text-white/45 text-xs mt-0.5">{leader.won}V · {leader.drawn}N · {leader.lost}P</p>
+                <p className="eyebrow">Capolista</p>
+                <p className="font-display text-white font-bold text-lg leading-tight truncate">{leader.teamName}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-dim)" }}>{leader.won}V · {leader.drawn}N · {leader.lost}P</p>
               </div>
               <div className="text-right">
-                <p className="text-white font-black text-3xl leading-none">{leader.points}</p>
-                <p className="text-xs" style={{ color: "var(--accent-soft)" }}>punti</p>
+                <p className="font-display text-white font-extrabold text-4xl leading-none">{leader.points}</p>
+                <p className="text-xs mt-1" style={{ color: "var(--accent-soft)" }}>punti</p>
               </div>
             </div>
           </div>
@@ -175,24 +187,23 @@ export default function StandingsPage() {
 
         {/* La tua posizione */}
         {myEntry && myEntry.position !== 1 && (
-          <div className="rounded-2xl p-3.5 flex items-center gap-3"
-            style={{ background: "rgba(133,124,240,0.1)", border: "1px solid rgba(133,124,240,0.32)" }}>
-            <span className="font-black text-2xl w-9 text-center" style={{ color: "var(--accent)" }}>{myEntry.position}°</span>
+          <div className="card-accent p-3.5 flex items-center gap-3">
+            <span className="font-display font-extrabold text-2xl w-10 text-center flex-none" style={{ color: "var(--accent)" }}>{myEntry.position}°</span>
             <Logo name={myEntry.teamName} fallback={myEntry.logoEmoji} size={36} radius={12} />
             <div className="flex-1 min-w-0">
-              <p className="text-white/45 text-[10px] font-semibold tracking-wide">LA TUA SQUADRA</p>
+              <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "var(--text-faint)" }}>La tua squadra</p>
               <p className="text-white font-semibold text-sm truncate">{myEntry.teamName}</p>
             </div>
             <div className="text-right">
-              <p className="text-white font-bold text-lg leading-none">{myEntry.points}</p>
-              <p className="text-white/40 text-[10px] mt-0.5">{myEntry.totalFp.toLocaleString("it-IT", { maximumFractionDigits: 0 })} fp</p>
+              <p className="font-display text-white font-bold text-lg leading-none">{myEntry.points}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--text-faint)" }}>{myEntry.totalFp.toLocaleString("it-IT", { maximumFractionDigits: 0 })} fp</p>
             </div>
           </div>
         )}
 
         {/* Lista completa */}
         {standings.length > 0 && (
-          <div className="app-card overflow-hidden mt-1">
+          <div className="card overflow-hidden mt-1">
             {standings.map((entry, i) => {
               const isMe = entry.teamName === myTeamName;
               const pct = Math.max(6, Math.round((entry.points / maxPoints) * 100));
@@ -200,27 +211,23 @@ export default function StandingsPage() {
                 <div key={entry.position}
                   className="flex items-center gap-3 px-3.5 py-3"
                   style={{
-                    background: isMe ? "rgba(133,124,240,0.12)" : "transparent",
+                    background: isMe ? "color-mix(in srgb, var(--accent) 11%, transparent)" : "transparent",
                     borderTop: i === 0 ? "none" : "1px solid var(--border)",
                   }}>
-                  <span className="w-6 text-center flex-none">
-                    {entry.position <= 3
-                      ? <span className="text-lg">{MEDAL[entry.position - 1]}</span>
-                      : <span className="text-white/35 text-sm font-medium">{entry.position}</span>}
-                  </span>
+                  <PositionBadge position={entry.position} />
                   <Logo name={entry.teamName} fallback={entry.logoEmoji} size={32} radius={10} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className={`text-sm font-semibold truncate ${isMe ? "" : "text-white"}`} style={isMe ? { color: "var(--accent-soft)" } : undefined}>
                         {entry.teamName}
                       </span>
-                      <span className="text-white font-bold text-sm flex-none">{entry.points}</span>
+                      <span className="font-display text-white font-bold text-sm flex-none">{entry.points}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1.5">
                       <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMe ? "var(--accent)" : "rgba(255,255,255,0.3)" }} />
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMe ? "var(--accent-grad)" : "rgba(255,255,255,0.28)" }} />
                       </div>
-                      <span className="text-white/55 text-[11px] flex-none tabular-nums">
+                      <span className="text-[11px] flex-none tabular-nums" style={{ color: "var(--text-dim)" }}>
                         {entry.won}-{entry.drawn}-{entry.lost} · {entry.goalDiff > 0 ? `+${entry.goalDiff}` : entry.goalDiff}
                       </span>
                     </div>
@@ -234,17 +241,17 @@ export default function StandingsPage() {
         {/* Punti totali fantacalcio */}
         {standings.length > 0 && standings.some((e) => e.totalFp > 0) && (
           <div className="mt-3">
-            <p className="text-white/40 text-[10px] font-semibold uppercase tracking-widest mb-2 px-1">Punti totali fantacalcio</p>
-            <div className="app-card overflow-hidden">
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: "var(--text-faint)" }}>Punti totali fantacalcio</p>
+            <div className="card overflow-hidden">
               {standings.slice().sort((a, b) => b.totalFp - a.totalFp).slice(0, 5).map((entry, i) => {
                 const isMe = entry.teamName === myTeamName;
                 return (
                   <div key={entry.teamName} className="flex items-center gap-3 px-3.5 py-2.5"
-                    style={{ borderTop: i === 0 ? "none" : "1px solid var(--border)", background: isMe ? "rgba(133,124,240,0.1)" : "transparent" }}>
-                    <span className="text-white/30 text-xs w-4 flex-none">{i + 1}</span>
+                    style={{ borderTop: i === 0 ? "none" : "1px solid var(--border)", background: isMe ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent" }}>
+                    <span className="text-xs w-4 flex-none" style={{ color: "var(--text-faint)" }}>{i + 1}</span>
                     <Logo name={entry.teamName} fallback={entry.logoEmoji} size={22} radius={7} />
                     <span className={`flex-1 text-sm truncate ${isMe ? "font-semibold" : "text-white"}`} style={isMe ? { color: "var(--accent-soft)" } : undefined}>{entry.teamName}</span>
-                    <span className="text-white font-bold text-sm">{entry.totalFp.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="font-display text-white font-bold text-sm">{entry.totalFp.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 );
               })}

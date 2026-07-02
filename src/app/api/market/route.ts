@@ -39,12 +39,22 @@ function cleanText(html: string): string {
     .trim();
 }
 
-/* Riconosce i post pubblicitari/sponsorizzati da scartare. */
+/* Domini di shopping / scommesse / affiliazione: link a questi = pubblicità.
+   NON includono i siti ufficiali dei club o delle testate, che compaiono
+   legittimamente negli annunci "UFFICIALE" dei trasferimenti. */
+const AD_LINK_HOSTS = /amzn\.to|amazon\.|aliexpress|ebay\.|temu\.|shein\.|bit\.ly|tidd\.ly|awin1|goaffpro|planetwin|sisal|snai\b|goldbet|betflag|lottomatica|bet365|betfair|eurobet|williamhill|888(?:sport|casino)|starcasino|codicerosso/i;
+
+/* Riconosce i post pubblicitari/sponsorizzati da scartare.
+   Attenzione: un semplice link esterno NON basta — gli annunci ufficiali
+   linkano il sito del club. Filtriamo solo su segnali promozionali certi. */
 function isAd(text: string, links: string[]): boolean {
-  // Link esterni (non t.me) = quasi sempre promo/affiliazione
-  if (links.length > 0) return true;
-  return /#(adv|advertising|pubblicit|sponsor)/i.test(text)
-    || /amzn\.to|amazon\.|aliexpress|prime day|invece di|a soli\s|codice sconto|bonus benvenuto|scommett/i.test(text);
+  // Hashtag di sponsorizzazione dichiarata
+  if (/#(adv|advertising|pubblicit|sponsor)/i.test(text)) return true;
+  // Testo da e-commerce / scommesse
+  if (/amzn\.to|amazon\.|aliexpress|prime day|invece di|a soli\s|codice sconto|bonus benvenuto|scommett|quota maggiorata|deposita ora|gioca ora/i.test(text)) return true;
+  // Link verso domini di shopping/scommesse/affiliazione
+  if (links.some((u) => AD_LINK_HOSTS.test(u))) return true;
+  return false;
 }
 
 function parseChannel(html: string): MarketNewsItem[] {

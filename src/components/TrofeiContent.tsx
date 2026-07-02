@@ -149,11 +149,9 @@ function AllTimePodium({ groups }: { groups: SeasonGroup[] }) {
   const [p1, p2, p3] = ranked;
 
   return (
-    <div className="rounded-2xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+    <div className="card p-4">
       <div className="flex items-center justify-between mb-4">
-        <span className="text-[13px] font-bold uppercase tracking-widest" style={{ color: "var(--accent-soft)" }}>
-          Classifica trofei
-        </span>
+        <span className="eyebrow">Classifica trofei</span>
         <span className="text-white/45 text-[11px] font-semibold uppercase tracking-wider">Tutti i tempi</span>
       </div>
 
@@ -283,11 +281,11 @@ function RecordTab({ groups }: { groups: SeasonGroup[] }) {
   const currentCup = COPPA[0];
 
   const Card = ({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) => (
-    <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+    <div className="card p-4 flex items-center gap-3">
       <span className="text-3xl flex-none">{icon}</span>
       <div className="min-w-0">
         <p className="text-white/50 text-[12px] font-semibold uppercase tracking-wide">{label}</p>
-        <p className="text-white font-black text-lg leading-tight truncate">{value}</p>
+        <p className="font-display text-white font-extrabold text-lg leading-tight truncate">{value}</p>
         {sub && <p className="text-white/55 text-[13px] truncate">{sub}</p>}
       </div>
     </div>
@@ -350,7 +348,7 @@ export default function TrofeiContent() {
       {loading && (
         <div className="px-4 py-4 flex flex-col gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-2xl animate-pulse" style={{ background: "rgba(255,255,255,0.05)", height: i === 0 ? 280 : 64 }} />
+            <div key={i} className="skeleton" style={{ height: i === 0 ? 280 : 64 }} />
           ))}
         </div>
       )}

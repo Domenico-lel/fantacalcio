@@ -123,8 +123,8 @@ export default function PwaInstallGuide() {
         onClick={(e) => e.stopPropagation()}
         className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden"
         style={{
-          background: "#141d33",
-          border: "1px solid rgba(255,255,255,0.12)",
+          background: "var(--bg-soft)",
+          border: "1px solid var(--border-2)",
           marginBottom: "env(safe-area-inset-bottom, 0px)",
           maxHeight: "92dvh",
           overflowY: "auto",
@@ -142,7 +142,7 @@ export default function PwaInstallGuide() {
               <img src="/icon.svg" alt="" className="w-11 h-11 rounded-2xl flex-none"
                 style={{ border: "1px solid rgba(255,255,255,0.12)" }} />
               <div className="min-w-0">
-                <h2 className="text-white font-bold text-lg leading-tight">Installa l&apos;app</h2>
+                <h2 className="font-display text-white font-bold text-lg leading-tight">Installa l&apos;app</h2>
                 <p className="text-white/45 text-xs leading-snug">Aggiungila alla Home: si apre a schermo intero, come un&apos;app vera.</p>
               </div>
             </div>

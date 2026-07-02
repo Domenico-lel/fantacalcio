@@ -2,38 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Base navy palette */
-  --bg: #0a0f1d;
-  --bg-soft: #0e1528;
-  --surface: #141d33;
-  --surface-2: #1b2542;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-2: rgba(255, 255, 255, 0.15);
-  --text: #f3f6fc;
-  --text-dim: rgba(255, 255, 255, 0.55);
-  --text-faint: rgba(255, 255, 255, 0.34);
+/* ─────────────────────────────────────────────────────────────────────────────
+   Design system — palette navy profonda, un accent per sezione, glow morbidi.
+   Le classi componente (.card, .input, .btn-*) sono la fonte unica dello stile:
+   nelle pagine si usano queste al posto degli stili inline.
+   ──────────────────────────────────────────────────────────────────────────── */
 
-  /* Default accent (neon mint) */
-  --accent: #1fe8a4;
-  --accent-soft: #9bffd9;
-  --accent-ink: #013027;
-  --accent-bg: #07332a;
-  --accent-grad: linear-gradient(135deg, #00ffd0, #2bff88);
-  --accent-glow: rgba(0, 255, 200, 0.5);
+:root {
+  /* Base */
+  --bg: #070b14;
+  --bg-soft: #0b111e;
+  --surface: #111a2b;
+  --surface-2: #182339;
+  --surface-3: #203050;
+  --border: rgba(160, 178, 214, 0.13);
+  --border-2: rgba(160, 178, 214, 0.25);
+  --text: #f4f7fd;
+  --text-dim: rgba(214, 226, 248, 0.62);
+  --text-faint: rgba(214, 226, 248, 0.36);
+  --danger: #f87171;
+  --success: #34d399;
+
+  /* Accent di default (mint — Bacheca) */
+  --accent: #2dd4a7;
+  --accent-soft: #9df0d5;
+  --accent-ink: #04281e;
+  --accent-bg: #0b3328;
+  --accent-grad: linear-gradient(135deg, #0ec98f, #4ae8b8);
+  --accent-glow: rgba(20, 220, 160, 0.35);
 }
 
-/* Per-section accent themes — neon "Cyber" con gradient + glow */
-.sec-news   { --accent:#25b6ff; --accent-soft:#9fe3ff; --accent-ink:#021b33; --accent-bg:#06243f;
-              --accent-grad:linear-gradient(135deg,#2e7bff,#00d4ff); --accent-glow:rgba(0,212,255,0.55); }
-.sec-market { --accent:#ff9b2f; --accent-soft:#ffce85; --accent-ink:#2e1500; --accent-bg:#3a2310;
-              --accent-grad:linear-gradient(135deg,#ff6b35,#ffd60a); --accent-glow:rgba(255,140,30,0.5); }
-.sec-rank   { --accent:#d24dff; --accent-soft:#ecb3ff; --accent-ink:#2a0a3a; --accent-bg:#2a0f3a;
-              --accent-grad:linear-gradient(135deg,#ff1fa8,#b026ff); --accent-glow:rgba(199,60,255,0.5); }
-.sec-board  { --accent:#1fe8a4; --accent-soft:#9bffd9; --accent-ink:#013027; --accent-bg:#07332a;
-              --accent-grad:linear-gradient(135deg,#00ffd0,#2bff88); --accent-glow:rgba(0,255,200,0.5); }
-.sec-bet    { --accent:#ffb31a; --accent-soft:#ffe08a; --accent-ink:#2e2400; --accent-bg:#3a2c0c;
-              --accent-grad:linear-gradient(135deg,#ffe600,#ff7a1a); --accent-glow:rgba(255,170,20,0.5); }
+/* Temi per sezione — stessa identità cromatica, tonalità più raffinate */
+.sec-news   { --accent:#38bdf8; --accent-soft:#bae6fd; --accent-ink:#062033; --accent-bg:#0a2a40;
+              --accent-grad:linear-gradient(135deg,#0ea5e9,#5ccbfa); --accent-glow:rgba(56,189,248,0.35); }
+.sec-market { --accent:#fb923c; --accent-soft:#fed7aa; --accent-ink:#2e1503; --accent-bg:#392410;
+              --accent-grad:linear-gradient(135deg,#f97316,#fbbf24); --accent-glow:rgba(251,146,60,0.35); }
+.sec-rank   { --accent:#a78bfa; --accent-soft:#ddd6fe; --accent-ink:#1e1145; --accent-bg:#251a4a;
+              --accent-grad:linear-gradient(135deg,#7c3aed,#c084fc); --accent-glow:rgba(167,139,250,0.35); }
+.sec-board  { --accent:#2dd4a7; --accent-soft:#9df0d5; --accent-ink:#04281e; --accent-bg:#0b3328;
+              --accent-grad:linear-gradient(135deg,#0ec98f,#4ae8b8); --accent-glow:rgba(20,220,160,0.35); }
+.sec-bet    { --accent:#fbbf24; --accent-soft:#fde68a; --accent-ink:#2c1e02; --accent-bg:#382a0c;
+              --accent-grad:linear-gradient(135deg,#f59e0b,#fcd34d); --accent-glow:rgba(251,191,36,0.35); }
 
 * {
   -webkit-tap-highlight-color: transparent;
@@ -63,44 +72,187 @@ main {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
 }
 
-/* Full-screen section surface */
+/* Safe-area in alto per i telefoni con notch/isola dinamica */
+.safe-top { padding-top: max(env(safe-area-inset-top, 0px), 0px); }
+
+/* ─── Superfici di pagina ──────────────────────────────────────────────────── */
+
+/* Full-screen section surface: alone dell'accent in alto, poi il fondo */
 .screen {
   min-height: 100dvh;
   background:
-    radial-gradient(130% 80% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    radial-gradient(120% 60% at 50% -5%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 62%),
     var(--bg);
 }
 
-/* Tinted section header */
+/* Header di sezione sticky: vetro scuro con velo dell'accent */
 .sec-header {
-  background: linear-gradient(180deg, var(--accent-bg), color-mix(in srgb, var(--accent-bg) 35%, var(--bg)));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 90%),
+    color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
 }
 
-/* Reusable card */
+/* ─── Tipografia ───────────────────────────────────────────────────────────── */
+
+.page-title {
+  font-family: var(--font-display), var(--font-inter), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-inter), system-ui, sans-serif;
+}
+
+/* Etichetta piccola sopra i titoli / le sezioni */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: var(--accent-soft);
+}
+
+/* ─── Card ─────────────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px -22px rgba(0, 0, 0, 0.9);
+}
+
+/* Variante leggera, per righe e box secondari */
+.card-flat {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+/* Variante tinta con l'accent della sezione (composer, box "tuo") */
+.card-accent {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 20px;
+}
+
+/* Alias storico usato in giro per l'app */
 .app-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px -22px rgba(0, 0, 0, 0.9);
 }
 
-/* Primary pill button */
+/* ─── Controlli ────────────────────────────────────────────────────────────── */
+
+.input {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  color: var(--text);
+  outline: none;
+  caret-color: var(--accent);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.input::placeholder { color: var(--text-faint); }
+.input:focus {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  background: rgba(255, 255, 255, 0.07);
+}
+select.input option { background: var(--surface-2); color: var(--text); }
+
+/* Bottone primario (gradient dell'accent, ombra morbida) */
+.btn-primary {
+  background: var(--accent-grad);
+  color: var(--accent-ink);
+  font-weight: 800;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px -8px var(--accent-glow);
+  transition: transform 0.12s ease, filter 0.12s ease, opacity 0.12s ease;
+}
+.btn-primary:active { transform: scale(0.97); filter: brightness(1.06); }
+.btn-primary:disabled { opacity: 0.45; box-shadow: none; }
+
+/* Alias storico */
 .btn-accent {
   background: var(--accent-grad);
   color: var(--accent-ink);
-  font-weight: 700;
-  box-shadow: 0 0 18px var(--accent-glow);
+  font-weight: 800;
+  box-shadow: 0 8px 20px -8px var(--accent-glow);
   transition: transform 0.12s ease, filter 0.12s ease;
 }
-.btn-accent:active { transform: scale(0.97); filter: brightness(1.1); }
+.btn-accent:active { transform: scale(0.97); filter: brightness(1.06); }
 
-/* Onboarding / auth backdrop */
+/* Bottone secondario neutro */
+.btn-soft {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border-2);
+  color: rgba(255, 255, 255, 0.78);
+  border-radius: 12px;
+  font-weight: 600;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.btn-soft:active { transform: scale(0.97); background: rgba(255, 255, 255, 0.1); }
+
+/* Azione distruttiva "leggera" */
+.btn-danger-soft {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  color: #f87171;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: transform 0.12s ease;
+}
+.btn-danger-soft:active { transform: scale(0.97); }
+
+/* Pillola/etichetta colorata */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ─── Skeleton loading (shimmer) ───────────────────────────────────────────── */
+
+.skeleton {
+  border-radius: 16px;
+  background: linear-gradient(100deg,
+    rgba(255, 255, 255, 0.045) 40%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.045) 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ─── Sfondi speciali ──────────────────────────────────────────────────────── */
+
+/* Onboarding / auth backdrop — aurora blu/verde sul navy */
 .pitch-bg {
   background:
-    radial-gradient(80% 50% at 50% 0%, #16305a 0%, transparent 60%),
-    radial-gradient(70% 40% at 50% 100%, #0e3a2c 0%, transparent 55%),
+    radial-gradient(90% 55% at 50% -8%, rgba(45, 110, 220, 0.3) 0%, transparent 60%),
+    radial-gradient(80% 45% at 50% 108%, rgba(16, 185, 129, 0.24) 0%, transparent 55%),
     var(--bg);
 }
+
+/* ─── Micro-interazioni e animazioni ───────────────────────────────────────── */
 
 .player-badge { transition: transform 0.15s ease-out; }
 .player-badge:active { transform: scale(0.95); }
@@ -149,9 +301,6 @@ main {
   min-width: 40px;
   min-height: 40px;
 }
-
-/* Safe-area in alto per i telefoni con notch/isola dinamica */
-.safe-top { padding-top: max(env(safe-area-inset-top, 0px), 0px); }
 
 /* Hide scrollbar but keep scrolling */
 .no-scrollbar::-webkit-scrollbar,

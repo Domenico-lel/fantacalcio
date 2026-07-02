@@ -102,22 +102,20 @@ export default function OnboardingPage() {
           <div className="slide-up">
             <div className="text-center mb-8">
               <div className="text-5xl mb-3">👤</div>
-              <h2 className="text-2xl font-bold text-white">Chi sei?</h2>
+              <h2 className="font-display text-2xl font-bold text-white">Chi sei?</h2>
               <p className="text-white/50 text-sm mt-1">Inserisci i tuoi dati per iniziare</p>
             </div>
             <div className="flex flex-col gap-4">
               <div>
                 <label className="text-white/60 text-sm font-medium block mb-1.5">Nome</label>
                 <input
-                  className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none"
-                  style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
+                  className="input w-full px-4 py-3.5"
                   placeholder="es. Marco" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               </div>
               <div>
                 <label className="text-white/60 text-sm font-medium block mb-1.5">Cognome</label>
                 <input
-                  className="w-full rounded-xl px-4 py-3.5 text-white placeholder:text-white/25 outline-none"
-                  style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
+                  className="input w-full px-4 py-3.5"
                   placeholder="es. Rossi" value={lastName} onChange={(e) => setLastName(e.target.value)} />
               </div>
             </div>
@@ -128,7 +126,7 @@ export default function OnboardingPage() {
           <div className="slide-up">
             <div className="text-center mb-6">
               <div className="text-5xl mb-3">🏟️</div>
-              <h2 className="text-2xl font-bold text-white">La tua squadra</h2>
+              <h2 className="font-display text-2xl font-bold text-white">La tua squadra</h2>
               <p className="text-white/50 text-sm mt-1">Seleziona la squadra che ti appartiene</p>
             </div>
 
@@ -144,16 +142,17 @@ export default function OnboardingPage() {
                 const sel = selectedTeam?.id === t.id;
                 return (
                   <button key={t.id} onClick={() => setSelectedTeam(t)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all"
+                    className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all active:scale-[0.98]"
                     style={{
-                      background: sel ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.06)",
-                      border: `1px solid ${sel ? "#34d399" : "rgba(255,255,255,0.1)"}`,
+                      background: sel ? "rgba(52,211,153,0.14)" : "rgba(255,255,255,0.055)",
+                      border: `1px solid ${sel ? "#34d399" : "var(--border)"}`,
+                      boxShadow: sel ? "0 6px 18px -10px rgba(52,211,153,0.5)" : "none",
                     }}>
                     {t.logoUrl
                       ? <img src={t.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-none" />
                       : <span className="w-9 h-9 rounded-full flex items-center justify-center text-xl flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
-                    <span className={`font-semibold text-sm ${sel ? "text-emerald-400" : "text-white"}`}>{t.name}</span>
-                    {sel && <span className="ml-auto text-emerald-400">✓</span>}
+                    <span className={`font-semibold text-sm ${sel ? "text-emerald-300" : "text-white"}`}>{t.name}</span>
+                    {sel && <span className="ml-auto text-emerald-300">✓</span>}
                   </button>
                 );
               })}
@@ -166,7 +165,7 @@ export default function OnboardingPage() {
         <div className="mt-8 flex flex-col gap-3">
           <button onClick={handleNext} disabled={saving || (step === 2 && !selectedTeam)}
             className="w-full py-4 font-bold rounded-2xl text-lg transition-all active:scale-95 disabled:opacity-60"
-            style={{ background: "#34d399", color: "#052e16" }}>
+            style={{ background: "linear-gradient(135deg, #0ec98f, #4ae8b8)", color: "#04281e", boxShadow: "0 10px 26px -10px rgba(20,220,160,0.5)" }}>
             {saving ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />

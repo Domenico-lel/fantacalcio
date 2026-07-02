@@ -10,6 +10,7 @@ import {
 import { fetchTeams, type Team } from "@/app/teams-actions";
 import { STARTING_CREDITS } from "@/lib/bet-constants";
 import { isImageAvatar } from "@/lib/avatar";
+import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
 import { useConfirm } from "@/components/Dialog";
@@ -56,34 +57,29 @@ export default function PronosticiPage() {
 
   return (
     <div className="screen sec-bet">
-      <div className="sec-header px-4 pt-12 pb-3 sticky top-0 z-20">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--accent-soft)" }}>La lega</p>
-            <h1 className="text-white font-bold text-2xl leading-tight">Pronostici</h1>
+      <PageHeader
+        eyebrow="La lega"
+        title="Pronostici"
+        right={!isAdmin ? (
+          <div className="text-right px-3 py-2 rounded-2xl"
+            style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)" }}>
+            <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "var(--text-dim)" }}>Crediti</p>
+            <p className="font-display font-extrabold text-xl leading-none mt-0.5" style={{ color: "var(--accent)" }}>
+              {loading ? "—" : data?.balance ?? 0}
+            </p>
           </div>
-          {!isAdmin && (
-            <div className="text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Crediti</p>
-              <p className="font-black text-2xl leading-none" style={{ color: "var(--accent)" }}>
-                {loading ? "—" : data?.balance ?? 0}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-3">
-          <SegmentedTabs
-            value={tab}
-            onChange={setTab}
-            items={[
-              { key: "bet" as TabKey, label: "Scommetti" },
-              { key: "rank" as TabKey, label: "Classifica" },
-              ...(isAdmin ? [{ key: "admin" as TabKey, label: "Gestione" }] : []),
-            ]}
-          />
-        </div>
-      </div>
+        ) : undefined}
+      >
+        <SegmentedTabs
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: "bet" as TabKey, label: "Scommetti" },
+            { key: "rank" as TabKey, label: "Classifica" },
+            ...(isAdmin ? [{ key: "admin" as TabKey, label: "Gestione" }] : []),
+          ]}
+        />
+      </PageHeader>
 
       <TabPanel tabKey={tab} keys={tabKeys}>
         {tab === "bet" ? <BetTab data={data} loading={loading} reload={load} />
@@ -104,13 +100,13 @@ function BetTab({ data, loading, reload }: { data: BetCenter | null; loading: bo
   return (
     <div className="px-4 py-4 flex flex-col gap-5">
       {!loading && data?.viewer && !data.viewer.isAdmin && !data.viewer.hasProfile && (
-        <p className="rounded-xl px-3 py-2.5 text-sm text-white/70" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
+        <p className="card-flat px-3 py-2.5 text-sm text-white/70">
           Completa il tuo profilo squadra per poter scommettere.
         </p>
       )}
 
       {loading && Array.from({ length: 2 }).map((_, i) => (
-        <div key={i} className="rounded-2xl animate-pulse" style={{ height: 140, background: "rgba(255,255,255,0.05)" }} />
+        <div key={i} className="skeleton" style={{ height: 140 }} />
       ))}
 
       {!loading && rounds.length === 0 && (
@@ -122,8 +118,8 @@ function BetTab({ data, loading, reload }: { data: BetCenter | null; loading: bo
 
       {rounds.map((r) => (
         <div key={r.id} className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-white text-sm">Giornata {r.day}{r.title ? ` · ${r.title}` : ""}</span>
+          <div className="flex items-center gap-2 px-1">
+            <span className="font-display font-bold text-white text-sm">Giornata {r.day}{r.title ? ` · ${r.title}` : ""}</span>
             <RoundBadge status={r.status} />
           </div>
           {r.matches.length === 0 && <p className="text-white/35 text-xs">Nessuno scontro inserito.</p>}
@@ -176,7 +172,7 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
   const odds: Record<Pick, number> = { "1": match.odd1, X: match.oddX, "2": match.odd2 };
 
   return (
-    <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
+    <div className="card p-4">
       {/* squadre */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -198,14 +194,15 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
           const active = isPicked && !match.result;
           return (
             <button key={p} disabled={locked} onClick={() => setPick(p)}
-              className="flex flex-col items-center py-2 rounded-xl transition-all active:scale-95 disabled:cursor-default"
+              className="flex flex-col items-center py-2.5 rounded-xl transition-all active:scale-95 disabled:cursor-default"
               style={{
-                background: isResult ? "var(--accent)" : active ? "rgba(240,164,58,0.18)" : "rgba(255,255,255,0.05)",
-                border: `1px solid ${isResult ? "var(--accent)" : active ? "var(--accent)" : "rgba(255,255,255,0.1)"}`,
+                background: isResult ? "var(--accent-grad)" : active ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${isResult || active ? "var(--accent)" : "var(--border)"}`,
+                boxShadow: active ? "0 4px 14px -6px var(--accent-glow)" : "none",
                 opacity: locked && !isResult && !isPicked ? 0.55 : 1,
               }}>
-              <span className="text-[11px] font-bold" style={{ color: isResult ? "var(--accent-ink)" : "rgba(255,255,255,0.55)" }}>{PICK_LABELS[p]}</span>
-              <span className="text-sm font-black" style={{ color: isResult ? "var(--accent-ink)" : "#fff" }}>{fmtOdd(odds[p])}</span>
+              <span className="text-[11px] font-bold" style={{ color: isResult ? "var(--accent-ink)" : active ? "var(--accent-soft)" : "var(--text-dim)" }}>{PICK_LABELS[p]}</span>
+              <span className="font-display text-sm font-bold" style={{ color: isResult ? "var(--accent-ink)" : "#fff" }}>{fmtOdd(odds[p])}</span>
             </button>
           );
         })}
@@ -234,11 +231,9 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
           <input
             type="number" inputMode="numeric" min={1} value={stake}
             onChange={(e) => setStake(e.target.value)} placeholder="Crediti"
-            className="w-24 rounded-xl px-3 py-2 text-white text-sm outline-none focus:ring-2"
-            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }} />
+            className="input w-24 px-3 py-2.5 text-sm" />
           <button onClick={submit} disabled={busy || !pick || stakeNum <= 0}
-            className="flex-1 py-2 rounded-xl text-sm font-bold disabled:opacity-40"
-            style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
+            className="btn-primary flex-1 py-2.5 text-sm">
             {busy ? "…" : `Punta${potential ? ` · vinci ${potential}` : ""}`}
           </button>
         </div>
@@ -257,19 +252,15 @@ function RankTab({ leaderboard, loading }: { leaderboard: CreditRow[]; loading: 
     <div className="px-4 py-4 flex flex-col gap-2">
       <p className="text-white/40 text-xs mb-1">Saldo crediti dei manager. Si parte da {STARTING_CREDITS} crediti; si guadagna e si perde scommettendo sulle giornate.</p>
       {loading && Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="rounded-xl animate-pulse" style={{ height: 56, background: "rgba(255,255,255,0.05)" }} />
+        <div key={i} className="skeleton" style={{ height: 56 }} />
       ))}
       {!loading && leaderboard.length === 0 && <p className="text-white/50 text-sm text-center py-10">Nessun manager.</p>}
       {leaderboard.map((row, i) => (
-        <div key={row.userId} className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-          style={{
-            background: row.mine ? "rgba(240,164,58,0.1)" : "rgba(255,255,255,0.04)",
-            border: `1px solid ${row.mine ? "rgba(240,164,58,0.3)" : "var(--border)"}`,
-          }}>
-          <span className="w-6 text-center font-black text-sm" style={{ color: i < 3 ? "var(--accent)" : "rgba(255,255,255,0.4)" }}>{i + 1}</span>
+        <div key={row.userId} className={`flex items-center gap-3 px-3 py-2.5 ${row.mine ? "card-accent" : "card-flat"}`}>
+          <span className="w-6 text-center font-display font-bold text-sm" style={{ color: i < 3 ? "var(--accent)" : "var(--text-faint)" }}>{i + 1}</span>
           <Avatar src={row.logo} size={30} />
           <span className="flex-1 min-w-0 truncate text-white text-sm font-semibold">{row.name}</span>
-          <span className="font-black text-sm" style={{ color: "var(--accent)" }}>{row.balance}</span>
+          <span className="font-display font-extrabold text-sm" style={{ color: "var(--accent)" }}>{row.balance}</span>
         </div>
       ))}
       <div className="h-4" />
@@ -302,15 +293,14 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
   return (
     <div className="px-4 py-4 flex flex-col gap-4">
       {/* crea giornata */}
-      <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
-        <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: "var(--accent)" }}>Nuova giornata</p>
+      <div className="card p-4">
+        <p className="eyebrow mb-3">Nuova giornata</p>
         <div className="flex gap-2">
           <input type="number" value={day} onChange={(e) => setDay(e.target.value)} placeholder="Giornata"
-            className="w-24 rounded-xl px-3 py-2 text-white text-sm outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }} />
+            className="input w-24 px-3 py-2 text-sm" />
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo (facoltativo)"
-            className="flex-1 rounded-xl px-3 py-2 text-white text-sm outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }} />
-          <button onClick={create} disabled={busy} className="px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
-            style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>+</button>
+            className="input flex-1 px-3 py-2 text-sm" />
+          <button onClick={create} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
         </div>
         {msg && <p className="text-white/60 text-xs mt-2">{msg}</p>}
       </div>
@@ -347,24 +337,22 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
     await reload();
   }
 
-  const selStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
-
   return (
-    <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
+    <div className="card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-white font-bold text-sm">Giornata {round.day}{round.title ? ` · ${round.title}` : ""}</span>
+          <span className="font-display text-white font-bold text-sm">Giornata {round.day}{round.title ? ` · ${round.title}` : ""}</span>
           <RoundBadge status={round.status} />
         </div>
         <div className="flex items-center gap-1.5">
           {round.status !== "settled" && (
             <button onClick={async () => { await setRoundStatus(round.id, round.status === "open" ? "closed" : "open"); await reload(); }}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white/70" style={selStyle}>
+              className="btn-soft px-2.5 py-1.5 text-[11px]">
               {round.status === "open" ? "Chiudi" : "Riapri"}
             </button>
           )}
           <button onClick={async () => { if (await confirm({ title: "Eliminare la giornata?", message: "Le giocate verranno rimborsate.", confirmLabel: "Elimina", danger: true })) { await deleteBetRound(round.id); await reload(); } }}
-            className="tap rounded-lg text-[13px] text-red-400/80" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>🗑️</button>
+            className="btn-danger-soft tap text-[13px]">🗑️</button>
         </div>
       </div>
 
@@ -372,22 +360,22 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
       {round.matches.map((m) => <AdminMatchRow key={m.id} match={m} reload={reload} />)}
 
       {/* nuovo scontro */}
-      <div className="rounded-xl px-3 py-3 flex flex-col gap-2" style={{ background: "rgba(240,164,58,0.06)", border: "1px solid rgba(240,164,58,0.2)" }}>
+      <div className="card-accent px-3 py-3 flex flex-col gap-2" style={{ borderRadius: 14 }}>
         <div className="flex gap-2">
-          <select value={home} onChange={(e) => setHome(e.target.value)} className="flex-1 min-w-0 rounded-lg px-2 py-2 text-white text-xs outline-none" style={selStyle}>
-            <option value="" style={{ background: "#141d33" }}>Casa…</option>
-            {teams.map((t) => <option key={t.id} value={t.id} style={{ background: "#141d33" }}>{t.name}</option>)}
+          <select value={home} onChange={(e) => setHome(e.target.value)} className="input flex-1 min-w-0 px-2 py-2 text-xs">
+            <option value="">Casa…</option>
+            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <select value={away} onChange={(e) => setAway(e.target.value)} className="flex-1 min-w-0 rounded-lg px-2 py-2 text-white text-xs outline-none" style={selStyle}>
-            <option value="" style={{ background: "#141d33" }}>Ospite…</option>
-            {teams.map((t) => <option key={t.id} value={t.id} style={{ background: "#141d33" }}>{t.name}</option>)}
+          <select value={away} onChange={(e) => setAway(e.target.value)} className="input flex-1 min-w-0 px-2 py-2 text-xs">
+            <option value="">Ospite…</option>
+            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
         <div className="flex gap-2 items-center">
-          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="w-full rounded-lg px-2 py-2 text-white text-xs outline-none text-center" style={selStyle} />
-          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="w-full rounded-lg px-2 py-2 text-white text-xs outline-none text-center" style={selStyle} />
-          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="w-full rounded-lg px-2 py-2 text-white text-xs outline-none text-center" style={selStyle} />
-          <button onClick={add} disabled={busy} className="px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>+</button>
+          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input w-full px-2 py-2 text-xs text-center" />
+          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input w-full px-2 py-2 text-xs text-center" />
+          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input w-full px-2 py-2 text-xs text-center" />
+          <button onClick={add} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
         </div>
         {err && <p className="text-red-400 text-xs">{err}</p>}
       </div>
@@ -397,7 +385,6 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
 
 function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Promise<void> }) {
   const confirm = useConfirm();
-  const selStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
   const [editOdds, setEditOdds] = useState(false);
   const [o1, setO1] = useState(m.odd1.toFixed(2));
   const [ox, setOx] = useState(m.oddX.toFixed(2));
@@ -412,7 +399,7 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
   }
 
   return (
-    <div className="rounded-xl px-3 py-2.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
+    <div className="card-flat px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-white text-xs font-semibold truncate flex-1">{m.homeName} <span className="text-white/30">vs</span> {m.awayName}</span>
         <button
@@ -426,10 +413,10 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
 
       {editOdds && !m.result && (
         <div className="flex items-center gap-1.5 mt-2">
-          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
-          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
-          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="w-full rounded-lg px-2 py-1.5 text-white text-xs text-center outline-none" style={selStyle} />
-          <button onClick={saveOdds} className="px-2.5 py-1.5 rounded-lg text-xs font-bold" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>✓</button>
+          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input w-full px-2 py-1.5 text-xs text-center" />
+          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input w-full px-2 py-1.5 text-xs text-center" />
+          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input w-full px-2 py-1.5 text-xs text-center" />
+          <button onClick={saveOdds} className="btn-primary px-2.5 py-1.5 text-xs">✓</button>
         </div>
       )}
 
@@ -439,17 +426,17 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
           <button key={p} onClick={async () => { await setMatchResult(m.id, p); await reload(); }}
             className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
             style={{
-              background: m.result === p ? "var(--accent)" : "rgba(255,255,255,0.06)",
-              color: m.result === p ? "var(--accent-ink)" : "rgba(255,255,255,0.6)",
-              border: `1px solid ${m.result === p ? "var(--accent)" : "rgba(255,255,255,0.1)"}`,
+              background: m.result === p ? "var(--accent-grad)" : "rgba(255,255,255,0.06)",
+              color: m.result === p ? "var(--accent-ink)" : "var(--text-dim)",
+              border: `1px solid ${m.result === p ? "var(--accent)" : "var(--border)"}`,
             }}>{PICK_LABELS[p]}</button>
         ))}
         {m.result && (
           <button onClick={async () => { await setMatchResult(m.id, null); await reload(); }}
-            className="px-2 py-1.5 rounded-lg text-[11px] text-white/50" style={selStyle}>annulla</button>
+            className="btn-soft px-2 py-1.5 text-[11px]">annulla</button>
         )}
         <button onClick={async () => { if (await confirm({ title: "Eliminare lo scontro?", confirmLabel: "Elimina", danger: true })) { await deleteBetMatch(m.id); await reload(); } }}
-          className="tap rounded-lg text-[13px] text-red-400/70" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>✕</button>
+          className="btn-danger-soft tap text-[13px]">✕</button>
       </div>
 
       {err && <p className="text-red-400 text-xs mt-1.5">{err}</p>}
@@ -492,19 +479,18 @@ function AdminCreditsCard({ leaderboard, reload }: { leaderboard: CreditRow[]; r
     await reload();
   }
 
-  const selStyle = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
   return (
-    <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)" }}>
-      <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: "var(--accent)" }}>Crediti manuali</p>
+    <div className="card p-4">
+      <p className="eyebrow mb-3">Crediti manuali</p>
       <div className="flex flex-col gap-2">
-        <select value={user} onChange={(e) => setUser(e.target.value)} className="w-full rounded-xl px-2 py-2 text-white text-sm outline-none" style={selStyle}>
-          <option value="" style={{ background: "#141d33" }}>Manager…</option>
-          {leaderboard.map((r) => <option key={r.userId} value={r.userId} style={{ background: "#141d33" }}>{r.name} ({r.balance})</option>)}
+        <select value={user} onChange={(e) => setUser(e.target.value)} className="input w-full px-2 py-2 text-sm">
+          <option value="">Manager…</option>
+          {leaderboard.map((r) => <option key={r.userId} value={r.userId}>{r.name} ({r.balance})</option>)}
         </select>
         <div className="flex gap-2">
           <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="±crediti"
-            className="flex-1 rounded-xl px-3 py-2 text-white text-sm outline-none" style={selStyle} />
-          <button onClick={apply} disabled={busy} className="px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>OK</button>
+            className="input flex-1 px-3 py-2 text-sm" />
+          <button onClick={apply} disabled={busy} className="btn-primary px-5 py-2 text-sm">OK</button>
         </div>
       </div>
       <p className="text-white/35 text-[10px] mt-2">Usa valori negativi per togliere crediti. Es. +100 ricarica, -50 multa.</p>
