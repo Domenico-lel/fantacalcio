@@ -12,7 +12,7 @@ import BadgeRow from "@/components/Badges";
 import {
   fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
   addRosterPlayer, deleteRosterPlayer, searchPlayers,
-  adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminAssignTeam, adminDeleteProfile, adminSetProfileBadges,
+  adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminAssignTeam, adminDeleteProfile, adminSetProfileBadges, adminSetTeamCapacity,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
 import { isAppOpen, setAppOpen } from "@/app/release-actions";
@@ -574,8 +574,13 @@ function GestioneTab() {
   useEffect(() => { load(); }, [load]);
   useRegisterRefresh(load);
 
-  const profileByTeam = new Map<string, AdminProfile>();
-  for (const p of profiles) if (p.teamRef) profileByTeam.set(p.teamRef, p);
+  // Una squadra può avere più allenatori → lista di profili per squadra.
+  const profilesByTeam = new Map<string, AdminProfile[]>();
+  for (const p of profiles) if (p.teamRef) {
+    const arr = profilesByTeam.get(p.teamRef) ?? [];
+    arr.push(p);
+    profilesByTeam.set(p.teamRef, arr);
+  }
 
   const unassignedManagers = profiles.filter((p) => !p.teamRef);
   const freeTeams = teams.filter((t) => !t.claimed);
@@ -611,7 +616,7 @@ function GestioneTab() {
           Nessuna squadra. Premi &quot;Sincronizza&quot; per importarle dalla classifica.
         </p>
       )}
-      {teams.map((t) => <TeamAdminCard key={t.id} team={t} profile={profileByTeam.get(t.id) ?? null} onTeamsChange={load} />)}
+      {teams.map((t) => <TeamAdminCard key={t.id} team={t} profiles={profilesByTeam.get(t.id) ?? []} onTeamsChange={load} />)}
       <div className="h-4" />
     </div>
   );
@@ -863,7 +868,46 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
   );
 }
 
-function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: AdminProfile | null; onTeamsChange: () => Promise<void> }) {
+/* Selettore capienza: quanti allenatori può avere la squadra.
+   1 = squadra normale, 2 = condivisa da due fantaallenatori. */
+function TeamCapacity({ team, reload }: { team: Team; reload: () => Promise<void> }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function set(n: number) {
+    if (busy || n === team.maxManagers) return;
+    setBusy(true);
+    const res = await adminSetTeamCapacity(team.id, n);
+    setBusy(false);
+    if (res.error) { toast(res.error, "error"); return; }
+    await reload();
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 min-w-0">
+        <p className="eyebrow text-[10px]">Allenatori per squadra</p>
+        <p className="text-white/40 text-[11px]">Occupati: {team.managerCount} · Posti: {team.maxManagers}</p>
+      </div>
+      <div className="flex gap-1 flex-none">
+        {[1, 2].map((n) => {
+          const active = team.maxManagers === n;
+          return (
+            <button key={n} onClick={() => set(n)} disabled={busy}
+              className="w-9 h-9 rounded-lg text-sm font-bold transition-all disabled:opacity-50"
+              style={active
+                ? { background: "var(--accent-grad)", color: "var(--accent-ink)" }
+                : { background: "rgba(255,255,255,0.06)", border: "1px solid var(--border)", color: "var(--text-dim)" }}>
+              {n}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TeamAdminCard({ team, profiles, onTeamsChange }: { team: Team; profiles: AdminProfile[]; onTeamsChange: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(false);
@@ -894,10 +938,11 @@ function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: 
     await onTeamsChange();
   }
 
-  const managerLabel = profile
-    ? (`${profile.firstName} ${profile.lastName}`.trim() || profile.teamName || "Manager")
-    : (team.claimed ? "Assegnata" : "Libera");
-
+  // Etichetta sotto il nome squadra: nomi degli allenatori, o stato se vuota.
+  const managerNames = profiles
+    .map((p) => `${p.firstName} ${p.lastName}`.trim() || p.teamName || "Manager")
+    .join(", ");
+  const managerLabel = managerNames || (team.maxManagers > 1 ? "Libera · 2 posti" : "Libera");
 
   return (
     <div className="card-flat overflow-hidden">
@@ -909,6 +954,13 @@ function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: 
           <p className="text-white font-semibold text-sm truncate">{team.name}</p>
           <p className="text-white/40 text-xs truncate">{managerLabel}</p>
         </div>
+        {/* Posti occupati/capienza — evidenzia le squadre condivise */}
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-none mr-1"
+          style={team.maxManagers > 1
+            ? { background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }
+            : { color: "var(--text-faint)" }}>
+          {team.managerCount}/{team.maxManagers}
+        </span>
         <span className="text-white/30 text-sm">{open ? "▲" : "▼"}</span>
       </button>
 
@@ -926,8 +978,11 @@ function TeamAdminCard({ team, profile, onTeamsChange }: { team: Team; profile: 
             {logoErr && <p className="text-red-400 text-xs mt-1">{logoErr}</p>}
           </div>
 
-          {/* Manager assegnato — l'admin modifica info o libera la squadra */}
-          {profile && <ManagerEditor key={profile.userId} profile={profile} reload={onTeamsChange} />}
+          {/* Capienza: quanti allenatori può avere la squadra (1 = normale, 2 = condivisa) */}
+          <TeamCapacity team={team} reload={onTeamsChange} />
+
+          {/* Manager assegnati — uno o più; l'admin modifica info o libera la squadra */}
+          {profiles.map((p) => <ManagerEditor key={p.userId} profile={p} reload={onTeamsChange} />)}
 
           {/* Rosa */}
           <div>

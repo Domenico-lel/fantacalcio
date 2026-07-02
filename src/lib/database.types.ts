@@ -231,6 +231,7 @@ export interface Database {
           name: string;
           team_id: string | null;
           logo_url: string | null;
+          max_managers: number;
           created_at: string;
           updated_at: string;
         };
@@ -238,11 +239,13 @@ export interface Database {
           name: string;
           team_id?: string | null;
           logo_url?: string | null;
+          max_managers?: number;
         };
         Update: {
           name?: string;
           team_id?: string | null;
           logo_url?: string | null;
+          max_managers?: number;
         };
         Relationships: [];
       };

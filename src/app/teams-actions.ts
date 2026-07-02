@@ -10,8 +10,10 @@ export interface Team {
   name: string;
   logoUrl: string | null;
   teamId: string | null;
-  claimed: boolean;
+  claimed: boolean;      // true = squadra piena (ha raggiunto max allenatori)
   mine: boolean;
+  managerCount: number;  // quanti allenatori l'hanno già scelta
+  maxManagers: number;   // posti disponibili (default 1)
 }
 
 export interface RosterPlayer {
@@ -39,19 +41,30 @@ export async function fetchTeams(): Promise<Team[]> {
     db.from("fanta_profiles").select("user_id, team_ref"),
   ]);
 
-  const claimedBy = new Map<string, string>();
+  // Una squadra può avere più allenatori: raccogliamo gli user_id per squadra.
+  const membersByTeam = new Map<string, string[]>();
   for (const p of profiles ?? []) {
-    if (p.team_ref) claimedBy.set(p.team_ref, p.user_id);
+    if (!p.team_ref) continue;
+    const arr = membersByTeam.get(p.team_ref) ?? [];
+    arr.push(p.user_id);
+    membersByTeam.set(p.team_ref, arr);
   }
 
-  return (teams ?? []).map((t) => ({
-    id: t.id,
-    name: t.name,
-    logoUrl: t.logo_url,
-    teamId: t.team_id,
-    claimed: claimedBy.has(t.id),
-    mine: !!viewer && claimedBy.get(t.id) === viewer.userId,
-  }));
+  return (teams ?? []).map((t) => {
+    const members = membersByTeam.get(t.id) ?? [];
+    // max_managers può non esistere (migrazione non ancora eseguita) → default 1
+    const maxManagers = (t as { max_managers?: number }).max_managers ?? 1;
+    return {
+      id: t.id,
+      name: t.name,
+      logoUrl: t.logo_url,
+      teamId: t.team_id,
+      claimed: members.length >= maxManagers, // "piena" quando ha raggiunto la capienza
+      mine: !!viewer && members.includes(viewer.userId),
+      managerCount: members.length,
+      maxManagers,
+    };
+  });
 }
 
 export async function syncTeams(): Promise<{ count: number; error: string | null }> {
@@ -148,16 +161,17 @@ export async function claimTeam(teamRef: string): Promise<{ error: string | null
   if (!viewer) return { error: "Non autenticato" };
 
   const db = createAdminClient();
-  const { data: taken } = await db
-    .from("fanta_profiles")
-    .select("user_id")
-    .eq("team_ref", teamRef)
-    .maybeSingle();
-  if (taken && taken.user_id !== viewer.userId) {
-    return { error: "Questa squadra è già stata scelta da un altro manager" };
+  // Quanti allenatori ha già questa squadra e qual è la sua capienza?
+  const [{ data: members }, { data: team }] = await Promise.all([
+    db.from("fanta_profiles").select("user_id").eq("team_ref", teamRef),
+    db.from("fanta_teams").select("*").eq("id", teamRef).maybeSingle(),
+  ]);
+  const already = (members ?? []).some((m) => m.user_id === viewer.userId);
+  const maxManagers = (team as { max_managers?: number } | null)?.max_managers ?? 1;
+  if (!already && (members?.length ?? 0) >= maxManagers) {
+    return { error: "Questa squadra ha già raggiunto il numero massimo di allenatori" };
   }
 
-  const { data: team } = await db.from("fanta_teams").select("name").eq("id", teamRef).maybeSingle();
   const patch: { team_ref: string; team_name?: string } = { team_ref: teamRef };
   if (team?.name) patch.team_name = team.name;
 
@@ -244,6 +258,29 @@ export async function adminReleaseTeam(userId: string): Promise<{ error: string 
   return { error: error?.message ?? null };
 }
 
+// Imposta quanti allenatori può avere una squadra (1 = normale, 2 = condivisa).
+// Non si può scendere sotto il numero di allenatori già assegnati.
+export async function adminSetTeamCapacity(teamRef: string, maxManagers: number): Promise<{ error: string | null }> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) return { error: "Solo l'admin" };
+  const n = Math.max(1, Math.min(4, Math.floor(maxManagers || 1)));
+
+  const db = createAdminClient();
+  const { count } = await db
+    .from("fanta_profiles")
+    .select("user_id", { count: "exact", head: true })
+    .eq("team_ref", teamRef);
+  if ((count ?? 0) > n) {
+    return { error: `La squadra ha già ${count} allenatori: liberane uno prima di ridurre i posti.` };
+  }
+
+  const { error } = await db.from("fanta_teams").update({ max_managers: n } as never).eq("id", teamRef);
+  if (error && /max_managers/i.test(error.message)) {
+    return { error: "Colonna max_managers mancante: esegui supabase-coaches-migration.sql." };
+  }
+  return { error: error?.message ?? null };
+}
+
 // Assegna manualmente una squadra a un manager (versione admin di claimTeam).
 // Se il manager ne aveva già un'altra, quella torna libera automaticamente.
 export async function adminAssignTeam(userId: string, teamRef: string): Promise<{ error: string | null }> {
@@ -252,17 +289,17 @@ export async function adminAssignTeam(userId: string, teamRef: string): Promise<
   if (!userId || !teamRef) return { error: "Dati mancanti" };
 
   const db = createAdminClient();
-  // la squadra è già di un altro manager?
-  const { data: taken } = await db
-    .from("fanta_profiles")
-    .select("user_id")
-    .eq("team_ref", teamRef)
-    .maybeSingle();
-  if (taken && taken.user_id !== userId) {
-    return { error: "Questa squadra è già assegnata a un altro manager" };
+  // La squadra ha ancora posti liberi? (escludendo il manager che stiamo assegnando)
+  const [{ data: members }, { data: team }] = await Promise.all([
+    db.from("fanta_profiles").select("user_id").eq("team_ref", teamRef),
+    db.from("fanta_teams").select("*").eq("id", teamRef).maybeSingle(),
+  ]);
+  const others = (members ?? []).filter((m) => m.user_id !== userId).length;
+  const maxManagers = (team as { max_managers?: number } | null)?.max_managers ?? 1;
+  if (others >= maxManagers) {
+    return { error: "Questa squadra ha già raggiunto il numero massimo di allenatori" };
   }
 
-  const { data: team } = await db.from("fanta_teams").select("name").eq("id", teamRef).maybeSingle();
   const patch: { team_ref: string; team_name?: string; updated_at: string } = {
     team_ref: teamRef,
     updated_at: new Date().toISOString(),
