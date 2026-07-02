@@ -299,7 +299,7 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
           <input type="number" value={day} onChange={(e) => setDay(e.target.value)} placeholder="Giornata"
             className="input w-24 px-3 py-2 text-sm" />
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo (facoltativo)"
-            className="input flex-1 px-3 py-2 text-sm" />
+            className="input flex-1 min-w-0 px-3 py-2 text-sm" />
           <button onClick={create} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
         </div>
         {msg && <p className="text-white/60 text-xs mt-2">{msg}</p>}
@@ -372,9 +372,9 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
           </select>
         </div>
         <div className="flex gap-2 items-center">
-          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input w-full px-2 py-2 text-xs text-center" />
-          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input w-full px-2 py-2 text-xs text-center" />
-          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input w-full px-2 py-2 text-xs text-center" />
+          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
+          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
+          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
           <button onClick={add} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
         </div>
         {err && <p className="text-red-400 text-xs">{err}</p>}
@@ -413,9 +413,9 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
 
       {editOdds && !m.result && (
         <div className="flex items-center gap-1.5 mt-2">
-          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input w-full px-2 py-1.5 text-xs text-center" />
-          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input w-full px-2 py-1.5 text-xs text-center" />
-          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input w-full px-2 py-1.5 text-xs text-center" />
+          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input flex-1 min-w-0 px-2 py-1.5 text-xs text-center" />
+          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input flex-1 min-w-0 px-2 py-1.5 text-xs text-center" />
+          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input flex-1 min-w-0 px-2 py-1.5 text-xs text-center" />
           <button onClick={saveOdds} className="btn-primary px-2.5 py-1.5 text-xs">✓</button>
         </div>
       )}
@@ -489,7 +489,7 @@ function AdminCreditsCard({ leaderboard, reload }: { leaderboard: CreditRow[]; r
         </select>
         <div className="flex gap-2">
           <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="±crediti"
-            className="input flex-1 px-3 py-2 text-sm" />
+            className="input flex-1 min-w-0 px-3 py-2 text-sm" />
           <button onClick={apply} disabled={busy} className="btn-primary px-5 py-2 text-sm">OK</button>
         </div>
       </div>

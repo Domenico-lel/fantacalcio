@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { loadViewerCache } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
-import { fetchTeams } from "@/app/teams-actions";
+import { fetchStandingsNameMap, type StandingsTeamInfo } from "@/app/teams-actions";
 import { isImageAvatar } from "@/lib/avatar";
 import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
@@ -18,7 +18,9 @@ const NOOP = () => {};
 
 interface StandingEntryWithLogo {
   position: number;
-  teamName: string;
+  teamName: string;      // nome originale scrapato (chiave per l'override)
+  displayName: string;   // nome mostrato (override bacheca, se presente)
+  logoUrl: string | null;
   logoEmoji: string;
   points: number;
   totalFp: number;
@@ -63,7 +65,7 @@ export default function StandingsPage() {
   const [myLogo, setMyLogo] = useState("⭐");
   const [standings, setStandings] = useState<StandingEntryWithLogo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [teamLogos, setTeamLogos] = useState<Record<string, string>>({});
+  const [overrides, setOverrides] = useState<Record<string, StandingsTeamInfo>>({});
 
   useEffect(() => {
     // Identità autorevole dal server (stessa fonte dell'header), con paint immediato dalla cache.
@@ -80,15 +82,10 @@ export default function StandingsPage() {
   }, []);
 
   useEffect(() => {
-    fetchTeams().then((teams) => {
-      const map: Record<string, string> = {};
-      for (const t of teams) if (t.logoUrl) map[t.name] = t.logoUrl;
-      setTeamLogos(map);
-    }).catch(() => {});
+    fetchStandingsNameMap().then(setOverrides).catch(() => {});
   }, []);
 
-  function Logo({ name, fallback, size, radius = 50 }: { name: string; fallback: string; size: number; radius?: number }) {
-    const url = teamLogos[name];
+  function Logo({ url, fallback, size, radius = 50 }: { url: string | null; fallback: string; size: number; radius?: number }) {
     if (url) return <img src={url} alt="" className="object-cover flex-none" style={{ width: size, height: size, borderRadius: radius }} />;
     return (
       <span className="flex-none flex items-center justify-center"
@@ -103,24 +100,30 @@ export default function StandingsPage() {
       const res = await fetch("/api/standings");
       if (!res.ok) throw new Error("Failed to fetch standings");
       const data = await res.json();
-      const withLogos: StandingEntryWithLogo[] = (data.items || []).map((entry: any) => ({
-        ...entry,
-        logoEmoji: entry.teamName === myTeamName ? myLogo : assignLogoToTeam(entry.teamName),
-      }));
+      const withLogos: StandingEntryWithLogo[] = (data.items || []).map((entry: any) => {
+        const ov = overrides[entry.teamName];
+        const displayName = ov?.displayName || entry.teamName;
+        return {
+          ...entry,
+          displayName,
+          logoUrl: ov?.logoUrl ?? null,
+          logoEmoji: displayName === myTeamName ? myLogo : assignLogoToTeam(entry.teamName),
+        };
+      });
       setStandings(withLogos);
     } catch {
       setStandings([]);
     } finally {
       setLoading(false);
     }
-  }, [myTeamName, myLogo]);
+  }, [myTeamName, myLogo, overrides]);
 
   useEffect(() => { loadStandings(); }, [loadStandings]);
 
   // Pull-to-refresh sulla classifica; sulla tab Trofei ci pensa TrofeiContent.
   useRegisterRefresh(tab === "classifica" ? loadStandings : NOOP);
 
-  const myEntry = standings.find((e) => e.teamName === myTeamName);
+  const myEntry = standings.find((e) => e.displayName === myTeamName);
   const leader = standings[0];
   const maxPoints = leader?.points || 1;
 
@@ -171,10 +174,10 @@ export default function StandingsPage() {
             }}>
             <span className="absolute -top-3 right-1 text-7xl opacity-20 select-none">👑</span>
             <div className="flex items-center gap-3 relative">
-              <Logo name={leader.teamName} fallback={leader.logoEmoji} size={54} radius={16} />
+              <Logo url={leader.logoUrl} fallback={leader.logoEmoji} size={54} radius={16} />
               <div className="flex-1 min-w-0">
                 <p className="eyebrow">Capolista</p>
-                <p className="font-display text-white font-bold text-lg leading-tight truncate">{leader.teamName}</p>
+                <p className="font-display text-white font-bold text-lg leading-tight truncate">{leader.displayName}</p>
                 <p className="text-xs mt-0.5" style={{ color: "var(--text-dim)" }}>{leader.won}V · {leader.drawn}N · {leader.lost}P</p>
               </div>
               <div className="text-right">
@@ -189,10 +192,10 @@ export default function StandingsPage() {
         {myEntry && myEntry.position !== 1 && (
           <div className="card-accent p-3.5 flex items-center gap-3">
             <span className="font-display font-extrabold text-2xl w-10 text-center flex-none" style={{ color: "var(--accent)" }}>{myEntry.position}°</span>
-            <Logo name={myEntry.teamName} fallback={myEntry.logoEmoji} size={36} radius={12} />
+            <Logo url={myEntry.logoUrl} fallback={myEntry.logoEmoji} size={36} radius={12} />
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "var(--text-faint)" }}>La tua squadra</p>
-              <p className="text-white font-semibold text-sm truncate">{myEntry.teamName}</p>
+              <p className="text-white font-semibold text-sm truncate">{myEntry.displayName}</p>
             </div>
             <div className="text-right">
               <p className="font-display text-white font-bold text-lg leading-none">{myEntry.points}</p>
@@ -205,7 +208,7 @@ export default function StandingsPage() {
         {standings.length > 0 && (
           <div className="card overflow-hidden mt-1">
             {standings.map((entry, i) => {
-              const isMe = entry.teamName === myTeamName;
+              const isMe = entry.displayName === myTeamName;
               const pct = Math.max(6, Math.round((entry.points / maxPoints) * 100));
               return (
                 <div key={entry.position}
@@ -215,11 +218,11 @@ export default function StandingsPage() {
                     borderTop: i === 0 ? "none" : "1px solid var(--border)",
                   }}>
                   <PositionBadge position={entry.position} />
-                  <Logo name={entry.teamName} fallback={entry.logoEmoji} size={32} radius={10} />
+                  <Logo url={entry.logoUrl} fallback={entry.logoEmoji} size={32} radius={10} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className={`text-sm font-semibold truncate ${isMe ? "" : "text-white"}`} style={isMe ? { color: "var(--accent-soft)" } : undefined}>
-                        {entry.teamName}
+                        {entry.displayName}
                       </span>
                       <span className="font-display text-white font-bold text-sm flex-none">{entry.points}</span>
                     </div>
@@ -244,13 +247,13 @@ export default function StandingsPage() {
             <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: "var(--text-faint)" }}>Punti totali fantacalcio</p>
             <div className="card overflow-hidden">
               {standings.slice().sort((a, b) => b.totalFp - a.totalFp).slice(0, 5).map((entry, i) => {
-                const isMe = entry.teamName === myTeamName;
+                const isMe = entry.displayName === myTeamName;
                 return (
                   <div key={entry.teamName} className="flex items-center gap-3 px-3.5 py-2.5"
                     style={{ borderTop: i === 0 ? "none" : "1px solid var(--border)", background: isMe ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent" }}>
                     <span className="text-xs w-4 flex-none" style={{ color: "var(--text-faint)" }}>{i + 1}</span>
-                    <Logo name={entry.teamName} fallback={entry.logoEmoji} size={22} radius={7} />
-                    <span className={`flex-1 text-sm truncate ${isMe ? "font-semibold" : "text-white"}`} style={isMe ? { color: "var(--accent-soft)" } : undefined}>{entry.teamName}</span>
+                    <Logo url={entry.logoUrl} fallback={entry.logoEmoji} size={22} radius={7} />
+                    <span className={`flex-1 text-sm truncate ${isMe ? "font-semibold" : "text-white"}`} style={isMe ? { color: "var(--accent-soft)" } : undefined}>{entry.displayName}</span>
                     <span className="font-display text-white font-bold text-sm">{entry.totalFp.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 );

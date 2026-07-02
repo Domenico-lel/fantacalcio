@@ -67,6 +67,40 @@ export async function fetchTeams(): Promise<Team[]> {
   });
 }
 
+export interface StandingsTeamInfo {
+  displayName: string;    // nome da mostrare in classifica (override scelto in bacheca)
+  logoUrl: string | null; // logo del catalogo squadre
+}
+
+// Mappa per la Classifica: nome ufficiale (= fanta_teams.name, che coincide con il nome
+// scrapato da fantacalcio.it) → nome da mostrare + logo. L'override del nome viene dal
+// profilo del manager (team_name, modificato dall'admin in bacheca); così un rename in
+// bacheca si riflette anche sulla classifica principale finché fantacalcio.it non porta
+// i nomi ufficiali della nuova competizione.
+export async function fetchStandingsNameMap(): Promise<Record<string, StandingsTeamInfo>> {
+  if (!isSupabaseConfigured()) return {};
+  const db = createAdminClient();
+  const [{ data: teams }, { data: profiles }] = await Promise.all([
+    db.from("fanta_teams").select("id, name, logo_url"),
+    db.from("fanta_profiles").select("team_ref, team_name"),
+  ]);
+
+  // Nome scelto dal manager, per squadra (in caso di squadra condivisa prendo il primo).
+  const nameByTeam = new Map<string, string>();
+  for (const p of profiles ?? []) {
+    const tn = (p.team_name ?? "").trim();
+    if (!p.team_ref || !tn) continue;
+    if (!nameByTeam.has(p.team_ref)) nameByTeam.set(p.team_ref, tn);
+  }
+
+  const map: Record<string, StandingsTeamInfo> = {};
+  for (const t of teams ?? []) {
+    if (!t.name) continue;
+    map[t.name] = { displayName: nameByTeam.get(t.id) || t.name, logoUrl: t.logo_url };
+  }
+  return map;
+}
+
 export async function syncTeams(): Promise<{ count: number; error: string | null }> {
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { count: 0, error: "Solo l'admin può sincronizzare le squadre" };
