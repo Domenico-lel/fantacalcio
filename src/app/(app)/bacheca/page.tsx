@@ -944,6 +944,10 @@ function TeamAdminCard({ team, profiles, onTeamsChange }: { team: Team; profiles
     .join(", ");
   const managerLabel = managerNames || (team.maxManagers > 1 ? "Libera · 2 posti" : "Libera");
 
+  // Titolo card: il nome "mostrato" scelto in bacheca (team_name del profilo) ha la
+  // precedenza sul nome del catalogo, così un rename si riflette anche qui.
+  const displayName = profiles.map((p) => (p.teamName ?? "").trim()).find(Boolean) || team.name;
+
   return (
     <div className="card-flat overflow-hidden">
       <button onClick={toggle} className="w-full flex items-center gap-3 px-3 py-3 text-left">
@@ -951,7 +955,7 @@ function TeamAdminCard({ team, profiles, onTeamsChange }: { team: Team; profiles
           ? <img src={team.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-none" />
           : <span className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm truncate">{team.name}</p>
+          <p className="text-white font-semibold text-sm truncate">{displayName}</p>
           <p className="text-white/40 text-xs truncate">{managerLabel}</p>
         </div>
         {/* Posti occupati/capienza — evidenzia le squadre condivise */}
