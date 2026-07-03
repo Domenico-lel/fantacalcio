@@ -14,6 +14,26 @@ function authHeaders(): Record<string, string> {
   return { "X-Auth-Token": (process.env.FOOTBALL_DATA_API_KEY || "").trim() };
 }
 
+// Timeout richieste: senza limite un fetch bloccato appenderebbe la server action.
+const REQUEST_TIMEOUT_MS = 10_000;
+
+// Estrae il motivo reale da un fetch fallito. In Node (undici) `fetch failed`
+// nasconde la causa vera (DNS, TLS, connessione rifiutata, egress bloccato) in
+// `err.cause`; la superficie così l'admin sa perché non si riesce a contattare.
+function contactError(err: unknown): string {
+  const base = "Impossibile contattare football-data.org";
+  if (err instanceof DOMException && err.name === "TimeoutError") {
+    return `${base}: timeout dopo ${REQUEST_TIMEOUT_MS / 1000}s.`;
+  }
+  const cause = (err as { cause?: unknown })?.cause;
+  const reason =
+    (cause && typeof cause === "object" && "code" in cause && String((cause as { code: unknown }).code)) ||
+    (cause instanceof Error && cause.message) ||
+    (err instanceof Error && err.message) ||
+    "";
+  return reason ? `${base} (${reason}).` : `${base}.`;
+}
+
 type FDTeam = { name?: string; shortName?: string; crest?: string };
 type FDMatch = {
   id: number;
@@ -56,6 +76,7 @@ export async function fetchCompetitionMatches(
     const res = await fetch(`${BASE}/competitions/${encodeURIComponent(code)}/matches?${params}`, {
       headers: authHeaders(),
       next: { revalidate: 60 },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) {
@@ -68,8 +89,8 @@ export async function fetchCompetitionMatches(
       list = list.filter((m) => m.status === "SCHEDULED" || m.status === "TIMED").slice(0, 20);
     }
     return { matches: list.map(normalize), error: null };
-  } catch {
-    return { matches: [], error: "Impossibile contattare football-data.org." };
+  } catch (err) {
+    return { matches: [], error: contactError(err) };
   }
 }
 
@@ -82,6 +103,7 @@ export async function fetchMatchResult(
     const res = await fetch(`${BASE}/matches/${encodeURIComponent(eventId)}`, {
       headers: authHeaders(),
       cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) {
@@ -94,7 +116,7 @@ export async function fetchMatchResult(
     const w = m.score?.winner;
     const result = w === "HOME_TEAM" ? "1" : w === "AWAY_TEAM" ? "2" : w === "DRAW" ? "X" : null;
     return { finished: true, result, error: null };
-  } catch {
-    return { finished: false, result: null, error: "Impossibile contattare football-data.org." };
+  } catch (err) {
+    return { finished: false, result: null, error: contactError(err) };
   }
 }
