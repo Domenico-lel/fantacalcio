@@ -25,6 +25,12 @@ export interface FeedComment {
   mine: boolean;
 }
 
+export interface PostLiker {
+  userId: string;
+  name: string;
+  logo: string;
+}
+
 export interface FeedPost {
   id: string;
   authorName: string;
@@ -37,6 +43,7 @@ export interface FeedPost {
   createdAt: string;
   likeCount: number;
   likedByMe: boolean;
+  likers: PostLiker[];
   comments: FeedComment[];
 }
 
@@ -159,8 +166,23 @@ export async function fetchFeed(): Promise<{ posts: FeedPost[]; viewer: Viewer |
 
   const ids = posts.map((p) => p.id);
   const authorIds = [...new Set(posts.map((p) => p.author_id))];
-  const [{ data: likes }, { data: comments }, badgeRes] = await Promise.all([
-    db.from("fanta_post_likes").select("post_id, user_id").in("post_id", ids),
+
+  // like: prova con nome/logo denormalizzati; fallback se le colonne non sono migrate
+  let likesRes = await db
+    .from("fanta_post_likes")
+    .select("post_id, user_id, user_name, user_logo")
+    .in("post_id", ids);
+  if (likesRes.error && /user_name|user_logo|column|schema cache/i.test(likesRes.error.message)) {
+    likesRes = (await db.from("fanta_post_likes").select("post_id, user_id").in("post_id", ids)) as typeof likesRes;
+  }
+  const likes = (likesRes.data ?? []) as Array<{
+    post_id: string;
+    user_id: string;
+    user_name?: string | null;
+    user_logo?: string | null;
+  }>;
+
+  const [{ data: comments }, badgeRes] = await Promise.all([
     db.from("fanta_post_comments").select("*").in("post_id", ids).order("created_at", { ascending: true }),
     db.from("fanta_profiles").select("user_id, badges").in("user_id", authorIds),
   ]);
@@ -171,8 +193,30 @@ export async function fetchFeed(): Promise<{ posts: FeedPost[]; viewer: Viewer |
     for (const r of badgeRes.data ?? []) badgeByUser.set(r.user_id, normalizeBadges((r as { badges?: unknown }).badges));
   }
 
+  // nome/logo di chi ha messo like ai vecchi post (like senza denormalizzazione)
+  const likerName = new Map<string, string>();
+  const likerLogo = new Map<string, string>();
+  const likerIds = [...new Set(likes.map((l) => l.user_id))];
+  if (likerIds.length && likes.some((l) => !l.user_name)) {
+    const [{ data: profs }, { data: teams }] = await Promise.all([
+      db.from("fanta_profiles").select("user_id, first_name, team_name, team_ref, logo").in("user_id", likerIds),
+      db.from("fanta_teams").select("id, logo_url"),
+    ]);
+    const teamLogo = new Map<string, string>();
+    for (const t of teams ?? []) if (t.logo_url) teamLogo.set(t.id, t.logo_url);
+    for (const p of profs ?? []) {
+      likerName.set(p.user_id, p.team_name || p.first_name || "Manager");
+      likerLogo.set(p.user_id, (p.team_ref && teamLogo.get(p.team_ref)) || p.logo || "⚽");
+    }
+  }
+
   const feed: FeedPost[] = posts.map((p) => {
-    const postLikes = (likes ?? []).filter((l) => l.post_id === p.id);
+    const postLikes = likes.filter((l) => l.post_id === p.id);
+    const likers: PostLiker[] = postLikes.map((l) => ({
+      userId: l.user_id,
+      name: l.user_name || likerName.get(l.user_id) || "Manager",
+      logo: l.user_logo || likerLogo.get(l.user_id) || "⚽",
+    }));
     const postComments = (comments ?? [])
       .filter((c) => c.post_id === p.id)
       .map((c) => ({
@@ -195,6 +239,7 @@ export async function fetchFeed(): Promise<{ posts: FeedPost[]; viewer: Viewer |
       createdAt: p.created_at,
       likeCount: postLikes.length,
       likedByMe: postLikes.some((l) => l.user_id === viewer.userId),
+      likers,
       comments: postComments,
     };
   });
@@ -299,7 +344,17 @@ export async function toggleLike(postId: string): Promise<{ liked: boolean; erro
     return { liked: false, error: error?.message ?? null };
   }
 
-  const { error } = await db.from("fanta_post_likes").insert({ post_id: postId, user_id: viewer.userId });
+  const { error } = await db.from("fanta_post_likes").insert({
+    post_id: postId,
+    user_id: viewer.userId,
+    user_name: viewer.displayName,
+    user_logo: viewer.logo,
+  });
+  // fallback se le colonne nome/logo non sono ancora state migrate
+  if (error && /user_name|user_logo|column|schema cache/i.test(error.message)) {
+    const retry = await db.from("fanta_post_likes").insert({ post_id: postId, user_id: viewer.userId });
+    return { liked: !retry.error, error: retry.error?.message ?? null };
+  }
   return { liked: !error, error: error?.message ?? null };
 }
 

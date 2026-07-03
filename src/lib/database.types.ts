@@ -161,15 +161,21 @@ export interface Database {
           id: string;
           post_id: string;
           user_id: string;
+          user_name: string | null;
+          user_logo: string | null;
           created_at: string;
         };
         Insert: {
           post_id: string;
           user_id: string;
+          user_name?: string | null;
+          user_logo?: string | null;
         };
         Update: {
           post_id?: string;
           user_id?: string;
+          user_name?: string | null;
+          user_logo?: string | null;
         };
         Relationships: [];
       };

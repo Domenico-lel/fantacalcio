@@ -252,14 +252,21 @@ function PostCard({ post, viewer, reload, setPosts }: {
 }) {
   const confirm = useConfirm();
   const [showComments, setShowComments] = useState(false);
+  const [showLikers, setShowLikers] = useState(false);
   const [comment, setComment] = useState("");
   const [sending, setSending] = useState(false);
 
   async function onLike() {
-    // ottimistico
-    setPosts((prev) => prev.map((p) => p.id === post.id
-      ? { ...p, likedByMe: !p.likedByMe, likeCount: p.likeCount + (p.likedByMe ? -1 : 1) }
-      : p));
+    // ottimistico: aggiorna anche l'elenco di chi ha messo like
+    setPosts((prev) => prev.map((p) => {
+      if (p.id !== post.id) return p;
+      const nowLiked = !p.likedByMe;
+      const me = viewer?.userId ?? "me";
+      const likers = nowLiked
+        ? [...p.likers, { userId: me, name: viewer?.displayName ?? "Tu", logo: viewer?.logo ?? "⚽" }]
+        : p.likers.filter((l) => l.userId !== me);
+      return { ...p, likedByMe: nowLiked, likeCount: p.likeCount + (nowLiked ? 1 : -1), likers };
+    }));
     const res = await toggleLike(post.id);
     if (res.error) reload(); // rollback via refetch
   }
@@ -329,15 +336,38 @@ function PostCard({ post, viewer, reload, setPosts }: {
 
       {/* Azioni */}
       <div className="flex items-center gap-5 px-4 py-3 mt-1" style={{ borderTop: "1px solid var(--border)" }}>
-        <button onClick={onLike} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-          <span className="text-lg">{post.likedByMe ? "❤️" : "🤍"}</span>
-          <span className="text-white/70 text-sm font-semibold">{post.likeCount}</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={onLike} className="active:scale-90 transition-transform" aria-label="Mi piace">
+            <span className="text-lg">{post.likedByMe ? "❤️" : "🤍"}</span>
+          </button>
+          <button
+            onClick={() => post.likeCount > 0 && setShowLikers((s) => !s)}
+            disabled={post.likeCount === 0}
+            className="text-white/70 text-sm font-semibold disabled:cursor-default"
+            style={{ textDecoration: showLikers ? "underline" : "none" }}
+            aria-label="Chi ha messo mi piace"
+          >
+            {post.likeCount}
+          </button>
+        </div>
         <button onClick={() => setShowComments((s) => !s)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
           <span className="text-lg">💬</span>
           <span className="text-white/70 text-sm font-semibold">{post.comments.length}</span>
         </button>
       </div>
+
+      {/* Chi ha messo like */}
+      {showLikers && post.likers.length > 0 && (
+        <div className="px-4 pb-3 pt-3 flex flex-wrap gap-x-3 gap-y-2" style={{ borderTop: "1px solid var(--border)" }}>
+          <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wide w-full">Piace a</span>
+          {post.likers.map((l) => (
+            <span key={l.userId} className="flex items-center gap-1.5">
+              <Avatar src={l.logo} size={18} />
+              <span className="text-white/75 text-xs">{l.name}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Commenti */}
       {showComments && (
