@@ -46,10 +46,14 @@ export default function PronosticiPage() {
   const [tab, setTab] = useState<TabKey>("bet");
   const [data, setData] = useState<BetCenter | null>(null);
   const [loading, setLoading] = useState(true);
+  // scarto tra orologio del server e del dispositivo: (server - client) al momento del fetch.
+  // Serve a chiudere le scommesse sull'ora del server, non su quella (potenzialmente sballata) del telefono.
+  const [clockOffset, setClockOffset] = useState(0);
 
   const load = useCallback(async () => {
     try {
       const d = await fetchBetCenter();
+      setClockOffset(d.serverNow - Date.now());
       setData(d);
     } catch {
       // network/server error — lascia data null
@@ -90,7 +94,7 @@ export default function PronosticiPage() {
       </PageHeader>
 
       <TabPanel tabKey={tab} keys={tabKeys}>
-        {tab === "bet" ? <BetTab data={data} loading={loading} reload={load} />
+        {tab === "bet" ? <BetTab data={data} loading={loading} reload={load} clockOffset={clockOffset} />
           : tab === "rank" ? <RankTab leaderboard={data?.leaderboard ?? []} loading={loading} />
           : isAdmin ? <AdminTab rounds={data?.rounds ?? []} leaderboard={data?.leaderboard ?? []} reload={load} />
           : null}
@@ -101,7 +105,7 @@ export default function PronosticiPage() {
 
 /* ─── TAB SCOMMETTI ─────────────────────────────────────────────────────── */
 
-function BetTab({ data, loading, reload }: { data: BetCenter | null; loading: boolean; reload: () => Promise<void> }) {
+function BetTab({ data, loading, reload, clockOffset }: { data: BetCenter | null; loading: boolean; reload: () => Promise<void>; clockOffset: number }) {
   const rounds = data?.rounds ?? [];
   const canBet = !!data?.viewer && !data.viewer.isAdmin && data.viewer.hasProfile;
 
@@ -132,7 +136,7 @@ function BetTab({ data, loading, reload }: { data: BetCenter | null; loading: bo
           </div>
           {r.matches.length === 0 && <p className="text-white/35 text-xs">Nessuno scontro inserito.</p>}
           {r.matches.map((m) => (
-            <MatchBetCard key={m.id} match={m} roundStatus={r.status} canBet={canBet} balance={data?.balance ?? 0} reload={reload} />
+            <MatchBetCard key={m.id} match={m} roundStatus={r.status} canBet={canBet} balance={data?.balance ?? 0} reload={reload} clockOffset={clockOffset} />
           ))}
         </div>
       ))}
@@ -153,16 +157,18 @@ function RoundBadge({ status }: { status: BetRound["status"] }) {
   );
 }
 
-function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
-  match: BetMatch; roundStatus: BetRound["status"]; canBet: boolean; balance: number; reload: () => Promise<void>;
+function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset }: {
+  match: BetMatch; roundStatus: BetRound["status"]; canBet: boolean; balance: number; reload: () => Promise<void>; clockOffset: number;
 }) {
   const [pick, setPick] = useState<Pick | null>(match.myBet?.pick ?? null);
   const [stake, setStake] = useState<string>(match.myBet ? String(match.myBet.stake) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // partita iniziata: niente più giocate (allineato al controllo server)
-  const started = !!match.kickoff && new Date(match.kickoff).getTime() <= Date.now();
+  // partita iniziata: niente più giocate (allineato al controllo server).
+  // Uso l'ora del server (Date.now() + scarto d'orologio) per non bloccare per errore
+  // chi ha l'orologio del telefono in anticipo rispetto al server.
+  const started = !!match.kickoff && new Date(match.kickoff).getTime() <= Date.now() + clockOffset;
   // una volta piazzata, la giocata non è più modificabile
   const locked = !!match.result || roundStatus !== "open" || !canBet || !!match.myBet || started;
   const stakeNum = parseInt(stake || "0", 10);

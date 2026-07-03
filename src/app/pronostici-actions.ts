@@ -72,6 +72,7 @@ export interface BetCenter {
   balance: number;
   rounds: BetRound[];
   leaderboard: CreditRow[];
+  serverNow: number; // ora del server (ms epoch) per calcolare lo scarto d'orologio del client
 }
 
 // ─── Helper crediti ──────────────────────────────────────────────────────────
@@ -112,7 +113,7 @@ function oddFor(match: { odd_1: number; odd_x: number; odd_2: number }, pick: Pi
 // ─── Lettura: centro scommesse ───────────────────────────────────────────────
 
 export async function fetchBetCenter(): Promise<BetCenter> {
-  const empty: BetCenter = { viewer: null, balance: 0, rounds: [], leaderboard: [] };
+  const empty: BetCenter = { viewer: null, balance: 0, rounds: [], leaderboard: [], serverNow: Date.now() };
   if (!isSupabaseConfigured()) return empty;
 
   const viewer = await getCurrentViewer();
@@ -246,7 +247,7 @@ export async function fetchBetCenter(): Promise<BetCenter> {
   }
   const leaderboard: CreditRow[] = Array.from(rowByTeam.values()).sort((a, b) => b.balance - a.balance);
 
-  return { viewer, balance, rounds: roundList, leaderboard };
+  return { viewer, balance, rounds: roundList, leaderboard, serverNow: Date.now() };
 }
 
 // ─── Scommessa (manager) ─────────────────────────────────────────────────────
