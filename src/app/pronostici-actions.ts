@@ -2,7 +2,9 @@
 
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import { getCurrentViewer, type Viewer } from "@/app/social-actions";
-import { STARTING_CREDITS } from "@/lib/bet-constants";
+import { STARTING_CREDITS, FOOTBALL_COMPETITIONS, type ExtMatch } from "@/lib/bet-constants";
+import { fetchCompetitionMatches, fetchMatchResult } from "@/lib/football-data";
+import { annotateWithOdds } from "@/lib/odds-api";
 
 type Pick = "1" | "X" | "2";
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -36,6 +38,9 @@ export interface BetMatch {
   awayName: string;
   homeLogo: string;
   awayLogo: string;
+  competition: string | null; // valorizzato per le partite reali
+  kickoff: string | null;     // data/ora ISO della partita reale
+  external: boolean;          // true = partita reale (non squadre della lega)
   odd1: number;
   oddX: number;
   odd2: number;
@@ -175,8 +180,11 @@ export async function fetchBetCenter(): Promise<BetCenter> {
       id: m.id,
       homeName: m.home_name,
       awayName: m.away_name,
-      homeLogo: (m.home_team && logoByTeam.get(m.home_team)) || "⚽",
-      awayLogo: (m.away_team && logoByTeam.get(m.away_team)) || "⚽",
+      homeLogo: m.home_logo || (m.home_team && logoByTeam.get(m.home_team)) || "⚽",
+      awayLogo: m.away_logo || (m.away_team && logoByTeam.get(m.away_team)) || "⚽",
+      competition: m.competition ?? null,
+      kickoff: m.kickoff ?? null,
+      external: !!(m.ext_event_id || m.competition),
       odd1: Number(m.odd_1),
       oddX: Number(m.odd_x),
       odd2: Number(m.odd_2),
@@ -403,6 +411,95 @@ export async function addBetMatch(input: {
   });
   await refreshRoundStatus(db, input.roundId);
   return { error: error?.message ?? null };
+}
+
+// ─── Partite reali (football-data.org) ───────────────────────────────────────
+
+// Cerca le partite di una competizione (per giornata o le prossime in programma).
+export async function fetchFootballMatches(
+  code: string,
+  matchday?: number
+): Promise<{ matches: ExtMatch[]; error: string | null }> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) return { matches: [], error: "Solo l'admin" };
+  const res = await fetchCompetitionMatches(code, matchday);
+  if (res.error || res.matches.length === 0) return res;
+  // pre-compila le quote 1/X/2 dai bookmaker, quando disponibili
+  const oddsKey = FOOTBALL_COMPETITIONS.find((c) => c.code === code)?.oddsKey;
+  const matches = await annotateWithOdds(res.matches, oddsKey);
+  return { matches, error: null };
+}
+
+// Aggiunge alla giornata uno scontro su una partita reale (da provider o manuale).
+export async function addExternalBetMatch(input: {
+  roundId: string;
+  homeName: string;
+  awayName: string;
+  homeLogo?: string | null;
+  awayLogo?: string | null;
+  competition?: string | null;
+  eventId?: string | null;
+  kickoff?: string | null;
+  odd1: number;
+  oddX: number;
+  odd2: number;
+}): Promise<{ error: string | null }> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) return { error: "Solo l'admin" };
+  const home = input.homeName.trim();
+  const away = input.awayName.trim();
+  if (!home || !away) return { error: "Inserisci entrambe le squadre" };
+  for (const o of [input.odd1, input.oddX, input.odd2]) {
+    if (!Number.isFinite(o) || o < 1) return { error: "Quote non valide (minimo 1.00)" };
+  }
+
+  const db = createAdminClient();
+  const { error } = await db.from("fanta_bet_matches").insert({
+    round_id: input.roundId,
+    home_name: home,
+    away_name: away,
+    home_logo: input.homeLogo?.trim() || null,
+    away_logo: input.awayLogo?.trim() || null,
+    competition: input.competition?.trim() || null,
+    ext_event_id: input.eventId?.trim() || null,
+    kickoff: input.kickoff || null,
+    odd_1: input.odd1,
+    odd_x: input.oddX,
+    odd_2: input.odd2,
+  });
+  if (error) {
+    if (/home_logo|away_logo|competition|ext_event_id|kickoff|column|schema cache/i.test(error.message)) {
+      return { error: "Colonne mancanti: esegui supabase-bet-external-migration.sql su Supabase." };
+    }
+    return { error: error.message };
+  }
+  await refreshRoundStatus(db, input.roundId);
+  return { error: null };
+}
+
+// Aggiorna i risultati delle partite reali della giornata dal provider e salda le giocate.
+export async function syncRoundResults(roundId: string): Promise<{ settled: number; error: string | null }> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) return { settled: 0, error: "Solo l'admin" };
+
+  const db = createAdminClient();
+  const { data: matches } = await db.from("fanta_bet_matches").select("*").eq("round_id", roundId);
+  const pending = (matches ?? []).filter((m) => m.ext_event_id && !m.result);
+  if (pending.length === 0) return { settled: 0, error: "Nessuna partita reale da aggiornare." };
+
+  let settled = 0;
+  let lastErr: string | null = null;
+  for (const m of pending) {
+    const r = await fetchMatchResult(m.ext_event_id as string);
+    if (r.error) { lastErr = r.error; continue; }
+    if (!r.finished || !r.result) continue;
+    await settleMatch(db, m.id, r.result);
+    await db.from("fanta_bet_matches").update({ result: r.result, settled_at: new Date().toISOString() }).eq("id", m.id);
+    settled++;
+  }
+  await refreshRoundStatus(db, roundId);
+  if (settled === 0) return { settled: 0, error: lastErr ?? "Nessuna partita ancora terminata." };
+  return { settled, error: null };
 }
 
 export async function updateMatchOdds(matchId: string, odd1: number, oddX: number, odd2: number): Promise<{ error: string | null }> {

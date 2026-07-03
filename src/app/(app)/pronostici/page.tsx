@@ -5,10 +5,11 @@ import {
   fetchBetCenter, placeBet, setMatchResult,
   createBetRound, setRoundStatus, deleteBetRound, addBetMatch, deleteBetMatch, adjustCredits,
   updateMatchOdds, adminDeleteBet,
+  fetchFootballMatches, addExternalBetMatch, syncRoundResults,
   type BetCenter, type BetRound, type BetMatch, type CreditRow,
 } from "@/app/pronostici-actions";
 import { fetchTeams, type Team } from "@/app/teams-actions";
-import { STARTING_CREDITS } from "@/lib/bet-constants";
+import { STARTING_CREDITS, FOOTBALL_COMPETITIONS, type ExtMatch } from "@/lib/bet-constants";
 import { isImageAvatar } from "@/lib/avatar";
 import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
@@ -32,6 +33,13 @@ function Avatar({ src, size }: { src: string; size: number }) {
 
 function fmtOdd(o: number) {
   return o.toFixed(2);
+}
+
+function fmtKickoff(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function PronosticiPage() {
@@ -173,6 +181,17 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
 
   return (
     <div className="card p-4">
+      {/* competizione + orario (partite reali) */}
+      {match.competition && (
+        <div className="flex items-center gap-2 mb-2.5">
+          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+            style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent-soft)" }}>
+            {match.competition}
+          </span>
+          {match.kickoff && <span className="text-white/35 text-[10px]">{fmtKickoff(match.kickoff)}</span>}
+        </div>
+      )}
+
       {/* squadre */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -316,24 +335,85 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
 
 function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team[]; reload: () => Promise<void> }) {
   const confirm = useConfirm();
+  const [mode, setMode] = useState<"league" | "real">("league");
+
+  // modalità squadre lega
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
+
+  // modalità partita reale
+  const [comp, setComp] = useState<string>(FOOTBALL_COMPETITIONS[0].code);
+  const [matchday, setMatchday] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [found, setFound] = useState<ExtMatch[]>([]);
+  const [sel, setSel] = useState<ExtMatch | null>(null);
+  const [rHome, setRHome] = useState("");
+  const [rAway, setRAway] = useState("");
+
+  // quote (comuni alle due modalità)
   const [o1, setO1] = useState("2.00");
   const [ox, setOx] = useState("3.00");
   const [o2, setO2] = useState("2.00");
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
 
-  async function add() {
+  const hasExternal = round.matches.some((m) => m.external);
+  const odds = () => ({ odd1: parseFloat(o1), oddX: parseFloat(ox), odd2: parseFloat(o2) });
+
+  async function addLeague() {
     if (!home || !away) { setErr("Scegli le due squadre"); return; }
     setBusy(true); setErr("");
-    const res = await addBetMatch({
-      roundId: round.id, homeTeamId: home, awayTeamId: away,
-      odd1: parseFloat(o1), oddX: parseFloat(ox), odd2: parseFloat(o2),
-    });
+    const res = await addBetMatch({ roundId: round.id, homeTeamId: home, awayTeamId: away, ...odds() });
     setBusy(false);
     if (res.error) { setErr(res.error); return; }
     setHome(""); setAway("");
+    await reload();
+  }
+
+  async function search() {
+    setSearching(true); setErr(""); setFound([]); setSel(null); setRHome(""); setRAway("");
+    const res = await fetchFootballMatches(comp, matchday ? parseInt(matchday, 10) : undefined);
+    setSearching(false);
+    if (res.error) { setErr(res.error); return; }
+    if (res.matches.length === 0) { setErr("Nessuna partita trovata per questa selezione."); return; }
+    setFound(res.matches);
+  }
+
+  function pickMatch(m: ExtMatch) {
+    setSel(m); setRHome(m.homeName); setRAway(m.awayName); setErr("");
+    // pre-compila le quote se il provider le ha trovate (restano modificabili)
+    if (m.odd1 && m.oddX && m.odd2) {
+      setO1(m.odd1.toFixed(2)); setOx(m.oddX.toFixed(2)); setO2(m.odd2.toFixed(2));
+    }
+  }
+
+  async function addReal() {
+    if (!rHome.trim() || !rAway.trim()) { setErr("Inserisci entrambe le squadre"); return; }
+    setBusy(true); setErr("");
+    const compName = sel?.competition || FOOTBALL_COMPETITIONS.find((c) => c.code === comp)?.name || null;
+    const res = await addExternalBetMatch({
+      roundId: round.id,
+      homeName: rHome, awayName: rAway,
+      homeLogo: sel?.homeLogo ?? null, awayLogo: sel?.awayLogo ?? null,
+      competition: compName,
+      eventId: sel?.eventId ?? null,
+      kickoff: sel?.kickoff ?? null,
+      ...odds(),
+    });
+    setBusy(false);
+    if (res.error) { setErr(res.error); return; }
+    setSel(null); setRHome(""); setRAway(""); setFound([]);
+    await reload();
+  }
+
+  async function sync() {
+    setSyncing(true); setSyncMsg("");
+    const res = await syncRoundResults(round.id);
+    setSyncing(false);
+    setSyncMsg(res.error ?? `Aggiornate ${res.settled} partite.`);
     await reload();
   }
 
@@ -345,6 +425,11 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
           <RoundBadge status={round.status} />
         </div>
         <div className="flex items-center gap-1.5">
+          {hasExternal && round.status !== "settled" && (
+            <button onClick={sync} disabled={syncing} className="btn-soft px-2.5 py-1.5 text-[11px]">
+              {syncing ? "…" : "↻ Risultati"}
+            </button>
+          )}
           {round.status !== "settled" && (
             <button onClick={async () => { await setRoundStatus(round.id, round.status === "open" ? "closed" : "open"); await reload(); }}
               className="btn-soft px-2.5 py-1.5 text-[11px]">
@@ -356,26 +441,91 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
         </div>
       </div>
 
+      {syncMsg && <p className="text-white/60 text-xs">{syncMsg}</p>}
+
       {/* scontri esistenti */}
       {round.matches.map((m) => <AdminMatchRow key={m.id} match={m} reload={reload} />)}
 
       {/* nuovo scontro */}
-      <div className="card-accent px-3 py-3 flex flex-col gap-2" style={{ borderRadius: 14 }}>
-        <div className="flex gap-2">
-          <select value={home} onChange={(e) => setHome(e.target.value)} className="input flex-1 min-w-0 px-2 py-2 text-xs">
-            <option value="">Casa…</option>
-            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          <select value={away} onChange={(e) => setAway(e.target.value)} className="input flex-1 min-w-0 px-2 py-2 text-xs">
-            <option value="">Ospite…</option>
-            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+      <div className="card-accent px-3 py-3 flex flex-col gap-2.5" style={{ borderRadius: 14 }}>
+        {/* toggle modalità */}
+        <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.05)" }}>
+          {([["league", "Squadre lega"], ["real", "Partita reale"]] as const).map(([key, label]) => (
+            <button key={key} onClick={() => { setMode(key); setErr(""); }}
+              className="flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+              style={{
+                background: mode === key ? "var(--accent-grad)" : "transparent",
+                color: mode === key ? "var(--accent-ink)" : "var(--text-dim)",
+              }}>{label}</button>
+          ))}
         </div>
+
+        {mode === "league" ? (
+          <div className="flex gap-2">
+            <select value={home} onChange={(e) => setHome(e.target.value)} className="input flex-1 min-w-0 px-2 py-2 text-xs">
+              <option value="">Casa…</option>
+              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <select value={away} onChange={(e) => setAway(e.target.value)} className="input flex-1 min-w-0 px-2 py-2 text-xs">
+              <option value="">Ospite…</option>
+              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        ) : (
+          <>
+            {/* ricerca partite reali: competizione + giornata (vuoto = prossime) */}
+            <div className="flex gap-2">
+              <select value={comp} onChange={(e) => setComp(e.target.value)} className="input flex-1 min-w-0 px-2 py-2 text-xs">
+                {FOOTBALL_COMPETITIONS.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </select>
+              <input value={matchday} onChange={(e) => setMatchday(e.target.value)} inputMode="numeric" placeholder="Giorn."
+                className="input w-16 px-2 py-2 text-xs text-center" />
+              <button onClick={search} disabled={searching} className="btn-soft px-3 py-2 text-xs">{searching ? "…" : "Cerca"}</button>
+            </div>
+
+            {found.length > 0 && (
+              <div className="flex flex-col gap-1 overflow-auto pr-0.5" style={{ maxHeight: 208 }}>
+                {found.map((m) => (
+                  <button key={m.eventId} onClick={() => pickMatch(m)}
+                    className="flex flex-col gap-1 px-2 py-1.5 rounded-lg text-left transition-all"
+                    style={{
+                      background: sel?.eventId === m.eventId ? "color-mix(in srgb, var(--accent) 18%, transparent)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${sel?.eventId === m.eventId ? "var(--accent)" : "transparent"}`,
+                    }}>
+                    <div className="flex items-center gap-2 w-full">
+                      <Avatar src={m.homeLogo || "⚽"} size={16} />
+                      <span className="text-white/85 text-[11px] flex-1 truncate">{m.homeName} <span className="text-white/30">-</span> {m.awayName}</span>
+                      <Avatar src={m.awayLogo || "⚽"} size={16} />
+                    </div>
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-white/35 text-[9px]">{fmtKickoff(m.kickoff)}</span>
+                      {m.odd1 && m.oddX && m.odd2 ? (
+                        <span className="text-[9px] font-bold ml-auto" style={{ color: "var(--accent-soft)" }}>
+                          {m.odd1.toFixed(2)} · {m.oddX.toFixed(2)} · {m.odd2.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-white/25 text-[9px] ml-auto">quote n/d</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* nomi: auto-compilati dalla partita scelta, oppure a mano */}
+            <div className="flex gap-2">
+              <input value={rHome} onChange={(e) => setRHome(e.target.value)} placeholder="Casa" className="input flex-1 min-w-0 px-2 py-2 text-xs" />
+              <input value={rAway} onChange={(e) => setRAway(e.target.value)} placeholder="Ospite" className="input flex-1 min-w-0 px-2 py-2 text-xs" />
+            </div>
+          </>
+        )}
+
+        {/* quote + aggiungi (comuni) */}
         <div className="flex gap-2 items-center">
           <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
           <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
           <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
-          <button onClick={add} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
+          <button onClick={mode === "league" ? addLeague : addReal} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
         </div>
         {err && <p className="text-red-400 text-xs">{err}</p>}
       </div>
@@ -400,6 +550,15 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
 
   return (
     <div className="card-flat px-3 py-2.5">
+      {m.competition && (
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+            style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent-soft)" }}>
+            {m.competition}
+          </span>
+          {m.kickoff && <span className="text-white/30 text-[9px]">{fmtKickoff(m.kickoff)}</span>}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2">
         <span className="text-white text-xs font-semibold truncate flex-1">{m.homeName} <span className="text-white/30">vs</span> {m.awayName}</span>
         <button

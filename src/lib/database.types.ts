@@ -316,6 +316,11 @@ export interface Database {
           away_team: string | null;
           home_name: string;
           away_name: string;
+          home_logo: string | null;
+          away_logo: string | null;
+          competition: string | null;
+          ext_event_id: string | null;
+          kickoff: string | null;
           odd_1: number;
           odd_x: number;
           odd_2: number;
@@ -329,6 +334,11 @@ export interface Database {
           away_team?: string | null;
           home_name: string;
           away_name: string;
+          home_logo?: string | null;
+          away_logo?: string | null;
+          competition?: string | null;
+          ext_event_id?: string | null;
+          kickoff?: string | null;
           odd_1?: number;
           odd_x?: number;
           odd_2?: number;
@@ -340,6 +350,11 @@ export interface Database {
           away_team?: string | null;
           home_name?: string;
           away_name?: string;
+          home_logo?: string | null;
+          away_logo?: string | null;
+          competition?: string | null;
+          ext_event_id?: string | null;
+          kickoff?: string | null;
           odd_1?: number;
           odd_x?: number;
           odd_2?: number;
