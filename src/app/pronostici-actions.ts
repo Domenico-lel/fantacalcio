@@ -76,20 +76,33 @@ export interface BetCenter {
 
 // ─── Helper crediti ──────────────────────────────────────────────────────────
 
-async function getBalance(db: AdminClient, userId: string): Promise<number> {
-  const { data } = await db.from("fanta_credits").select("balance").eq("user_id", userId).maybeSingle();
+// La "cassa crediti" di un manager è la sua squadra: i comproprietari di una
+// squadra condivisa (doppio) condividono lo stesso saldo. Chi non ha una squadra
+// fa cassa a sé (fallback all'user_id, usato anche dagli aggiustamenti admin).
+async function creditAccountKey(db: AdminClient, userId: string): Promise<string> {
+  const { data } = await db.from("fanta_profiles").select("team_ref").eq("user_id", userId).maybeSingle();
+  return data?.team_ref || userId;
+}
+
+async function getBalanceByKey(db: AdminClient, key: string): Promise<number> {
+  const { data } = await db.from("fanta_credits").select("balance").eq("user_id", key).maybeSingle();
   if (data) return data.balance;
-  await db.from("fanta_credits").insert({ user_id: userId, balance: STARTING_CREDITS });
+  await db.from("fanta_credits").insert({ user_id: key, balance: STARTING_CREDITS });
   return STARTING_CREDITS;
+}
+
+async function getBalance(db: AdminClient, userId: string): Promise<number> {
+  return getBalanceByKey(db, await creditAccountKey(db, userId));
 }
 
 async function addBalance(db: AdminClient, userId: string, delta: number): Promise<void> {
   if (!delta) return;
-  const bal = await getBalance(db, userId);
+  const key = await creditAccountKey(db, userId);
+  const bal = await getBalanceByKey(db, key);
   await db
     .from("fanta_credits")
     .update({ balance: Math.max(0, bal + delta), updated_at: new Date().toISOString() })
-    .eq("user_id", userId);
+    .eq("user_id", key);
 }
 
 function oddFor(match: { odd_1: number; odd_x: number; odd_2: number }, pick: Pick): number {
@@ -205,21 +218,33 @@ export async function fetchBetCenter(): Promise<BetCenter> {
     matches: matchesByRound.get(r.id) ?? [],
   }));
 
-  // classifica crediti — solo manager con una squadra assegnata
-  // (l'admin ha un profilo senza team_ref e non è in gara)
-  const balByUser = new Map<string, number>();
-  for (const c of credits ?? []) balByUser.set(c.user_id, c.balance);
+  // classifica crediti — una riga per squadra assegnata (l'admin non è in gara).
+  // I comproprietari di una squadra condivisa (doppio) condividono la stessa
+  // cassa: il saldo è per team_ref, quindi la squadra appare una sola volta.
+  const balByAccount = new Map<string, number>();
+  for (const c of credits ?? []) balByAccount.set(c.user_id, c.balance);
 
-  const leaderboard: CreditRow[] = (profiles ?? [])
-    .filter((p) => !!p.team_ref)
-    .map((p) => ({
-      userId: p.user_id,
+  // squadra del viewer, per evidenziare la propria riga anche da comproprietario
+  const viewerTeam = (profiles ?? []).find((p) => p.user_id === viewer.userId)?.team_ref ?? null;
+
+  const rowByTeam = new Map<string, CreditRow>();
+  for (const p of profiles ?? []) {
+    if (!p.team_ref) continue;
+    const existing = rowByTeam.get(p.team_ref);
+    if (existing) {
+      if (viewerTeam && p.team_ref === viewerTeam) existing.mine = true;
+      if ((!existing.name || existing.name === "Manager") && p.team_name) existing.name = p.team_name;
+      continue;
+    }
+    rowByTeam.set(p.team_ref, {
+      userId: p.team_ref, // la cassa è la squadra
       name: p.team_name || p.first_name || "Manager",
-      logo: (p.team_ref && logoByTeam.get(p.team_ref)) || p.logo || "⚽",
-      balance: balByUser.get(p.user_id) ?? STARTING_CREDITS,
-      mine: p.user_id === viewer.userId,
-    }))
-    .sort((a, b) => b.balance - a.balance);
+      logo: logoByTeam.get(p.team_ref) || p.logo || "⚽",
+      balance: balByAccount.get(p.team_ref) ?? STARTING_CREDITS,
+      mine: !!viewerTeam && p.team_ref === viewerTeam,
+    });
+  }
+  const leaderboard: CreditRow[] = Array.from(rowByTeam.values()).sort((a, b) => b.balance - a.balance);
 
   return { viewer, balance, rounds: roundList, leaderboard };
 }
@@ -256,15 +281,10 @@ export async function placeBet(matchId: string, pick: Pick, stake: number): Prom
   if (balance < stake) return { error: `Crediti insufficienti (hai ${balance})` };
 
   const odd = Number(oddFor(match, pick));
-  const newBalance = balance - stake;
-  await db
-    .from("fanta_credits")
-    .update({ balance: newBalance, updated_at: new Date().toISOString() })
-    .eq("user_id", viewer.userId);
-
+  await addBalance(db, viewer.userId, -stake); // scala dalla cassa condivisa della squadra
   await db.from("fanta_bets").insert({ match_id: matchId, user_id: viewer.userId, pick, stake, odd });
 
-  return { error: null, balance: newBalance };
+  return { error: null, balance: balance - stake };
 }
 
 // ─── Settlement (admin) ──────────────────────────────────────────────────────
