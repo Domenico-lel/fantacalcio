@@ -161,8 +161,10 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // partita iniziata: niente più giocate (allineato al controllo server)
+  const started = !!match.kickoff && new Date(match.kickoff).getTime() <= Date.now();
   // una volta piazzata, la giocata non è più modificabile
-  const locked = !!match.result || roundStatus !== "open" || !canBet || !!match.myBet;
+  const locked = !!match.result || roundStatus !== "open" || !canBet || !!match.myBet || started;
   const stakeNum = parseInt(stake || "0", 10);
   const odd = pick === "1" ? match.odd1 : pick === "X" ? match.oddX : pick === "2" ? match.odd2 : 0;
   const potential = pick && stakeNum > 0 ? Math.round(stakeNum * odd) : 0;
@@ -242,6 +244,11 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload }: {
           {match.myBet.status === "lost" && <span className="text-red-400 text-xs font-bold">Persa</span>}
           {match.myBet.status === "pending" && <span className="text-white/50 text-xs">poss. {Math.round(match.myBet.stake * match.myBet.odd)}</span>}
         </div>
+      )}
+
+      {/* partita già iniziata: scommesse chiuse (solo se non hai già giocato) */}
+      {started && !match.myBet && !match.result && (
+        <p className="mt-3 text-white/45 text-xs flex items-center gap-1.5">🔒 Partita iniziata — scommesse chiuse</p>
       )}
 
       {/* form puntata */}
@@ -579,23 +586,33 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
         </div>
       )}
 
-      {/* risultato */}
-      <div className="flex items-center gap-1.5 mt-2">
-        {(["1", "X", "2"] as Pick[]).map((p) => (
-          <button key={p} onClick={async () => { await setMatchResult(m.id, p); await reload(); }}
-            className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
-            style={{
-              background: m.result === p ? "var(--accent-grad)" : "rgba(255,255,255,0.06)",
-              color: m.result === p ? "var(--accent-ink)" : "var(--text-dim)",
-              border: `1px solid ${m.result === p ? "var(--accent)" : "var(--border)"}`,
-            }}>{PICK_LABELS[p]}</button>
-        ))}
+      {/* risultato: l'admin dichiara chi ha vinto → salda subito le giocate */}
+      <p className="text-white/45 text-[10px] mt-2.5 mb-1">
+        {m.result ? "Risultato — tocca per cambiare, oppure annulla" : "Chi ha vinto? Imposta il risultato e salda le giocate"}
+      </p>
+      <div className="flex items-center gap-1.5">
+        {(["1", "X", "2"] as Pick[]).map((p) => {
+          const caption = p === "1" ? m.homeName : p === "2" ? m.awayName : "Pareggio";
+          const on = m.result === p;
+          return (
+            <button key={p} onClick={async () => { await setMatchResult(m.id, p); await reload(); }}
+              className="flex-1 min-w-0 flex flex-col items-center py-1.5 rounded-lg transition-all"
+              style={{
+                background: on ? "var(--accent-grad)" : "rgba(255,255,255,0.06)",
+                color: on ? "var(--accent-ink)" : "var(--text-dim)",
+                border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
+              }}>
+              <span className="text-xs font-bold leading-none">{PICK_LABELS[p]}</span>
+              <span className="text-[9px] leading-tight truncate max-w-full mt-0.5 opacity-80">{caption}</span>
+            </button>
+          );
+        })}
         {m.result && (
           <button onClick={async () => { await setMatchResult(m.id, null); await reload(); }}
-            className="btn-soft px-2 py-1.5 text-[11px]">annulla</button>
+            className="btn-soft px-2 py-1.5 text-[11px] flex-none">annulla</button>
         )}
         <button onClick={async () => { if (await confirm({ title: "Eliminare lo scontro?", confirmLabel: "Elimina", danger: true })) { await deleteBetMatch(m.id); await reload(); } }}
-          className="btn-danger-soft tap text-[13px]">✕</button>
+          className="btn-danger-soft tap text-[13px] flex-none">✕</button>
       </div>
 
       {err && <p className="text-red-400 text-xs mt-1.5">{err}</p>}

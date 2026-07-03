@@ -268,6 +268,11 @@ export async function placeBet(matchId: string, pick: Pick, stake: number): Prom
   const { data: round } = await db.from("fanta_bet_rounds").select("status").eq("id", match.round_id).maybeSingle();
   if (round?.status !== "open") return { error: "Scommesse chiuse per questa giornata" };
 
+  // niente giocate dopo il calcio d'inizio della partita reale
+  if (match.kickoff && new Date(match.kickoff).getTime() <= Date.now()) {
+    return { error: "Partita già iniziata: scommesse chiuse" };
+  }
+
   // una giocata già piazzata non si può più modificare
   const { data: existing } = await db
     .from("fanta_bets")
@@ -518,7 +523,12 @@ export async function syncRoundResults(roundId: string): Promise<{ settled: numb
     settled++;
   }
   await refreshRoundStatus(db, roundId);
-  if (settled === 0) return { settled: 0, error: lastErr ?? "Nessuna partita ancora terminata." };
+  if (settled === 0) {
+    return {
+      settled: 0,
+      error: lastErr ?? "football-data.org non ha ancora pubblicato i risultati finali. Puoi impostare il vincitore a mano con i tasti 1 / X / 2.",
+    };
+  }
   return { settled, error: null };
 }
 
