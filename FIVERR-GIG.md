@@ -132,6 +132,11 @@ Italiano e inglese.
 
 ## 8) Immagini della galleria  *(consigli per la gallery del Gig)*
 
+> ✅ **Copertina già pronta:** `fiverr-assets/fiverr-cover.png` (1280×769 @2x, formato
+> consigliato da Fiverr). Mostra 3 telefoni con le schermate dell'app (Mercato, Classifica,
+> Bacheca), il rating 4.8 e le funzionalità chiave. I nomi squadra sono inventati per privacy.
+> Sorgente modificabile: `fiverr-assets/fiverr-cover.html`.
+
 La prima immagine è la più importante: deve comunicare "app mobile" in un colpo d'occhio.
 - **Immagine 1 (copertina):** mockup di 2–3 smartphone con le schermate dell'app + titolo grande tipo *"App Mobile per iOS & Android"* (stile simile all'esempio che hai visto).
 - **Immagine 2:** primo piano di una singola schermata dell'app (es. la bacheca o la classifica).
