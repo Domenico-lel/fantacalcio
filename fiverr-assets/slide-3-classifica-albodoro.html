@@ -1,0 +1,185 @@
+<style>
+  :root{
+    --navy:#070b14; --navy2:#0a1122; --surface:#111a2b; --surface2:#182339;
+    --border:rgba(160,178,214,.14); --border2:rgba(160,178,214,.26);
+    --text:#f4f7fd; --dim:rgba(214,226,248,.62); --faint:rgba(214,226,248,.34);
+    --orange:#fb923c; --purple:#a78bfa; --mint:#2dd4a7; --yellow:#fbbf24; --blue:#38bdf8;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  .stage{position:relative;width:1280px;height:769px;overflow:hidden;font-family:var(--sans);color:var(--text);
+    background:radial-gradient(140% 90% at 50% -10%, #12203f 0%, #0a1122 42%, #060a15 100%);
+    display:flex;flex-direction:column;padding:30px 60px 24px;}
+  .glow{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}
+  .g1{width:520px;height:520px;left:-60px;top:200px;background:var(--purple);opacity:.20}
+  .g2{width:460px;height:460px;right:-40px;top:260px;background:var(--yellow);opacity:.14}
+  .g3{width:340px;height:340px;left:50%;bottom:-130px;transform:translateX(-50%);background:var(--purple);opacity:.10}
+  .grid{position:absolute;inset:0;opacity:.05;pointer-events:none;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:44px 44px;mask-image:radial-gradient(80% 70% at 50% 25%,#000,transparent 85%)}
+
+  .top{position:relative;z-index:3;display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--mint)}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 12px var(--mint)}
+  h1{margin-top:12px;font-size:44px;line-height:1.04;font-weight:800;letter-spacing:-.02em;text-wrap:balance;max-width:660px}
+  h1 .hl{background:linear-gradient(120deg,var(--purple),var(--yellow));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{margin-top:12px;font-size:16.5px;font-weight:500;color:var(--dim);max-width:600px;line-height:1.4}
+
+  .tagchip{flex:none;display:flex;align-items:center;gap:8px;background:rgba(45,212,167,.1);border:1px solid rgba(45,212,167,.4);
+    border-radius:14px;padding:10px 16px;color:var(--mint);font-weight:800;font-size:13px;letter-spacing:.04em}
+  .tagchip .ic{font-size:15px}
+
+  .phones{position:relative;z-index:2;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:34px;margin-top:6px}
+  .phone{position:relative;width:230px;height:456px;border-radius:38px;background:linear-gradient(#0c1220,#05070d);border:8px solid #0b1120;
+    box-shadow:0 42px 74px -30px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.05),inset 0 0 0 2px rgba(255,255,255,.04);}
+  .phone::before{content:"";position:absolute;top:11px;left:50%;transform:translateX(-50%);width:70px;height:17px;border-radius:11px;background:#05070d;z-index:6}
+  .scr{position:absolute;inset:0;border-radius:30px;overflow:hidden;background:var(--navy);display:flex;flex-direction:column}
+
+  .status{display:flex;justify-content:space-between;align-items:center;padding:9px 17px 3px;font-size:11px;font-weight:700}
+  .status .r{display:flex;gap:5px;align-items:center;opacity:.9}
+  .status .bat{width:19px;height:10px;border:1px solid var(--dim);border-radius:3px;position:relative;padding:1px}
+  .status .bat::after{content:"";position:absolute;right:-3px;top:2.5px;width:2px;height:4px;background:var(--dim);border-radius:0 1px 1px 0}
+  .status .bat i{display:block;height:100%;width:72%;background:var(--mint);border-radius:1px}
+
+  .appbar{display:flex;align-items:center;gap:8px;padding:4px 16px 8px}
+  .appbar .col{flex:1;min-width:0}
+  .appbar .lbl{font-size:8.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .appbar .team{font-size:14.5px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .appbar .ava{width:30px;height:30px;border-radius:50%;background:var(--surface2);border:2px solid var(--border2);
+    display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
+
+  .sechead{padding:2px 16px 8px;display:flex;align-items:center;justify-content:space-between}
+  .sechead .t{display:flex;align-items:center;gap:7px;font-size:19px;font-weight:800;letter-spacing:-.01em}
+  .sechead .t .pip{width:9px;height:9px;border-radius:3px}
+  .sechead .s{font-size:10px;color:var(--faint);font-weight:600;margin-top:2px}
+  .sechead .trophy{width:32px;height:32px;border-radius:50%;background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.4);
+    display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}
+
+  .segt{display:flex;gap:6px;padding:0 9px 8px}
+  .segt span{flex:1;text-align:center;font-size:10.5px;font-weight:700;padding:7px 4px;border-radius:9px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .segt span.on-p{background:rgba(167,139,250,.18);color:var(--purple)}
+
+  .content{flex:1;overflow:hidden;padding:0 10px;position:relative}
+  .content::after{content:"";position:absolute;left:0;right:0;bottom:0;height:32px;background:linear-gradient(transparent,var(--navy))}
+
+  .lead{background:var(--surface);border:1px solid rgba(167,139,250,.3);border-radius:16px;padding:11px 13px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+  .lead .crest{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:17px;flex:none}
+  .lead .info{flex:1;min-width:0}
+  .lead .cap{font-size:8.5px;font-weight:800;letter-spacing:.1em;color:var(--purple);text-transform:uppercase}
+  .lead .nm{font-size:13.5px;font-weight:800;margin-top:2px}
+  .lead .rec{font-size:9px;color:var(--faint);margin-top:1px}
+  .lead .pts{text-align:right;flex:none}
+  .lead .pts b{font-size:19px;font-weight:800}
+  .lead .pts small{display:block;font-size:8px;color:var(--faint);font-weight:700}
+
+  .me{background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.4);border-radius:16px;padding:10px 13px;margin-bottom:10px;display:flex;align-items:center;gap:9px}
+  .me .rk{width:22px;height:22px;border-radius:50%;background:rgba(167,139,250,.22);color:var(--purple);font-size:11.5px;font-weight:800;flex:none;display:flex;align-items:center;justify-content:center}
+  .me .crest{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+  .me .info{flex:1;min-width:0}
+  .me .cap{font-size:7.5px;font-weight:800;letter-spacing:.06em;color:var(--faint);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .me .nm{font-size:12.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .me .pts{font-size:15px;font-weight:800;flex:none;text-align:right}
+  .me .pts small{font-size:8px;color:var(--faint);font-weight:700;margin-left:1px}
+
+  .row{display:flex;align-items:center;gap:7px;padding:6px 7px;border-radius:12px;margin-bottom:4px}
+  .pos{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;flex:none;color:var(--faint)}
+  .crest2{width:19px;height:19px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
+  .rname{flex:1;min-width:0;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rpts{font-size:12px;font-weight:800;flex:none}
+
+  /* trophy hall of fame rows */
+  .trow{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:9px 11px;margin-bottom:7px}
+  .trow .rk{width:16px;font-size:12px;font-weight:800;color:var(--purple);flex:none}
+  .trow .av{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex:none}
+  .trow .av.gold{border-color:#f5c518;color:#f5c518}
+  .trow .info{flex:1;min-width:0}
+  .trow .nm{font-size:12.5px;font-weight:800}
+  .trow .ss{font-size:9px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .trow .cup{flex:none;font-size:12.5px;font-weight:800;color:#f5c518}
+
+  .bnav{display:flex;padding:7px 4px 9px;border-top:1px solid var(--border);background:rgba(7,11,20,.9)}
+  .bnav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--faint)}
+  .bnav a .ic{width:40px;height:24px;border-radius:20px;display:flex;align-items:center;justify-content:center}
+  .bnav a span{font-size:8px;font-weight:700}
+  .bnav a.on-p{color:var(--purple)} .bnav a.on-p .ic{background:rgba(167,139,250,.14)}
+
+  .brandtag{position:relative;z-index:3;display:flex;align-items:center;gap:7px;justify-content:center;margin-top:12px;font-size:11.5px;font-weight:700;color:var(--faint);letter-spacing:.02em}
+  .brandtag i{width:6px;height:6px;border-radius:50%;background:var(--mint)}
+</style>
+
+<div class="stage">
+  <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+  <div class="grid"></div>
+
+  <div class="top">
+    <div>
+      <span class="eyebrow"><span class="dot"></span>Area Utente · Classifica</span>
+      <h1>Classifica live e <span class="hl">Albo d'oro</span>.</h1>
+      <p class="sub">Segui la lega giornata per giornata e sfoglia lo storico completo: record, vincitori e stagioni passate.</p>
+    </div>
+    <div class="tagchip"><span class="ic">👤</span>Vista Utente</div>
+  </div>
+
+  <div class="phones">
+
+    <!-- LEFT: Classifica -->
+    <div class="phone">
+      <div class="scr">
+        <div class="status"><span>9:41</span><span class="r">📶 <span class="bat"><i></i></span></span></div>
+        <div class="appbar"><div class="col"><div class="lbl">FantaLega</div><div class="team">Real Fanta FC</div></div><div class="ava">⭐</div></div>
+        <div class="sechead"><div><div class="t"><span class="pip" style="background:var(--purple)"></span>Classifica</div><div class="s">Stagione 2025/26</div></div></div>
+        <div class="segt"><span class="on-p">Classifica</span><span>Trofei</span></div>
+        <div class="content">
+          <div class="lead">
+            <div class="crest">🚂</div>
+            <div class="info"><div class="cap">Capolista</div><div class="nm">Lokomotiv</div><div class="rec">23V · 7N · 8P</div></div>
+            <div class="pts"><b>76</b><small>punti</small></div>
+          </div>
+          <div class="me">
+            <div class="rk">4</div><div class="crest">⭐</div>
+            <div class="info"><div class="cap">La tua squadra</div><div class="nm">Real Fanta FC</div></div>
+            <div class="pts">56<small>pt</small></div>
+          </div>
+          <div class="row"><span class="pos" style="background:rgba(245,197,24,.16);color:#f5c518;border:1px solid rgba(245,197,24,.4)">1</span><span class="crest2">🚂</span><span class="rname">Lokomotiv</span><span class="rpts">76</span></div>
+          <div class="row"><span class="pos" style="background:rgba(200,210,220,.16);color:#c8d2dc;border:1px solid rgba(200,210,220,.4)">2</span><span class="crest2">🔥</span><span class="rname">Bomber Utd</span><span class="rpts">64</span></div>
+          <div class="row"><span class="pos" style="background:rgba(205,127,50,.18);color:#cd7f32;border:1px solid rgba(205,127,50,.4)">3</span><span class="crest2">🦊</span><span class="rname">Le Volpi</span><span class="rpts">60</span></div>
+          <div class="row" style="background:rgba(167,139,250,.1)"><span class="pos">4</span><span class="crest2">⭐</span><span class="rname">Real Fanta FC</span><span class="rpts">56</span></div>
+          <div class="row"><span class="pos">5</span><span class="crest2">🪑</span><span class="rname">Panchina FC</span><span class="rpts">48</span></div>
+        </div>
+        <div class="bnav">
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M15 7l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Mercato</span></a>
+          <a class="on-p"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="13" width="4" height="8" rx="1.5" stroke="currentColor" stroke-width="2.2"/><rect x="10" y="9" width="4" height="12" rx="1.5" stroke="currentColor" stroke-width="2.2"/><rect x="17" y="5" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="2.2"/></svg></span><span>Classifica</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="5" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="9" r="1.3" fill="currentColor"/><circle cx="15" cy="9" r="1.3" fill="currentColor"/><circle cx="9" cy="15" r="1.3" fill="currentColor"/><circle cx="15" cy="15" r="1.3" fill="currentColor"/></svg></span><span>Pronostici</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3 11v2a1 1 0 001 1h2l4 4V6L6 10H4a1 1 0 00-1 1z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 8a4 4 0 010 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span>Bacheca</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Albo d'oro / Manager -->
+    <div class="phone">
+      <div class="scr">
+        <div class="status"><span>9:41</span><span class="r">📶 <span class="bat"><i></i></span></span></div>
+        <div class="appbar"><div class="col"><div class="lbl">FantaLega</div><div class="team">Real Fanta FC</div></div><div class="ava">⭐</div></div>
+        <div class="sechead"><div><div class="t"><span class="pip" style="background:var(--purple)"></span>Albo d'oro</div><div class="s">8 stagioni dal 2018</div></div><div class="trophy">🏆</div></div>
+        <div class="segt"><span>Classifica</span><span class="on-p">Trofei</span></div>
+        <div class="segt" style="padding-top:0"><span>Stagioni</span><span>Record</span><span class="on-p">Manager</span></div>
+        <div class="content">
+          <div class="trow"><span class="rk">1</span><span class="av gold">D</span><div class="info"><div class="nm">Davide</div><div class="ss">Ultimo:23/24</div></div><span class="cup">🏆 3</span></div>
+          <div class="trow"><span class="rk">2</span><span class="av">F</span><div class="info"><div class="nm">Fabio</div><div class="ss">Ultimo:25/26</div></div><span class="cup">🏆 2</span></div>
+          <div class="trow"><span class="rk">3</span><span class="av">S</span><div class="info"><div class="nm">Simone</div><div class="ss">Ultimo:24/25</div></div><span class="cup">🏆 2</span></div>
+          <div class="trow"><span class="rk">4</span><span class="av">A</span><div class="info"><div class="nm">Andrea</div><div class="ss">Ultimo:18/19</div></div><span class="cup">🏆 1</span></div>
+          <div class="trow"><span class="rk">5</span><span class="av">C</span><div class="info"><div class="nm">Chiara</div><div class="ss">Ultimo:24/25</div></div><span class="cup">🥈 1</span></div>
+        </div>
+        <div class="bnav">
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M15 7l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Mercato</span></a>
+          <a class="on-p"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="13" width="4" height="8" rx="1.5" stroke="currentColor" stroke-width="2.2"/><rect x="10" y="9" width="4" height="12" rx="1.5" stroke="currentColor" stroke-width="2.2"/><rect x="17" y="5" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="2.2"/></svg></span><span>Classifica</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="5" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="9" r="1.3" fill="currentColor"/><circle cx="15" cy="9" r="1.3" fill="currentColor"/><circle cx="9" cy="15" r="1.3" fill="currentColor"/><circle cx="15" cy="15" r="1.3" fill="currentColor"/></svg></span><span>Pronostici</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3 11v2a1 1 0 001 1h2l4 4V6L6 10H4a1 1 0 00-1 1z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 8a4 4 0 010 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span>Bacheca</span></a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="brandtag"><i></i>FantaLega — Classifica &amp; Albo d'oro</div>
+</div>

@@ -132,19 +132,33 @@ Italiano e inglese.
 
 ## 8) Immagini della galleria  *(consigli per la gallery del Gig)*
 
-> ✅ **Copertina già pronta:** `fiverr-assets/fiverr-cover.png` (1280×769 @2x, formato
-> consigliato da Fiverr). Mostra 3 telefoni con le schermate dell'app (Mercato, Classifica,
-> Bacheca), il rating 4.8 e le funzionalità chiave. I nomi squadra sono inventati per privacy.
-> Sorgente modificabile: `fiverr-assets/fiverr-cover.html`.
+> ✅ **6 immagini già pronte** in `fiverr-assets/` (1280×769 @2x ciascuna, formato
+> landscape consigliato da Fiverr). Caricale nell'ordine sotto — Fiverr le mostra in
+> sequenza nella gallery del gig. Ogni immagine ha il sorgente HTML abbinato, modificabile
+> (colori, nomi, testi) e ri-esportabile in PNG.
 
-La prima immagine è la più importante: deve comunicare "app mobile" in un colpo d'occhio.
-- **Immagine 1 (copertina):** mockup di 2–3 smartphone con le schermate dell'app + titolo grande tipo *"App Mobile per iOS & Android"* (stile simile all'esempio che hai visto).
-- **Immagine 2:** primo piano di una singola schermata dell'app (es. la bacheca o la classifica).
-- **Immagine 3:** una piccola griglia "cosa ottieni" (design + login + database + installabile).
-- **Video (opzionale ma consigliatissimo):** 20–40 secondi in cui scorri l'app dal telefono. I gig con video vendono molto di più.
+| # | File | Contenuto |
+|---|---|---|
+| 1 | `fiverr-cover.png` | Copertina hero: 3 telefoni (Mercato, Classifica, Bacheca), rating 4.8★, pill funzionalità |
+| 2 | `slide-2-mercato.png` | **Area Utente** — Voci di mercato (news, formazioni ufficiali) + Trattative (% di completamento, quote, fee) |
+| 3 | `slide-3-classifica-albodoro.png` | **Area Utente** — Classifica live con podio e posizione evidenziata + Albo d'oro (storico manager e titoli) |
+| 4 | `slide-4-pronostici-bacheca.png` | **Area Utente** — Pronostici a crediti con quote 1/X/2 + Bacheca social (post, tag, reazioni) |
+| 5 | `slide-5-admin-pronostici.png` | **Area Admin** 🔐 — Creazione giornate, gestione risultati, editor quote, crediti manuali |
+| 6 | `slide-6-admin-squadre.png` | **Area Admin** 🔐 — Stato app, sincronizzazione squadre, assegnazione manager, gestione badge |
 
-> Strumenti gratuiti per i mockup: **mockuphone.com**, **shots.so**, oppure Canva
-> (cerca "app mockup"). Inserisci screenshot reali della tua app.
+Le slide 2-4 sono taggate "Vista Utente" (verde), le slide 5-6 "Vista Admin" (ambra) —
+la distinzione visiva rende subito chiaro ai clienti che l'app include **sia un'esperienza
+utente completa sia un pannello di amministrazione**, un forte punto di forza per un gig
+di sviluppo app: dimostra capacità full-stack, non solo frontend.
+
+I nomi squadra/manager in tutte le immagini sono **inventati** per privacy (Real Fanta FC,
+Lokomotiv, Bomber Utd, Davide, Fabio, Simone…) — nessun dato reale della tua lega o dei
+tuoi amici compare negli screenshot.
+
+- **Video (opzionale ma consigliatissimo):** 20–40 secondi in cui scorri l'app dal telefono vero. I gig con video vendono molto di più — puoi registrarlo tu con uno screen recording e aggiungerlo come 7ª immagine/video della gallery.
+
+> Per modificare una slide: apri il relativo file `.html` in `fiverr-assets/`, cambia il
+> testo/colori, poi richiedimi di ri-esportarla in PNG.
 
 ---
 

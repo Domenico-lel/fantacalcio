@@ -1,0 +1,181 @@
+<style>
+  :root{
+    --navy:#070b14; --navy2:#0a1122; --surface:#111a2b; --surface2:#182339;
+    --border:rgba(160,178,214,.14); --border2:rgba(160,178,214,.26);
+    --text:#f4f7fd; --dim:rgba(214,226,248,.62); --faint:rgba(214,226,248,.34);
+    --orange:#fb923c; --purple:#a78bfa; --mint:#2dd4a7; --yellow:#fbbf24; --blue:#38bdf8; --amber:#f59e0b; --red:#f87171;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  .stage{position:relative;width:1280px;height:769px;overflow:hidden;font-family:var(--sans);color:var(--text);
+    background:radial-gradient(140% 90% at 50% -10%, #12203f 0%, #0a1122 42%, #060a15 100%);
+    display:flex;flex-direction:column;padding:30px 60px 24px;}
+  .glow{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}
+  .g1{width:520px;height:520px;left:-60px;top:200px;background:var(--orange);opacity:.22}
+  .g2{width:460px;height:460px;right:-40px;top:260px;background:var(--orange);opacity:.12}
+  .g3{width:340px;height:340px;left:50%;bottom:-130px;transform:translateX(-50%);background:var(--yellow);opacity:.10}
+  .grid{position:absolute;inset:0;opacity:.05;pointer-events:none;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:44px 44px;mask-image:radial-gradient(80% 70% at 50% 25%,#000,transparent 85%)}
+
+  .top{position:relative;z-index:3;display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--mint)}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 12px var(--mint)}
+  h1{margin-top:12px;font-size:44px;line-height:1.04;font-weight:800;letter-spacing:-.02em;text-wrap:balance;max-width:660px}
+  h1 .hl{background:linear-gradient(120deg,var(--orange),var(--yellow));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{margin-top:12px;font-size:16.5px;font-weight:500;color:var(--dim);max-width:600px;line-height:1.4}
+
+  .tagchip{flex:none;display:flex;align-items:center;gap:8px;background:rgba(45,212,167,.1);border:1px solid rgba(45,212,167,.4);
+    border-radius:14px;padding:10px 16px;color:var(--mint);font-weight:800;font-size:13px;letter-spacing:.04em}
+  .tagchip .ic{font-size:15px}
+
+  .phones{position:relative;z-index:2;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:34px;margin-top:6px}
+  .phone{position:relative;width:230px;height:456px;border-radius:38px;background:linear-gradient(#0c1220,#05070d);border:8px solid #0b1120;
+    box-shadow:0 42px 74px -30px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.05),inset 0 0 0 2px rgba(255,255,255,.04);}
+  .phone::before{content:"";position:absolute;top:11px;left:50%;transform:translateX(-50%);width:70px;height:17px;border-radius:11px;background:#05070d;z-index:6}
+  .scr{position:absolute;inset:0;border-radius:30px;overflow:hidden;background:var(--navy);display:flex;flex-direction:column}
+
+  .status{display:flex;justify-content:space-between;align-items:center;padding:9px 17px 3px;font-size:11px;font-weight:700}
+  .status .r{display:flex;gap:5px;align-items:center;opacity:.9}
+  .status .bat{width:19px;height:10px;border:1px solid var(--dim);border-radius:3px;position:relative;padding:1px}
+  .status .bat::after{content:"";position:absolute;right:-3px;top:2.5px;width:2px;height:4px;background:var(--dim);border-radius:0 1px 1px 0}
+  .status .bat i{display:block;height:100%;width:72%;background:var(--mint);border-radius:1px}
+
+  .appbar{display:flex;align-items:center;gap:8px;padding:4px 16px 8px}
+  .appbar .col{flex:1;min-width:0}
+  .appbar .lbl{font-size:8.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .appbar .team{font-size:14.5px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .appbar .ava{width:30px;height:30px;border-radius:50%;background:var(--surface2);border:2px solid var(--border2);
+    display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
+
+  .sechead{padding:2px 16px 8px}
+  .sechead .t{display:flex;align-items:center;gap:7px;font-size:19px;font-weight:800;letter-spacing:-.01em}
+  .sechead .t .pip{width:9px;height:9px;border-radius:3px}
+  .sechead .s{font-size:10px;color:var(--faint);font-weight:600;margin-top:2px}
+
+  .segt{display:flex;gap:6px;padding:0 9px 8px}
+  .segt span{flex:1;text-align:center;font-size:10.5px;font-weight:700;padding:7px 4px;border-radius:9px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .segt span.on-o{background:rgba(251,146,60,.18);color:var(--orange)}
+
+  .content{flex:1;overflow:hidden;padding:0 10px;position:relative}
+  .content::after{content:"";position:absolute;left:0;right:0;bottom:0;height:32px;background:linear-gradient(transparent,var(--navy))}
+
+  /* voci di mercato: news cards */
+  .news{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:11px 12px;margin-bottom:9px}
+  .news .tagr{display:flex;align-items:center;justify-content:space-between}
+  .news .tagr b{font-size:8.5px;font-weight:800;letter-spacing:.05em;color:var(--orange);background:rgba(251,146,60,.14);padding:3px 8px;border-radius:6px}
+  .news .tagr span{font-size:9px;color:var(--faint);font-weight:600}
+  .news h4{font-size:13.5px;font-weight:800;margin-top:8px}
+  .news p{font-size:11px;color:var(--dim);margin-top:5px;line-height:1.4}
+  .news .meta{display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:10.5px;color:var(--dim)}
+
+  /* trattative: deal cards */
+  .deal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:11px 12px;margin-bottom:9px}
+  .deal .top2{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .deal .role{font-size:10px;color:var(--faint);font-weight:600}
+  .deal .pn{font-size:14px;font-weight:800;margin-top:2px}
+  .deal .pct{flex:none;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;color:var(--mint);
+    background:rgba(45,212,167,.14);border:1px solid rgba(45,212,167,.4);border-radius:999px;padding:4px 10px}
+  .deal .pct i{width:6px;height:6px;border-radius:50%;background:var(--mint)}
+  .deal .clubs{display:flex;align-items:center;gap:6px;margin-top:9px;font-size:12px;font-weight:700;color:var(--text);white-space:nowrap}
+  .deal .clubs .arw{color:var(--orange);font-weight:800}
+  .deal .bottom2{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+  .deal .stat{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--mint)}
+  .deal .stat i{width:6px;height:6px;border-radius:50%;background:var(--mint)}
+  .deal .stat.mid{color:var(--yellow)} .deal .stat.mid i{background:var(--yellow)}
+  .deal .fee{font-size:13px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+
+  .bnav{display:flex;padding:7px 4px 9px;border-top:1px solid var(--border);background:rgba(7,11,20,.9)}
+  .bnav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--faint)}
+  .bnav a .ic{width:40px;height:24px;border-radius:20px;display:flex;align-items:center;justify-content:center}
+  .bnav a span{font-size:8px;font-weight:700}
+  .bnav a.on-o{color:var(--orange)} .bnav a.on-o .ic{background:rgba(251,146,60,.14)}
+
+  .brandtag{position:relative;z-index:3;display:flex;align-items:center;gap:7px;justify-content:center;margin-top:12px;font-size:11.5px;font-weight:700;color:var(--faint);letter-spacing:.02em}
+  .brandtag i{width:6px;height:6px;border-radius:50%;background:var(--mint)}
+</style>
+
+<div class="stage">
+  <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+  <div class="grid"></div>
+
+  <div class="top">
+    <div>
+      <span class="eyebrow"><span class="dot"></span>Area Utente · Mercato</span>
+      <h1>Mercato aggiornato in <span class="hl">tempo reale</span>.</h1>
+      <p class="sub">Rumors, formazioni ufficiali e trattative in corso con percentuale di completamento, quota e club coinvolti.</p>
+    </div>
+    <div class="tagchip"><span class="ic">👤</span>Vista Utente</div>
+  </div>
+
+  <div class="phones">
+
+    <!-- LEFT: Voci di mercato -->
+    <div class="phone">
+      <div class="scr">
+        <div class="status"><span>9:41</span><span class="r">📶 <span class="bat"><i></i></span></span></div>
+        <div class="appbar"><div class="col"><div class="lbl">FantaLega</div><div class="team">Real Fanta FC</div></div><div class="ava">⭐</div></div>
+        <div class="sechead"><div class="t"><span class="pip" style="background:var(--orange)"></span>Mercato</div><div class="s">Rumors di mercato</div></div>
+        <div class="segt"><span class="on-o">Voci di mercato</span><span>Trattative</span></div>
+        <div class="content">
+          <div class="news">
+            <div class="tagr"><b>UFFICIALE</b><span>12m fa</span></div>
+            <h4>🔥 Colpo in difesa</h4>
+            <p>D. Neri lascia il Parma e firma con il Napoli fino al 2029.</p>
+          </div>
+          <div class="news">
+            <div class="tagr"><b>FORMAZIONI</b><span>38m fa</span></div>
+            <h4>📣 Ufficiali!</h4>
+            <div class="meta">
+              <span>⚽ Real Fanta FC vs Lokomotiv</span>
+              <span>🏟️ Stadio Comunale</span>
+              <span>🕗 20:45 · 📺 DAZN</span>
+            </div>
+          </div>
+        </div>
+        <div class="bnav">
+          <a class="on-o"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M15 7l5 5-5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Mercato</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="13" width="4" height="8" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="10" y="9" width="4" height="12" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="17" y="5" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg></span><span>Classifica</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="5" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="9" r="1.3" fill="currentColor"/><circle cx="15" cy="9" r="1.3" fill="currentColor"/><circle cx="9" cy="15" r="1.3" fill="currentColor"/><circle cx="15" cy="15" r="1.3" fill="currentColor"/></svg></span><span>Pronostici</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3 11v2a1 1 0 001 1h2l4 4V6L6 10H4a1 1 0 00-1 1z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 8a4 4 0 010 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span>Bacheca</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Trattative -->
+    <div class="phone">
+      <div class="scr">
+        <div class="status"><span>9:41</span><span class="r">📶 <span class="bat"><i></i></span></span></div>
+        <div class="appbar"><div class="col"><div class="lbl">FantaLega</div><div class="team">Real Fanta FC</div></div><div class="ava">⭐</div></div>
+        <div class="sechead"><div class="t"><span class="pip" style="background:var(--orange)"></span>Mercato</div><div class="s">Rumors di mercato</div></div>
+        <div class="segt"><span>Voci di mercato</span><span class="on-o">Trattative</span></div>
+        <div class="content">
+          <div class="deal">
+            <div class="top2"><div><div class="role">Ala destra</div><div class="pn">J. Petit</div></div><div class="pct"><i></i>84%</div></div>
+            <div class="clubs">🔵 Toro <span class="arw">→</span> ⭐ Fanta</div>
+            <div class="bottom2"><span class="stat"><i></i>Quasi fatta</span><span class="fee">14,50 mln €</span></div>
+          </div>
+          <div class="deal">
+            <div class="top2"><div><div class="role">Portiere</div><div class="pn">S. Conti</div></div><div class="pct" style="color:var(--yellow);background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.4)"><i style="background:var(--yellow)"></i>71%</div></div>
+            <div class="clubs">🦊 Volpi <span class="arw">→</span> 🔥 Bomber</div>
+            <div class="bottom2"><span class="stat mid"><i></i>In corso</span><span class="fee">6,00 mln €</span></div>
+          </div>
+          <div class="deal">
+            <div class="top2"><div><div class="role">Difensore</div><div class="pn">A. Marino</div></div><div class="pct"><i></i>98%</div></div>
+            <div class="clubs">🪑 Panchina <span class="arw">→</span> 🦈 Squali</div>
+            <div class="bottom2"><span class="stat"><i></i>Quasi fatta</span><span class="fee">9,50 mln €</span></div>
+          </div>
+        </div>
+        <div class="bnav">
+          <a class="on-o"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M15 7l5 5-5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Mercato</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="13" width="4" height="8" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="10" y="9" width="4" height="12" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="17" y="5" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg></span><span>Classifica</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="5" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="9" r="1.3" fill="currentColor"/><circle cx="15" cy="9" r="1.3" fill="currentColor"/><circle cx="9" cy="15" r="1.3" fill="currentColor"/><circle cx="15" cy="15" r="1.3" fill="currentColor"/></svg></span><span>Pronostici</span></a>
+          <a><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3 11v2a1 1 0 001 1h2l4 4V6L6 10H4a1 1 0 00-1 1z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 8a4 4 0 010 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span>Bacheca</span></a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="brandtag"><i></i>FantaLega — Mercato &amp; Trattative</div>
+</div>
