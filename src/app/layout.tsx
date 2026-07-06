@@ -24,7 +24,7 @@ const sora = Sora({
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "Soccer Dick Club",
+  title: "Fanta Soccer Club",
   description: "La lega più scatenata del fantacalcio",
   manifest: "/manifest.json",
   icons: {
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Soccer Dick Club",
+    title: "Fanta Soccer Club",
   },
 };
 

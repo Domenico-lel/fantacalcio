@@ -130,7 +130,7 @@ export default function StandingsPage() {
   return (
     <div className="screen sec-rank">
       <PageHeader
-        eyebrow={tab === "classifica" ? "Stagione 2025/26" : "Soccer Dick Club"}
+        eyebrow={tab === "classifica" ? "Stagione 2025/26" : "Fanta Soccer Club"}
         title={tab === "classifica" ? "Classifica" : "Albo d'oro"}
         right={
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl"

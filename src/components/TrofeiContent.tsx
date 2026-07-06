@@ -340,7 +340,7 @@ export default function TrofeiContent() {
         />
         {groups.length > 0 && (
           <p className="text-[13px] font-semibold tracking-wide mt-3 px-1" style={{ color: "var(--accent-soft)" }}>
-            L&apos;albo d&apos;oro del Soccer Dick Club · {groups.length} stagioni dal {minYear}
+            L&apos;albo d&apos;oro del Fanta Soccer Club · {groups.length} stagioni dal {minYear}
           </p>
         )}
       </div>

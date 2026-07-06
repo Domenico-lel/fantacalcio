@@ -54,7 +54,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <header className="flex-none flex items-center gap-3 px-4 pt-4 pb-3 safe-top">
         <div className="flex flex-col min-w-0 flex-1">
           <span className="text-[10px] font-bold uppercase tracking-[0.14em] leading-none" style={{ color: "var(--text-faint)" }}>
-            Soccer Dick Club
+            Fanta Soccer Club
           </span>
           <div className="flex items-center gap-1.5 min-w-0 mt-1">
             <span className="font-display text-white text-[17px] font-bold leading-tight truncate">{teamLabel}</span>
