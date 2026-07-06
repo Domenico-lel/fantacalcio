@@ -1,4 +1,4 @@
-# ⚽ Soccer Dick Club
+# ⚽ Fanta Soccer Club
 
 App mobile PWA per gestire il fantacalcio creativo con amici. **Installabile come app nativa** su smartphone. Notizie calcio, transfer rumors, classifica lega in tempo reale, bacheca social, pronostici e sistema badge illustrati.
 
