@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Sora } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ClerkUserBridge } from "@/components/ClerkUserBridge";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 // Inter: font da UI ad alta leggibilità sugli schermi piccoli (cellulare).
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <head />
         <body className="font-sans antialiased">
           <ClerkUserBridge>{children}</ClerkUserBridge>
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>
