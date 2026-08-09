@@ -1,0 +1,37 @@
+name: Keep Supabase awake
+
+on:
+  schedule:
+    # Three lightweight read-only queries per day. Times are UTC.
+    - cron: "17 7,13,19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-alive:
+    name: Read-only database keep-alive
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Verify the required secrets are present
+        shell: bash
+        run: |
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+
+      - name: Execute a safe database query
+        shell: bash
+        run: |
+          curl --fail --silent --show-error \
+            --retry 3 --retry-all-errors --connect-timeout 10 --max-time 30 \
+            --output /dev/null --write-out "Supabase keep-alive completed (HTTP %{http_code})\\n" \
+            --user-agent "github-actions-supabase-keepalive/1.0" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "${SUPABASE_URL%/}/rest/v1/fanta_profiles?select=id&limit=1"
