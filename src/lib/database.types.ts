@@ -1,3 +1,11 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export interface Database {
   public: {
     Tables: {
@@ -402,9 +410,102 @@ export interface Database {
         };
         Relationships: [];
       };
+      fanta_careers: {
+        Row: {
+          id: string;
+          user_id: string;
+          owner_name: string;
+          owner_logo: string;
+          status: "active" | "retired";
+          state: Json;
+          current_season: number;
+          goat_points: number;
+          version: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          owner_name: string;
+          owner_logo?: string;
+          status?: "active" | "retired";
+          state?: Json;
+          current_season?: number;
+          goat_points?: number;
+          version?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          owner_name?: string;
+          owner_logo?: string;
+          status?: "active" | "retired";
+          state?: Json;
+          current_season?: number;
+          goat_points?: number;
+          version?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      fanta_career_seasons: {
+        Row: {
+          id: string;
+          career_id: string;
+          user_id: string;
+          season_no: number;
+          age: number;
+          club_name: string;
+          summary: Json;
+          goat_points: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          career_id: string;
+          user_id: string;
+          season_no: number;
+          age: number;
+          club_name: string;
+          summary?: Json;
+          goat_points?: number;
+          created_at?: string;
+        };
+        Update: {
+          career_id?: string;
+          user_id?: string;
+          season_no?: number;
+          age?: number;
+          club_name?: string;
+          summary?: Json;
+          goat_points?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      save_fanta_career_season: {
+        Args: {
+          p_career_id: string;
+          p_user_id: string;
+          p_expected_version: number;
+          p_status: string;
+          p_state: Json;
+          p_current_season: number;
+          p_goat_points: number;
+          p_season_no: number;
+          p_age: number;
+          p_club_name: string;
+          p_summary: Json;
+          p_season_goat_points: number;
+          p_updated_at: string;
+        };
+        Returns: boolean;
+      };
+    };
     Enums: Record<string, never>;
   };
 }

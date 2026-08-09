@@ -16,6 +16,7 @@ import { isImageAvatar } from "@/lib/avatar";
 const NAV_ITEMS = [
   { href: "/players",     label: "Mercato",    icon: TransferIcon,   color: "#fb923c" },
   { href: "/standings",   label: "Classifica", icon: StandingsIcon,  color: "#a78bfa" },
+  { href: "/carriera",    label: "Carriera",   icon: CareerIcon,     color: "#22d3ee" },
   { href: "/pronostici",  label: "Pronostici", icon: DiceIcon,       color: "#fbbf24" },
   { href: "/bacheca",     label: "Bacheca",    icon: MegaphoneIcon,  color: "#2dd4a7" },
 ];
@@ -81,7 +82,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {/* Bottom navigation */}
       <nav aria-label="Navigazione principale" className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
            style={{ background: "rgba(7,11,20,0.9)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderTop: "1px solid var(--border)" }}>
-        <div className="mx-auto grid w-full max-w-xl grid-cols-4">
+        <div
+          className="mx-auto grid w-full max-w-xl"
+          style={{ gridTemplateColumns: `repeat(${NAV_ITEMS.length}, minmax(0, 1fr))` }}
+        >
           {NAV_ITEMS.map(({ href, label, icon: Icon, color }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
@@ -159,6 +163,19 @@ function DiceIcon({ active }: { active: boolean }) {
       <circle cx="15" cy="9" r="1.4" fill="currentColor" />
       <circle cx="9" cy="15" r="1.4" fill="currentColor" />
       <circle cx="15" cy="15" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+function CareerIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.1" stroke="currentColor" strokeWidth={active ? 2.2 : 1.6}
+        fill={active ? "currentColor" : "none"} fillOpacity={0.14} />
+      <path d="M6.5 20c.45-4 2.15-6 5.5-6s5.05 2 5.5 6" stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.6} strokeLinecap="round" />
+      <path d="m18.25 4.4.55 1.12 1.24.18-.9.87.21 1.23-1.1-.58-1.1.58.21-1.23-.9-.87 1.24-.18.55-1.12Z"
+        fill="currentColor" />
     </svg>
   );
 }

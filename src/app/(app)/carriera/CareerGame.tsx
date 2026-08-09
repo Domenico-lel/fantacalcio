@@ -1,0 +1,542 @@
+"use client";
+
+import { useCallback, useState, type KeyboardEvent } from "react";
+import PageHeader from "@/components/PageHeader";
+import SegmentedTabs from "@/components/SegmentedTabs";
+import TabPanel from "@/components/TabPanel";
+import { useConfirm, useToast } from "@/components/Dialog";
+import { useRegisterRefresh } from "@/components/PullToRefresh";
+import {
+  acceptCareerTransfer,
+  advanceCareerSeason,
+  chooseCareerClub,
+  createCareer,
+  declineCareerTransfers,
+  fetchCareerHub,
+  restartCareer,
+  type CareerHub,
+  type CareerMutationResult,
+  type CreateCareerRequest,
+} from "@/app/career-actions";
+import {
+  CLUBS_BY_COUNTRY,
+  COUNTRY_OPTIONS,
+  ROLE_OPTIONS,
+  TRAINING_OPTIONS,
+  type CareerEvent,
+  type CareerOffer,
+  type CareerSeason,
+  type CareerState,
+  type CountryCode,
+  type GameMode,
+  type PreferredFoot,
+  type Role,
+  type StartMode,
+  type TrainingChoice,
+} from "@/lib/career-engine";
+
+type TabKey = "career" | "stats" | "archive";
+type SetupStep = 1 | 2 | 3;
+
+interface SetupDraft {
+  firstName: string;
+  lastName: string;
+  nationality: CountryCode;
+  role: Role | "";
+  preferredFoot: PreferredFoot;
+  shirtNumber: string;
+  gameMode: GameMode;
+  startMode: StartMode;
+  agentEnabled: boolean;
+  startingClubName: string;
+}
+
+const DEFAULT_DRAFT: SetupDraft = {
+  firstName: "",
+  lastName: "",
+  nationality: "IT",
+  role: "",
+  preferredFoot: "right",
+  shirtNumber: "10",
+  gameMode: "balanced",
+  startMode: "academy",
+  agentEnabled: true,
+  startingClubName: "",
+};
+
+export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
+  const [hub, setHub] = useState(initialHub);
+  const [tab, setTab] = useState<TabKey>("career");
+  const [setupStep, setSetupStep] = useState<SetupStep | null>(null);
+  const [draft, setDraft] = useState<SetupDraft>(DEFAULT_DRAFT);
+  const [busy, setBusy] = useState(false);
+  const [report, setReport] = useState<CareerSeason | null>(null);
+  const [reportStep, setReportStep] = useState(0);
+  const toast = useToast();
+  const confirm = useConfirm();
+
+  const reload = useCallback(async () => {
+    try {
+      const next = await fetchCareerHub();
+      setHub(next);
+      if (next.error) toast(next.error, "error");
+    } catch {
+      toast("Connessione non disponibile. Riprova tra poco.", "error");
+    }
+  }, [toast]);
+  useRegisterRefresh(reload);
+
+  const applyResult = useCallback((result: CareerMutationResult) => {
+    setHub(result.hub);
+    if (result.error) toast(result.error, "error");
+    return !result.error;
+  }, [toast]);
+
+  async function submitCareer() {
+    if (!draft.role) { toast("Scegli il ruolo del giocatore.", "error"); setSetupStep(2); return; }
+    const shirtNumber = Number(draft.shirtNumber);
+    const payload: CreateCareerRequest = {
+      firstName: draft.firstName,
+      lastName: draft.lastName,
+      nationality: draft.nationality,
+      role: draft.role,
+      preferredFoot: draft.preferredFoot,
+      shirtNumber,
+      gameMode: draft.gameMode,
+      startMode: draft.startMode,
+      agentEnabled: draft.agentEnabled,
+      startingClubName: draft.startMode === "freeAgent" ? draft.startingClubName : undefined,
+    };
+    setBusy(true);
+    try {
+      const result = await createCareer(payload);
+      if (applyResult(result)) {
+        setSetupStep(null);
+        toast(draft.startMode === "academy" ? "Le prime offerte sono arrivate." : "Carriera creata.", "success");
+      }
+    } catch {
+      toast("Non riesco a salvare la carriera. Controlla la connessione e riprova.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function mutate(action: () => Promise<CareerMutationResult>, success?: string): Promise<CareerMutationResult | null> {
+    setBusy(true);
+    try {
+      const result = await action();
+      if (applyResult(result) && success) toast(success, "success");
+      return result;
+    } catch {
+      toast("Operazione non riuscita. Controlla la connessione e riprova.", "error");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function simulate(choice: TrainingChoice) {
+    const expectedVersion = hub.career?.dbVersion;
+    if (!expectedVersion) {
+      toast("Ricarica la carriera prima di simulare la stagione.", "error");
+      return;
+    }
+    const result = await mutate(() => advanceCareerSeason(choice, expectedVersion));
+    if (result && !result.error && result.season) {
+      setReport(result.season);
+      setReportStep(0);
+    }
+  }
+
+  async function reset() {
+    const ok = await confirm({
+      title: "Ricominciare la carriera?",
+      message: "Il giocatore, le stagioni e tutti i trofei di questa carriera verranno cancellati.",
+      confirmLabel: "Ricomincia",
+      danger: true,
+    });
+    if (!ok) return;
+    const result = await mutate(restartCareer);
+    if (result && !result.error) {
+      setReport(null);
+      setSetupStep(null);
+      setTab("career");
+      toast("Puoi creare un nuovo giocatore.", "success");
+    }
+  }
+
+  if (!hub.career) {
+    return (
+      <div className="screen sec-career">
+        <PageHeader eyebrow="Il tuo viaggio" title="Carriera" />
+        {hub.error && <ErrorBanner message={hub.error} onRetry={reload} />}
+        {setupStep === null
+          ? <ModePicker onPick={(mode) => { setDraft({ ...DEFAULT_DRAFT, gameMode: mode }); setSetupStep(1); }} />
+          : <SetupWizard step={setupStep} setStep={setSetupStep} draft={draft} setDraft={setDraft} busy={busy} onSubmit={submitCareer} onCancel={() => setSetupStep(null)} />}
+      </div>
+    );
+  }
+
+  const state = hub.career.state;
+  if (state.stage === "choosingClub") {
+    return (
+      <div className="screen sec-career">
+        <PageHeader eyebrow="Primo contratto" title="Scegli il club" />
+        {hub.error && <ErrorBanner message={hub.error} onRetry={reload} />}
+        <StartingOffers state={state} busy={busy} onChoose={(name) => mutate(() => chooseCareerClub(name), "Hai firmato il primo contratto.")} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen sec-career">
+      <PageHeader
+        eyebrow="Il tuo viaggio"
+        title="Carriera"
+        right={<GoatPill score={state.goatScore} />}
+      >
+        <SegmentedTabs<TabKey>
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: "career", label: "Carriera" },
+            { key: "stats", label: "Statistiche" },
+            { key: "archive", label: "Archivio" },
+          ]}
+        />
+      </PageHeader>
+
+      {hub.error && <ErrorBanner message={hub.error} onRetry={reload} />}
+      <TabPanel tabKey={tab} keys={["career", "stats", "archive"]}>
+        {tab === "career" ? (
+          <CareerTab
+            state={state}
+            report={report}
+            reportStep={reportStep}
+            busy={busy}
+            onReportNext={() => setReportStep((value) => value + 1)}
+            onReportClose={() => setReport(null)}
+            onSimulate={simulate}
+            onAcceptTransfer={(name) => mutate(() => acceptCareerTransfer(name), "Trasferimento completato.")}
+            onDeclineTransfers={() => mutate(declineCareerTransfers, "Resti nel tuo club.")}
+            onReset={reset}
+          />
+        ) : tab === "stats" ? (
+          <StatsTab state={state} onReset={reset} />
+        ) : (
+          <ArchiveTab seasons={hub.seasons} />
+        )}
+      </TabPanel>
+    </div>
+  );
+}
+
+function ModePicker({ onPick }: { onPick: (mode: GameMode) => void }) {
+  return (
+    <main className="px-4 py-5">
+      <div className="mb-5 rounded-3xl p-5 overflow-hidden relative"
+        style={{ background: "linear-gradient(145deg, #103548, #0b1d31 65%, #101827)", border: "1px solid rgba(103,232,249,.24)" }}>
+        <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full blur-3xl" style={{ background: "rgba(34,211,238,.18)" }} />
+        <p className="eyebrow">Nuova modalità</p>
+        <h2 className="font-display mt-2 text-3xl font-extrabold leading-tight text-white">Scrivi la tua<br />storia nel calcio</h2>
+        <p className="mt-3 max-w-xs text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>
+          Parti dal vivaio, cresci stagione dopo stagione e prova a diventare una leggenda.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {["14–39 anni", "12 ruoli", "9 nazioni", "Salvataggio automatico"].map((label) => <span key={label} className="chip">{label}</span>)}
+        </div>
+      </div>
+
+      <p className="eyebrow mb-3 px-1">Scegli il ritmo</p>
+      <div className="space-y-3">
+        <ModeCard title="Rapida" badge="Classica" icon="⚡" description="Una stagione in un tocco, con risultati e resoconto subito." onClick={() => onPick("balanced")} />
+        <ModeCard title="Immersiva" badge="Dettagliata" icon="🎬" description="Il resoconto si apre per scene: stagione, numeri, eventi e premi." onClick={() => onPick("realistic")} />
+        <div className="card-flat flex min-h-[88px] items-center gap-4 p-4 opacity-55" aria-disabled="true">
+          <span className="text-3xl" aria-hidden="true">👑</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2"><h3 className="font-display font-bold text-white">Leggenda</h3><span className="chip">Più avanti</span></div>
+            <p className="mt-1 text-xs" style={{ color: "var(--text-dim)" }}>Una modalità narrativa speciale arriverà nelle prossime versioni.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function ModeCard({ title, badge, icon, description, onClick }: { title: string; badge: string; icon: string; description: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="card-accent w-full min-h-[104px] p-4 text-left active:scale-[.985] transition-transform">
+      <div className="flex items-center gap-4">
+        <span className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl text-3xl"
+          style={{ background: "color-mix(in srgb, var(--accent) 13%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 24%, transparent)" }} aria-hidden="true">{icon}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2"><h3 className="font-display text-lg font-extrabold text-white">{title}</h3><span className="chip">{badge}</span></div>
+          <p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{description}</p>
+        </div>
+        <span className="text-xl" style={{ color: "var(--accent)" }} aria-hidden="true">›</span>
+      </div>
+    </button>
+  );
+}
+
+function SetupWizard({ step, setStep, draft, setDraft, busy, onSubmit, onCancel }: {
+  step: SetupStep;
+  setStep: (step: SetupStep) => void;
+  draft: SetupDraft;
+  setDraft: (draft: SetupDraft) => void;
+  busy: boolean;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  const selectedCountry = countryFor(draft.nationality);
+  const countryCodes = COUNTRY_OPTIONS.map((country) => country.code);
+  const roleCodes = ROLE_OPTIONS.map((role) => role.code);
+  const feet: PreferredFoot[] = ["left", "right", "both"];
+  const startModes: StartMode[] = ["academy", "freeAgent"];
+  const canContinue = step === 1 || (step === 2 && !!draft.firstName.trim() && !!draft.role && Number(draft.shirtNumber) >= 1 && Number(draft.shirtNumber) <= 99)
+    || (step === 3 && (draft.startMode === "academy" || !!draft.startingClubName));
+
+  return (
+    <main className="px-4 py-4 pb-8">
+      <div className="card p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="eyebrow">Definisci la tua identità</p><h2 className="font-display mt-1 text-xl font-bold text-white">{step === 1 ? "Nazionalità" : step === 2 ? "Ruolo e maglia" : "Opzioni carriera"}</h2></div>
+          <button type="button" onClick={onCancel} className="tap rounded-xl text-lg" style={{ color: "var(--text-dim)" }} aria-label="Chiudi configurazione">×</button>
+        </div>
+        <ol className="mt-4 grid grid-cols-3 gap-2" aria-label="Avanzamento configurazione">
+          {[1, 2, 3].map((value) => (
+            <li key={value} className="h-1.5 rounded-full" style={{ background: value <= step ? "var(--accent)" : "rgba(255,255,255,.09)" }}>
+              <span className="sr-only">Passaggio {value}{value === step ? ", attuale" : ""}</span>
+            </li>
+          ))}
+        </ol>
+
+        {step === 1 && (
+          <div className="mt-5">
+            <p className="text-sm font-bold text-white">Dove nasce il tuo giocatore?</p>
+            <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Nazionalità">
+              {COUNTRY_OPTIONS.map((country) => {
+                const selected = draft.nationality === country.code;
+                return <button key={country.code} type="button" role="radio" aria-checked={selected} tabIndex={selected ? 0 : -1}
+                  onClick={() => setDraft({ ...draft, nationality: country.code, startingClubName: "" })}
+                  onKeyDown={(event) => onRadioKeyDown(event, countryCodes, draft.nationality, (nationality) => setDraft({ ...draft, nationality, startingClubName: "" }))}
+                  className="min-h-[68px] rounded-2xl px-2 py-2 text-center transition-colors"
+                  style={{ background: selected ? "color-mix(in srgb, var(--accent) 14%, var(--surface-2))" : "rgba(255,255,255,.045)", border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}` }}>
+                  <span className="block text-2xl" aria-hidden="true">{country.flag}</span><span className="mt-1 block text-xs font-bold text-white">{country.name}</span>
+                </button>;
+              })}
+            </div>
+            <div className="card-accent mt-4 p-4">
+              <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold" style={{ color: "var(--accent-soft)" }}>{selectedCountry.league.name}</p><p className="mt-1 text-xs" style={{ color: "var(--text-dim)" }}>{selectedCountry.league.style}</p></div><strong className="font-display text-xl text-white">{selectedCountry.league.clubs}</strong></div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center"><SmallInfo label="Club" value={String(selectedCountry.league.clubs)} /><SmallInfo label="Partite" value={String(selectedCountry.league.leagueMatches)} /><SmallInfo label="Livello" value={String(selectedCountry.league.strength)} /></div>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="mt-5 space-y-5">
+            <div className="grid grid-cols-2 gap-2">
+              <Field id="career-first-name" label="Nome" value={draft.firstName} onChange={(value) => setDraft({ ...draft, firstName: value })} placeholder="Mario" maxLength={30} />
+              <Field id="career-last-name" label="Cognome (facoltativo)" value={draft.lastName} onChange={(value) => setDraft({ ...draft, lastName: value })} placeholder="Rossi" maxLength={30} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">Ruolo</p>
+              <div className="mt-2 grid grid-cols-4 gap-2" role="radiogroup" aria-label="Ruolo">
+                {ROLE_OPTIONS.map((role) => {
+                  const selected = draft.role === role.code;
+                  return <button key={role.code} type="button" role="radio" aria-checked={selected}
+                    aria-label={role.label}
+                    tabIndex={selected || (!draft.role && role.code === roleCodes[0]) ? 0 : -1}
+                    onClick={() => setDraft({ ...draft, role: role.code })}
+                    onKeyDown={(event) => onRadioKeyDown(event, roleCodes, draft.role || roleCodes[0], (nextRole) => setDraft({ ...draft, role: nextRole }))}
+                    className="min-h-[52px] rounded-xl px-1 text-xs font-bold"
+                    title={role.label}
+                    style={{ background: selected ? "var(--accent-grad)" : "rgba(255,255,255,.05)", color: selected ? "var(--accent-ink)" : "var(--text-dim)", border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}` }}>
+                    {role.shortLabel}
+                  </button>;
+                })}
+              </div>
+              {draft.role && <p className="mt-2 text-xs" style={{ color: "var(--text-dim)" }}>{roleFor(draft.role).label} · {roleFor(draft.role).department}</p>}
+            </div>
+            <div className="grid grid-cols-[94px_1fr] gap-3">
+              <Field id="career-number" label="Numero" value={draft.shirtNumber} onChange={(value) => setDraft({ ...draft, shirtNumber: value })} type="number" inputMode="numeric" />
+              <div><p className="mb-1.5 text-xs font-bold text-white">Piede preferito</p><div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Piede preferito">
+                {feet.map((foot) => <button key={foot} type="button" role="radio" aria-checked={draft.preferredFoot === foot} tabIndex={draft.preferredFoot === foot ? 0 : -1}
+                  onClick={() => setDraft({ ...draft, preferredFoot: foot })}
+                  onKeyDown={(event) => onRadioKeyDown(event, feet, draft.preferredFoot, (preferredFoot) => setDraft({ ...draft, preferredFoot }))}
+                  className="min-h-[46px] rounded-xl text-xs font-bold" style={{ background: draft.preferredFoot === foot ? "var(--accent-grad)" : "rgba(255,255,255,.05)", color: draft.preferredFoot === foot ? "var(--accent-ink)" : "var(--text-dim)", border: `1px solid ${draft.preferredFoot === foot ? "var(--accent)" : "var(--border)"}` }}>{foot === "left" ? "Sinistro" : foot === "right" ? "Destro" : "Entrambi"}</button>)}
+              </div></div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="mt-5 space-y-5">
+            <div><p className="text-sm font-bold text-white">Primo contratto</p><div className="mt-2 grid gap-2" role="radiogroup" aria-label="Tipo di partenza">
+              <ChoiceCard selected={draft.startMode === "academy"} title="Offerte dal vivaio" description="Ricevi tre proposte a sorpresa adatte al tuo livello."
+                onClick={() => setDraft({ ...draft, startMode: "academy", startingClubName: "" })}
+                onKeyDown={(event) => onRadioKeyDown(event, startModes, draft.startMode, (startMode) => setDraft({ ...draft, startMode, startingClubName: startMode === "academy" ? "" : draft.startingClubName }))} />
+              <ChoiceCard selected={draft.startMode === "freeAgent"} title="Scegli tu il club" description="Parti direttamente da una squadra della nazione selezionata."
+                onClick={() => setDraft({ ...draft, startMode: "freeAgent" })}
+                onKeyDown={(event) => onRadioKeyDown(event, startModes, draft.startMode, (startMode) => setDraft({ ...draft, startMode, startingClubName: startMode === "academy" ? "" : draft.startingClubName }))} />
+            </div></div>
+            {draft.startMode === "freeAgent" && <div><label htmlFor="career-club" className="mb-1.5 block text-xs font-bold text-white">Club iniziale</label><select id="career-club" className="input min-h-12 w-full px-3 text-sm" value={draft.startingClubName} onChange={(event) => setDraft({ ...draft, startingClubName: event.target.value })}><option value="">Scegli una squadra…</option>{CLUBS_BY_COUNTRY[draft.nationality].map((club) => <option key={club.name} value={club.name}>{club.name} · OVR {club.rating}</option>)}</select></div>}
+            <button type="button" role="switch" aria-checked={draft.agentEnabled} onClick={() => setDraft({ ...draft, agentEnabled: !draft.agentEnabled })}
+              className="card-flat flex min-h-[72px] w-full items-center gap-3 p-3 text-left">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl text-xl" style={{ background: "rgba(255,255,255,.06)" }} aria-hidden="true">🤝</span>
+              <span className="min-w-0 flex-1"><strong className="block text-sm text-white">Agente trasferimenti</strong><span className="mt-0.5 block text-xs" style={{ color: "var(--text-dim)" }}>Se attivo, a fine stagione può portarti nuove offerte.</span></span>
+              <span className="relative h-7 w-12 rounded-full transition-colors" style={{ background: draft.agentEnabled ? "var(--accent)" : "rgba(255,255,255,.16)" }}><span className="absolute top-1 h-5 w-5 rounded-full bg-white transition-transform" style={{ left: 4, transform: draft.agentEnabled ? "translateX(20px)" : "none" }} /></span>
+            </button>
+          </div>
+        )}
+
+        <div className="mt-6 flex gap-2">
+          <button type="button" onClick={() => step === 1 ? onCancel() : setStep((step - 1) as SetupStep)} className="btn-soft min-h-12 flex-1 px-4 py-3 text-sm">{step === 1 ? "Annulla" : "Indietro"}</button>
+          <button type="button" disabled={!canContinue || busy} onClick={() => step === 3 ? onSubmit() : setStep((step + 1) as SetupStep)} className="btn-primary min-h-12 flex-[1.4] px-4 py-3 text-sm">{busy ? "Salvataggio…" : step === 3 ? "Inizia carriera" : "Avanti"}</button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function Field({ id, label, value, onChange, placeholder, maxLength, type = "text", inputMode }: { id: string; label: string; value: string; onChange: (value: string) => void; placeholder?: string; maxLength?: number; type?: string; inputMode?: "numeric" }) {
+  return <div><label htmlFor={id} className="mb-1.5 block text-xs font-bold text-white">{label}</label><input id={id} type={type} inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} maxLength={maxLength} min={type === "number" ? 1 : undefined} max={type === "number" ? 99 : undefined} className="input min-h-12 w-full px-3 text-sm" /></div>;
+}
+
+function ChoiceCard({ selected, title, description, onClick, onKeyDown }: { selected: boolean; title: string; description: string; onClick: () => void; onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void }) {
+  return <button type="button" role="radio" aria-checked={selected} tabIndex={selected ? 0 : -1} onClick={onClick} onKeyDown={onKeyDown} className="min-h-[72px] rounded-2xl p-3 text-left" style={{ background: selected ? "color-mix(in srgb, var(--accent) 12%, var(--surface-2))" : "rgba(255,255,255,.045)", border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}` }}><span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ border: `2px solid ${selected ? "var(--accent)" : "var(--text-faint)"}` }}>{selected && <span className="h-2.5 w-2.5 rounded-full" style={{ background: "var(--accent)" }} />}</span><strong className="text-sm text-white">{title}</strong></span><span className="mt-1.5 block pl-7 text-xs" style={{ color: "var(--text-dim)" }}>{description}</span></button>;
+}
+
+function StartingOffers({ state, busy, onChoose }: { state: CareerState; busy: boolean; onChoose: (name: string) => void }) {
+  return <main className="px-4 py-5"><div className="card-accent p-4"><p className="eyebrow">Inizio carriera · {state.seasonYear}</p><h2 className="font-display mt-2 text-xl font-bold text-white">Tre club credono in te</h2><p className="mt-1.5 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>A {state.age} anni arriva il primo bivio. Confronta livello, ruolo previsto e contratto.</p></div><div className="mt-4 space-y-3">{state.pendingOffers.map((offer) => <OfferCard key={offer.id} offer={offer} busy={busy} label="Firma" onClick={() => onChoose(offer.clubName)} />)}</div><PlayerStrip state={state} /></main>;
+}
+
+function CareerTab({ state, report, reportStep, busy, onReportNext, onReportClose, onSimulate, onAcceptTransfer, onDeclineTransfers, onReset }: {
+  state: CareerState; report: CareerSeason | null; reportStep: number; busy: boolean;
+  onReportNext: () => void; onReportClose: () => void; onSimulate: (choice: TrainingChoice) => void;
+  onAcceptTransfer: (name: string) => void; onDeclineTransfers: () => void; onReset: () => void;
+}) {
+  return <main className="px-4 py-4 pb-8 space-y-4">
+    {report && <SeasonReport season={report} immersive={state.gameMode === "realistic"} step={reportStep} onNext={onReportNext} onClose={onReportClose} />}
+    <PlayerHero state={state} />
+    {!report && (state.stage === "retired" ? <RetiredCard state={state} onReset={onReset} /> : <>
+      {state.pendingOffers.length > 0 && <TransferPanel offers={state.pendingOffers} busy={busy} onAccept={onAcceptTransfer} onDecline={onDeclineTransfers} />}
+      {state.pendingOffers.length === 0 && <TrainingPanel state={state} busy={busy} onSimulate={onSimulate} />}
+    </>)}
+    {!report && <EventFeed events={state.feed.slice(0, 6)} />}
+  </main>;
+}
+
+function PlayerHero({ state }: { state: CareerState }) {
+  const club = state.currentClub;
+  const country = countryFor(state.player.nationality);
+  const role = roleFor(state.player.role);
+  return <section className="relative overflow-hidden rounded-3xl p-5" aria-label="Scheda giocatore" style={{ background: club ? `linear-gradient(145deg, ${club.colors[0]}dd, #0b1220 70%)` : "var(--surface)", border: "1px solid rgba(255,255,255,.13)" }}>
+    <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full blur-3xl" style={{ background: club?.colors[1] ?? "var(--accent)", opacity: .2 }} />
+    <div className="relative flex items-start gap-4"><div className="flex h-20 w-20 flex-none flex-col items-center justify-center rounded-3xl" style={{ background: "rgba(5,10,20,.55)", border: "1px solid rgba(255,255,255,.16)" }}><span className="text-[11px] font-bold uppercase" style={{ color: "var(--text-dim)" }}>OVR</span><strong className="font-display text-3xl font-extrabold text-white">{state.overall}</strong></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-dim)" }}><span>{country.flag}</span><span>#{state.player.shirtNumber}</span><span>{role.shortLabel}</span></div><h2 className="font-display mt-1 truncate text-xl font-extrabold text-white">{state.player.displayName}</h2><p className="mt-1 truncate text-sm font-semibold" style={{ color: "var(--accent-soft)" }}>{club?.name ?? "Svincolato"}</p><p className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>{club?.league}</p></div></div>
+    <div className="relative mt-5 grid grid-cols-4 gap-2"><HeroStat label="Età" value={String(state.age)} /><HeroStat label="Valore" value={formatMoney(state.marketValue)} /><HeroStat label="Forma" value={String(state.form)} /><HeroStat label="GOAT" value={String(state.goatScore)} /></div>
+  </section>;
+}
+
+function TrainingPanel({ state, busy, onSimulate }: { state: CareerState; busy: boolean; onSimulate: (choice: TrainingChoice) => void }) {
+  const choices = trainingForRole(state.player.role);
+  return <section><div className="mb-3 flex items-end justify-between gap-3 px-1"><div><p className="eyebrow">Pre-stagione</p><h3 className="font-display mt-1 text-lg font-bold text-white">Scegli come crescere</h3></div><span className="text-xs" style={{ color: "var(--text-dim)" }}>{state.seasonYear}/{String(state.seasonYear + 1).slice(-2)}</span></div><div className="space-y-2">{choices.map((choice, index) => <button key={choice.code} type="button" disabled={busy} onClick={() => onSimulate(choice.code)} className="card w-full min-h-[82px] p-3 text-left active:scale-[.985] transition-transform"><div className="flex items-center gap-3"><span className="flex h-11 w-11 flex-none items-center justify-center rounded-xl text-xl" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }} aria-hidden="true">{index === 0 ? "⚖️" : index === 1 ? roleTrainingIcon(state.player.role) : "🧘"}</span><span className="min-w-0 flex-1"><strong className="block text-sm text-white">{choice.label}</strong><span className="mt-1 block text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{choice.description}</span></span><span style={{ color: "var(--accent)" }} aria-hidden="true">›</span></div></button>)}</div>{busy && <p className="mt-3 text-center text-xs" role="status" style={{ color: "var(--accent-soft)" }}>Simulazione della stagione…</p>}</section>;
+}
+
+function SeasonReport({ season, immersive, step, onNext, onClose }: { season: CareerSeason; immersive: boolean; step: number; onNext: () => void; onClose: () => void }) {
+  const maxStep = immersive ? 2 : 0;
+  return <section className="card-accent slide-up overflow-hidden" aria-live="polite"><div className="p-4" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent)" }}><div className="flex items-center justify-between gap-3"><div><p className="eyebrow">Report stagione</p><h3 className="font-display mt-1 text-xl font-extrabold text-white">{season.label} · {season.clubName}</h3></div><div className="rounded-2xl px-3 py-2 text-center" style={{ background: "rgba(0,0,0,.24)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>Media</span><strong className="font-display text-xl text-white">{season.averageRating.toFixed(2)}</strong></div></div>
+      {(step === 0 || !immersive) && <div className="mt-4 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="GOAT" value={`+${season.goatPointsEarned}`} /></div>}
+      {(step >= 1 || !immersive) && <div className="mt-4 card-flat p-3"><div className="grid grid-cols-3 gap-2 text-center"><SmallInfo label="Campionato" value={`${season.leaguePosition}°`} /><SmallInfo label="Coppa" value={season.cupResult} /><SmallInfo label="OVR" value={`${season.overallStart}→${season.overallEnd}`} /></div></div>}
+      {(step >= 2 || !immersive) && <div className="mt-4 space-y-2">{[...season.trophies, ...season.awards].length > 0 ? <div className="flex flex-wrap gap-2">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div> : <p className="text-xs" style={{ color: "var(--text-dim)" }}>Nessun trofeo, ma ogni stagione costruisce la carriera.</p>}{season.events.map((event) => <p key={event.id} className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}><strong className="text-white">{event.title}.</strong> {event.description}</p>)}</div>}
+      <button type="button" onClick={step < maxStep ? onNext : onClose} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">{step < maxStep ? "Continua" : season.retiredAfterSeason ? "Guarda la carriera" : "Vai alla nuova stagione"}</button>
+    </div></section>;
+}
+
+function TransferPanel({ offers, busy, onAccept, onDecline }: { offers: CareerOffer[]; busy: boolean; onAccept: (name: string) => void; onDecline: () => void }) {
+  return <section><div className="px-1"><p className="eyebrow">Mercato estivo</p><h3 className="font-display mt-1 text-lg font-bold text-white">Il tuo agente ha delle offerte</h3></div><div className="mt-3 space-y-2">{offers.map((offer) => <OfferCard key={offer.id} offer={offer} busy={busy} label="Accetta" onClick={() => onAccept(offer.clubName)} />)}</div><button type="button" disabled={busy} onClick={onDecline} className="btn-soft mt-3 min-h-12 w-full px-4 py-3 text-sm">Resta nel club attuale</button></section>;
+}
+
+function OfferCard({ offer, busy, label, onClick }: { offer: CareerOffer; busy: boolean; label: string; onClick: () => void }) {
+  const country = countryFor(offer.country);
+  return <article className="card p-4"><div className="flex items-start gap-3"><div className="flex h-12 w-12 flex-none items-center justify-center rounded-2xl text-2xl" style={{ background: "rgba(255,255,255,.055)" }}>{country.flag}</div><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)}</span><span className="chip">{offer.contractYears} anni</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
+}
+
+function StatsTab({ state, onReset }: { state: CareerState; onReset: () => void }) {
+  const isKeeper = state.player.role === "GK";
+  return <main className="px-4 py-4 pb-8 space-y-4"><section className="card p-4"><div className="flex items-center justify-between"><div><p className="eyebrow">Numeri totali</p><h2 className="font-display mt-1 text-lg font-bold text-white">{state.player.displayName}</h2></div><div className="font-display text-2xl font-extrabold" style={{ color: "var(--accent)" }}>{state.goatScore}</div></div><div className="mt-4 grid grid-cols-3 gap-2"><BigStat label="Presenze" value={state.totals.appearances} /><BigStat label={isKeeper ? "Parate" : "Gol"} value={isKeeper ? state.totals.saves : state.totals.goals} /><BigStat label={isKeeper ? "Clean sheet" : "Assist"} value={isKeeper ? state.totals.cleanSheets : state.totals.assists} /><BigStat label="Da titolare" value={state.totals.starts} /><BigStat label={isKeeper ? "Porte inviolate" : "Passaggi chiave"} value={isKeeper ? state.totals.cleanSheets : state.totals.keyPasses} /><BigStat label="MVP" value={state.totals.playerOfTheMatch} /></div></section>
+    <section className="card p-4"><p className="eyebrow">Livello attuale</p><div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="OVR" value={String(state.overall)} /><HeroStat label="Potenziale" value={String(state.potential)} /><HeroStat label="Reputaz." value={String(state.reputation)} /><HeroStat label="Forma" value={String(state.form)} /></div></section>
+    <section className="card p-4"><p className="eyebrow">Nazionale {countryFor(state.player.nationality).flag}</p><div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="Presenze" value={String(state.nationalTeam.caps)} /><HeroStat label="Gol" value={String(state.nationalTeam.goals)} /><HeroStat label="Assist" value={String(state.nationalTeam.assists)} /><HeroStat label="Trofei" value={String(state.nationalTeam.trophies)} /></div></section>
+    <Cabinet title="Trofei di squadra" empty="Nessun trofeo ancora." items={state.trophyCabinet.map((item) => ({ name: item.name, count: item.count }))} />
+    <Cabinet title="Premi individuali" empty="Nessun premio ancora." items={state.awardCabinet.map((item) => ({ name: item.name, count: item.count }))} />
+    <button type="button" onClick={onReset} className="btn-danger-soft min-h-12 w-full px-4 py-3 text-sm">Ricomincia da zero</button>
+  </main>;
+}
+
+function ArchiveTab({ seasons }: { seasons: CareerSeason[] }) {
+  return <main className="px-4 py-4 pb-8"><p className="mb-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>Ogni stagione resta salvata con rendimento, crescita e traguardi.</p>{seasons.length === 0 ? <EmptyState icon="📚" title="Archivio vuoto" body="Completa la prima stagione per iniziare a scrivere la tua storia." /> : <div className="space-y-3">{seasons.map((season) => <article key={season.id} className="card p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="eyebrow">{season.label} · Età {season.age}</p><h3 className="font-display mt-1 truncate text-base font-bold text-white">{season.clubName}</h3><p className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>{season.leaguePosition}° in campionato · Coppa: {season.cupResult}</p></div><div className="rounded-xl px-2.5 py-2 text-center" style={{ background: "rgba(255,255,255,.055)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>OVR</span><strong className="text-white">{season.overallEnd}</strong></div></div><div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="Media" value={season.averageRating.toFixed(2)} /></div>{[...season.trophies, ...season.awards].length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div>}</article>)}</div>}</main>;
+}
+
+function EventFeed({ events }: { events: CareerEvent[] }) {
+  if (events.length === 0) return null;
+  return <section><p className="eyebrow mb-3 px-1">Diario carriera</p><div className="card overflow-hidden">{events.map((event, index) => <article key={event.id} className="flex gap-3 p-3" style={{ borderTop: index ? "1px solid var(--border)" : undefined }}><span className="mt-1 h-2.5 w-2.5 flex-none rounded-full" style={{ background: event.tone === "negative" ? "#f87171" : event.tone === "special" ? "#fbbf24" : event.tone === "positive" ? "#34d399" : "var(--text-faint)" }} /><div><h3 className="text-sm font-bold text-white">{event.title}</h3><p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{event.description}</p></div></article>)}</div></section>;
+}
+
+function RetiredCard({ state, onReset }: { state: CareerState; onReset: () => void }) {
+  return <section className="card-accent p-5 text-center"><span className="text-5xl" aria-hidden="true">🏟️</span><p className="eyebrow mt-4">Fine carriera</p><h3 className="font-display mt-1 text-2xl font-extrabold text-white">Una storia da {state.goatScore} punti</h3><p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{state.player.displayName} si ritira a {state.retiredAtAge ?? state.age} anni dopo {state.seasons.length} stagioni e {state.trophyCabinet.reduce((sum, item) => sum + item.count, 0)} trofei.</p><button type="button" onClick={onReset} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">Crea una nuova carriera</button></section>;
+}
+
+function Cabinet({ title, empty, items }: { title: string; empty: string; items: { name: string; count: number }[] }) {
+  return <section className="card p-4"><p className="eyebrow">{title}</p>{items.length === 0 ? <p className="mt-3 text-xs" style={{ color: "var(--text-dim)" }}>{empty}</p> : <div className="mt-3 space-y-2">{items.map((item) => <div key={item.name} className="card-flat flex items-center gap-3 px-3 py-2.5"><span aria-hidden="true">🏆</span><span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{item.name}</span><strong style={{ color: "var(--accent)" }}>×{item.count}</strong></div>)}</div>}</section>;
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div className="mx-4 mt-4 flex items-center gap-3 rounded-2xl p-3" role="alert" style={{ background: "rgba(239,68,68,.1)", border: "1px solid rgba(248,113,113,.25)" }}><p className="min-w-0 flex-1 text-xs leading-relaxed text-red-200">{message}</p><button type="button" onClick={onRetry} className="btn-soft min-h-11 px-3 text-xs">Riprova</button></div>;
+}
+
+function EmptyState({ icon, title, body }: { icon: string; title: string; body: string }) {
+  return <div className="py-16 text-center"><span className="text-5xl" aria-hidden="true">{icon}</span><h2 className="font-display mt-4 text-lg font-bold text-white">{title}</h2><p className="mx-auto mt-1.5 max-w-xs text-sm" style={{ color: "var(--text-dim)" }}>{body}</p></div>;
+}
+
+function PlayerStrip({ state }: { state: CareerState }) {
+  return <div className="card-flat mt-4 flex items-center gap-3 p-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl font-display text-lg font-extrabold" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)" }}>{state.overall}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white">{state.player.displayName}</p><p className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>#{state.player.shirtNumber} · {roleFor(state.player.role).label} · {state.age} anni</p></div><strong className="text-xs" style={{ color: "var(--accent-soft)" }}>{formatMoney(state.marketValue)}</strong></div>;
+}
+
+function GoatPill({ score }: { score: number }) {
+  return <div className="rounded-2xl px-3 py-2 text-right" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)" }}><span className="block text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-dim)" }}>GOAT</span><strong className="font-display block text-lg leading-none" style={{ color: "var(--accent)" }}>{score}</strong></div>;
+}
+
+function HeroStat({ label, value }: { label: string; value: string }) { return <div className="rounded-xl px-1.5 py-2 text-center" style={{ background: "rgba(4,9,18,.32)", border: "1px solid rgba(255,255,255,.07)" }}><span className="block truncate text-[11px]" style={{ color: "var(--text-dim)" }}>{label}</span><strong className="mt-0.5 block truncate text-sm text-white">{value}</strong></div>; }
+function BigStat({ label, value }: { label: string; value: number }) { return <div className="card-flat p-3 text-center"><strong className="font-display block text-xl text-white">{value}</strong><span className="mt-0.5 block text-[11px]" style={{ color: "var(--text-dim)" }}>{label}</span></div>; }
+function SmallInfo({ label, value }: { label: string; value: string }) { return <div><span className="block text-[11px]" style={{ color: "var(--text-faint)" }}>{label}</span><strong className="mt-0.5 block truncate text-xs text-white">{value}</strong></div>; }
+
+function onRadioKeyDown<T extends string>(
+  event: KeyboardEvent<HTMLButtonElement>,
+  values: T[],
+  current: T,
+  onSelect: (value: T) => void,
+) {
+  const currentIndex = Math.max(0, values.indexOf(current));
+  let nextIndex = currentIndex;
+  if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (currentIndex + 1) % values.length;
+  else if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (currentIndex - 1 + values.length) % values.length;
+  else if (event.key === "Home") nextIndex = 0;
+  else if (event.key === "End") nextIndex = values.length - 1;
+  else return;
+
+  event.preventDefault();
+  const group = event.currentTarget.closest('[role="radiogroup"]');
+  onSelect(values[nextIndex]);
+  requestAnimationFrame(() => group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[nextIndex]?.focus());
+}
+
+function countryFor(code: CountryCode) { return COUNTRY_OPTIONS.find((country) => country.code === code) ?? COUNTRY_OPTIONS[0]; }
+function roleFor(code: Role) { return ROLE_OPTIONS.find((role) => role.code === code) ?? ROLE_OPTIONS[0]; }
+function squadRoleLabel(role: CareerOffer["squadRole"]) { return role === "star" ? "Stella" : role === "starter" ? "Titolare" : role === "rotation" ? "Rotazione" : "Prospetto"; }
+function formatMoney(value: number) { if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`; if (value >= 1_000) return `€${Math.round(value / 1_000)}K`; return `€${value}`; }
+function roleTrainingIcon(role: Role) { return role === "GK" ? "🧤" : ["RB", "CB", "LB", "DM"].includes(role) ? "🛡️" : ["CM", "AM"].includes(role) ? "🎯" : "🥅"; }
+function trainingForRole(role: Role) {
+  const specialist: TrainingChoice = role === "GK" ? "goalkeeping" : ["RB", "CB", "LB", "DM"].includes(role) ? "defending" : ["CM", "AM"].includes(role) ? "playmaking" : "finishing";
+  const codes: TrainingChoice[] = ["balanced", specialist, "recovery"];
+  return codes.map((code) => TRAINING_OPTIONS.find((item) => item.code === code) ?? TRAINING_OPTIONS[0]);
+}
