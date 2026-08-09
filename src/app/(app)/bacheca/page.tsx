@@ -12,7 +12,7 @@ import BadgeRow from "@/components/Badges";
 import {
   fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
   addRosterPlayer, deleteRosterPlayer, searchPlayers,
-  adminListProfiles, adminUpdateProfile, adminReleaseTeam, adminAssignTeam, adminDeleteProfile, adminSetProfileBadges, adminSetTeamCapacity,
+  adminListProfiles, adminUpdateProfile, adminUpdateTeamName, adminReleaseTeam, adminAssignTeam, adminDeleteProfile, adminSetProfileBadges, adminSetTeamCapacity,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
 import { isAppOpen, setAppOpen } from "@/app/release-actions";
@@ -879,18 +879,17 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
   const confirm = useConfirm();
   const [firstName, setFirstName] = useState(profile.firstName);
   const [lastName, setLastName] = useState(profile.lastName);
-  const [teamName, setTeamName] = useState(profile.teamName);
   const [badges, setBadges] = useState<string[]>(profile.badges);
   const [busy, setBusy] = useState(false);
   const [badgeBusy, setBadgeBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const dirty = firstName !== profile.firstName || lastName !== profile.lastName || teamName !== profile.teamName;
+  const dirty = firstName !== profile.firstName || lastName !== profile.lastName;
   const availableBadges = BADGES.filter((b) => !badges.includes(b.id));
 
   async function save() {
     setBusy(true); setMsg("");
-    const res = await adminUpdateProfile(profile.userId, { firstName, lastName, teamName });
+    const res = await adminUpdateProfile(profile.userId, { firstName, lastName });
     setBusy(false);
     if (res.error) { setMsg(res.error); return; }
     setMsg("✓ Salvato");
@@ -917,8 +916,6 @@ function ManagerEditor({ profile, reload }: { profile: AdminProfile; reload: () 
           <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Cognome"
             className="input flex-1 min-w-0 px-3 py-2 text-sm" />
         </div>
-        <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Nome squadra (mostrato)"
-          className="input w-full px-3 py-2 text-sm" />
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={save} disabled={busy || !dirty}
             className="btn-primary px-3 py-2 text-xs">Salva</button>
@@ -1009,8 +1006,13 @@ function TeamAdminCard({ team, profiles, onTeamsChange }: { team: Team; profiles
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [teamName, setTeamName] = useState(team.name);
+  const [teamNameBusy, setTeamNameBusy] = useState(false);
+  const [teamNameMsg, setTeamNameMsg] = useState("");
   const [logoErr, setLogoErr] = useState("");
   const logoRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setTeamName(team.name); }, [team.name]);
 
   const loadRoster = useCallback(async () => {
     setLoadingRoster(true);
@@ -1035,15 +1037,22 @@ function TeamAdminCard({ team, profiles, onTeamsChange }: { team: Team; profiles
     await onTeamsChange();
   }
 
+  async function saveTeamName() {
+    const nextName = teamName.trim();
+    if (!nextName) { setTeamNameMsg("Inserisci un nome squadra"); return; }
+    setTeamNameBusy(true); setTeamNameMsg("");
+    const res = await adminUpdateTeamName(team.id, nextName);
+    setTeamNameBusy(false);
+    if (res.error) { setTeamNameMsg(res.error); return; }
+    setTeamNameMsg("✓ Nome squadra aggiornato");
+    await onTeamsChange();
+  }
+
   // Etichetta sotto il nome squadra: nomi degli allenatori, o stato se vuota.
   const managerNames = profiles
     .map((p) => `${p.firstName} ${p.lastName}`.trim() || p.teamName || "Manager")
     .join(", ");
   const managerLabel = managerNames || (team.maxManagers > 1 ? "Libera · 2 posti" : "Libera");
-
-  // Titolo card: il nome "mostrato" scelto in bacheca (team_name del profilo) ha la
-  // precedenza sul nome del catalogo, così un rename si riflette anche qui.
-  const displayName = profiles.map((p) => (p.teamName ?? "").trim()).find(Boolean) || team.name;
 
   return (
     <div className="card-flat overflow-hidden">
@@ -1052,7 +1061,7 @@ function TeamAdminCard({ team, profiles, onTeamsChange }: { team: Team; profiles
           ? <img src={team.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-none" />
           : <span className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm truncate">{displayName}</p>
+          <p className="text-white font-semibold text-sm truncate">{team.name}</p>
           <p className="text-white/40 text-xs truncate">{managerLabel}</p>
         </div>
         {/* Posti occupati/capienza — evidenzia le squadre condivise */}
@@ -1077,6 +1086,20 @@ function TeamAdminCard({ team, profiles, onTeamsChange }: { team: Team; profiles
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onLogo(f); }} />
             <p className="text-white/30 text-[10px] mt-1.5">Questo logo è anche la foto profilo del manager.</p>
             {logoErr && <p className="text-red-400 text-xs mt-1">{logoErr}</p>}
+          </div>
+
+          <div>
+            <label htmlFor={`team-name-${team.id}`} className="eyebrow text-[10px] mb-1.5 block">Nome squadra</label>
+            <div className="flex gap-2">
+              <input id={`team-name-${team.id}`} value={teamName} onChange={(e) => setTeamName(e.target.value)}
+                maxLength={60} className="input min-w-0 flex-1 px-3 py-2 text-sm" />
+              <button type="button" onClick={saveTeamName} disabled={teamNameBusy || !teamName.trim() || teamName.trim() === team.name}
+                className="btn-primary min-h-[40px] px-3 text-xs disabled:opacity-50">
+                {teamNameBusy ? "Salvo…" : "Salva"}
+              </button>
+            </div>
+            <p className="text-white/40 text-[11px] mt-1.5">Modificabile anche senza manager. Non altera il collegamento con la classifica.</p>
+            {teamNameMsg && <p role={teamNameMsg.startsWith("✓") ? "status" : "alert"} className="text-xs mt-1" style={{ color: teamNameMsg.startsWith("✓") ? "var(--success)" : "var(--danger)" }}>{teamNameMsg}</p>}
           </div>
 
           {/* Capienza: quanti allenatori può avere la squadra (1 = normale, 2 = condivisa) */}

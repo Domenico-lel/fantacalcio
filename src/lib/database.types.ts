@@ -235,6 +235,7 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          display_name: string | null;
           team_id: string | null;
           logo_url: string | null;
           max_managers: number;
@@ -243,12 +244,14 @@ export interface Database {
         };
         Insert: {
           name: string;
+          display_name?: string | null;
           team_id?: string | null;
           logo_url?: string | null;
           max_managers?: number;
         };
         Update: {
           name?: string;
+          display_name?: string | null;
           team_id?: string | null;
           logo_url?: string | null;
           max_managers?: number;

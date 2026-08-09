@@ -7,7 +7,7 @@ import { normalizeBadges } from "@/lib/badges";
 
 export interface Team {
   id: string;
-  name: string;
+  name: string;          // nome visualizzato nell'app (override admin, se presente)
   logoUrl: string | null;
   teamId: string | null;
   claimed: boolean;      // true = squadra piena (ha raggiunto max allenatori)
@@ -38,25 +38,29 @@ export async function fetchTeams(): Promise<Team[]> {
 
   const [{ data: teams }, { data: profiles }] = await Promise.all([
     db.from("fanta_teams").select("*").order("name", { ascending: true }),
-    db.from("fanta_profiles").select("user_id, team_ref"),
+    db.from("fanta_profiles").select("user_id, team_ref, team_name"),
   ]);
 
   // Una squadra può avere più allenatori: raccogliamo gli user_id per squadra.
   const membersByTeam = new Map<string, string[]>();
+  const legacyNameByTeam = new Map<string, string>();
   for (const p of profiles ?? []) {
     if (!p.team_ref) continue;
     const arr = membersByTeam.get(p.team_ref) ?? [];
     arr.push(p.user_id);
     membersByTeam.set(p.team_ref, arr);
+    const legacyName = (p.team_name ?? "").trim();
+    if (legacyName && !legacyNameByTeam.has(p.team_ref)) legacyNameByTeam.set(p.team_ref, legacyName);
   }
 
   return (teams ?? []).map((t) => {
     const members = membersByTeam.get(t.id) ?? [];
     // max_managers può non esistere (migrazione non ancora eseguita) → default 1
     const maxManagers = (t as { max_managers?: number }).max_managers ?? 1;
+    const displayName = (t.display_name ?? "").trim() || legacyNameByTeam.get(t.id) || t.name;
     return {
       id: t.id,
-      name: t.name,
+      name: displayName,
       logoUrl: t.logo_url,
       teamId: t.team_id,
       claimed: members.length >= maxManagers, // "piena" quando ha raggiunto la capienza
@@ -81,7 +85,7 @@ export async function fetchStandingsNameMap(): Promise<Record<string, StandingsT
   if (!isSupabaseConfigured()) return {};
   const db = createAdminClient();
   const [{ data: teams }, { data: profiles }] = await Promise.all([
-    db.from("fanta_teams").select("id, name, logo_url"),
+    db.from("fanta_teams").select("id, name, display_name, logo_url"),
     db.from("fanta_profiles").select("team_ref, team_name"),
   ]);
 
@@ -96,7 +100,8 @@ export async function fetchStandingsNameMap(): Promise<Record<string, StandingsT
   const map: Record<string, StandingsTeamInfo> = {};
   for (const t of teams ?? []) {
     if (!t.name) continue;
-    map[t.name] = { displayName: nameByTeam.get(t.id) || t.name, logoUrl: t.logo_url };
+    const displayName = (t.display_name ?? "").trim() || nameByTeam.get(t.id) || t.name;
+    map[t.name] = { displayName, logoUrl: t.logo_url };
   }
   return map;
 }
@@ -207,7 +212,8 @@ export async function claimTeam(teamRef: string): Promise<{ error: string | null
   }
 
   const patch: { team_ref: string; team_name?: string } = { team_ref: teamRef };
-  if (team?.name) patch.team_name = team.name;
+  const displayName = (team?.display_name ?? "").trim() || team?.name;
+  if (displayName) patch.team_name = displayName;
 
   const { error } = await db.from("fanta_profiles").update(patch).eq("user_id", viewer.userId);
   return { error: error?.message ?? null };
@@ -283,6 +289,39 @@ export async function adminUpdateProfile(
   return { error: error?.message ?? null };
 }
 
+// Il nome visualizzato appartiene alla squadra, non a un singolo manager.
+// `fanta_teams.name` resta il nome tecnico importato dalla classifica, necessario al sync.
+export async function adminUpdateTeamName(teamRef: string, displayName: string): Promise<{ error: string | null }> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) return { error: "Solo l'admin" };
+
+  const name = displayName.trim();
+  if (!teamRef || !name) return { error: "Il nome squadra non può essere vuoto" };
+  if (name.length > 60) return { error: "Il nome squadra può avere al massimo 60 caratteri" };
+
+  const db = createAdminClient();
+  const { data, error } = await db
+    .from("fanta_teams")
+    .update({ display_name: name } as never)
+    .eq("id", teamRef)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    if (/display_name/i.test(error.message)) {
+      return { error: "Aggiornamento database mancante: esegui la migrazione del nome squadra." };
+    }
+    return { error: error.message };
+  }
+  if (!data) return { error: "Squadra non trovata" };
+
+  // Mantiene aggiornati header e cache denormalizzata dei manager già assegnati.
+  const { error: profilesError } = await db
+    .from("fanta_profiles")
+    .update({ team_name: name, updated_at: new Date().toISOString() } as never)
+    .eq("team_ref", teamRef);
+  return { error: profilesError?.message ?? null };
+}
+
 // Libera la squadra di un manager (resta il profilo, la squadra torna selezionabile)
 export async function adminReleaseTeam(userId: string): Promise<{ error: string | null }> {
   const viewer = await getCurrentViewer();
@@ -338,7 +377,8 @@ export async function adminAssignTeam(userId: string, teamRef: string): Promise<
     team_ref: teamRef,
     updated_at: new Date().toISOString(),
   };
-  if (team?.name) patch.team_name = team.name;
+  const displayName = (team?.display_name ?? "").trim() || team?.name;
+  if (displayName) patch.team_name = displayName;
 
   const { error } = await db.from("fanta_profiles").update(patch as never).eq("user_id", userId);
   return { error: error?.message ?? null };

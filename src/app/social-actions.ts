@@ -106,10 +106,20 @@ async function getViewer(): Promise<ViewerInternal | null> {
     if (profile.team_ref) {
       const { data: team } = await db
         .from("fanta_teams")
-        .select("logo_url")
+        .select("logo_url, display_name, name")
         .eq("id", profile.team_ref)
         .maybeSingle();
       if (team?.logo_url) logo = team.logo_url;
+      const teamDisplayName = (team?.display_name ?? "").trim() || team?.name?.trim();
+      return {
+        userId,
+        email,
+        isAdmin: false,
+        displayName: teamDisplayName || profile.team_name || profile.first_name || cu?.firstName || "Manager",
+        logo,
+        hasProfile: true,
+        badges: await safeProfileBadges(db, userId),
+      };
     }
     return {
       userId,
