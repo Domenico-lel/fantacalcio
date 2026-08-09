@@ -18,10 +18,12 @@
   --border: rgba(160, 178, 214, 0.13);
   --border-2: rgba(160, 178, 214, 0.25);
   --text: #f4f7fd;
-  --text-dim: rgba(214, 226, 248, 0.62);
-  --text-faint: rgba(214, 226, 248, 0.36);
+  --text-dim: rgba(214, 226, 248, 0.72);
+  --text-faint: rgba(214, 226, 248, 0.52);
   --danger: #f87171;
   --success: #34d399;
+  --bottom-nav-height: 72px;
+  --touch-target: 44px;
 
   /* Accent di default (mint — Bacheca) */
   --accent: #2dd4a7;
@@ -61,6 +63,7 @@ body {
   background: var(--bg);
   color: var(--text);
   overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 #__next,
@@ -68,18 +71,25 @@ main {
   min-height: 100dvh;
 }
 
-.safe-bottom {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
-}
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px); }
 
 /* Safe-area in alto per i telefoni con notch/isola dinamica */
-.safe-top { padding-top: max(env(safe-area-inset-top, 0px), 0px); }
+.safe-top { padding-top: max(env(safe-area-inset-top, 0px), 8px); }
+
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, [role="button"] { touch-action: manipulation; }
+
+/* Focus evidente anche con tastiera esterna o switch control. */
+:where(button, a, input, select, textarea, [role="tab"]):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 70%, white);
+  outline-offset: 3px;
+}
 
 /* ─── Superfici di pagina ──────────────────────────────────────────────────── */
 
 /* Full-screen section surface: alone dell'accent in alto, poi il fondo */
 .screen {
-  min-height: 100dvh;
+  min-height: 100%;
   background:
     radial-gradient(120% 60% at 50% -5%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 62%),
     var(--bg);
@@ -100,7 +110,7 @@ main {
 .page-title {
   font-family: var(--font-display), var(--font-inter), system-ui, sans-serif;
   font-weight: 800;
-  font-size: 26px;
+  font-size: 24px;
   line-height: 1.12;
   letter-spacing: -0.02em;
   color: var(--text);
@@ -112,7 +122,7 @@ main {
 
 /* Etichetta piccola sopra i titoli / le sezioni */
 .eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.13em;
@@ -289,7 +299,12 @@ select.input option { background: var(--surface-2); color: var(--text); }
 .tab-in-right { animation: tabInRight 0.28s cubic-bezier(0.23, 1, 0.32, 1); }
 .tab-in-left  { animation: tabInLeft  0.28s cubic-bezier(0.23, 1, 0.32, 1); }
 @media (prefers-reduced-motion: reduce) {
-  .tab-in-right, .tab-in-left { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Area di tocco minima ~44px: allarga la zona cliccabile dei bottoni piccoli
@@ -298,8 +313,8 @@ select.input option { background: var(--surface-2); color: var(--text); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  min-height: 40px;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
 }
 
 /* Hide scrollbar but keep scrolling */

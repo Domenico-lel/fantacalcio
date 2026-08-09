@@ -23,7 +23,7 @@ export default function TabPanel({
   useEffect(() => { prev.current = tabKey; }, [tabKey]);
 
   return (
-    <div key={tabKey} className={forward ? "tab-in-right" : "tab-in-left"}>
+    <div key={tabKey} id={`tab-panel-${tabKey}`} role="tabpanel" aria-labelledby={`tab-${tabKey}`} tabIndex={0} className={forward ? "tab-in-right" : "tab-in-left"}>
       {children}
     </div>
   );

@@ -67,6 +67,9 @@ export default function StandingsPage() {
   const [loading, setLoading] = useState(true);
   const [overrides, setOverrides] = useState<Record<string, StandingsTeamInfo>>({});
   const [sourceError, setSourceError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
     // Identità autorevole dal server (stessa fonte dell'header), con paint immediato dalla cache.
@@ -76,7 +79,9 @@ export default function StandingsPage() {
     if (cached?.displayName) setMyTeamName(cached.displayName);
     if (cached?.logo && !isImageAvatar(cached.logo)) setMyLogo(cached.logo);
     getCurrentViewer().then((v) => {
-      if (!v?.displayName) return;
+      if (!v) return;
+      setIsAdmin(v.isAdmin);
+      if (!v.displayName) return;
       setMyTeamName(v.displayName);
       setMyLogo(isImageAvatar(v.logo) ? "⭐" : v.logo || "⭐");
     }).catch(() => {});
@@ -113,6 +118,7 @@ export default function StandingsPage() {
         };
       });
       setStandings(withLogos);
+      setLastUpdated(new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
     } catch {
       setStandings([]);
       setSourceError("Impossibile caricare la classifica. Riprova tra poco.");
@@ -123,8 +129,14 @@ export default function StandingsPage() {
 
   useEffect(() => { loadStandings(); }, [loadStandings]);
 
+  async function refreshStandings() {
+    setRefreshing(true);
+    await loadStandings();
+    setRefreshing(false);
+  }
+
   // Pull-to-refresh sulla classifica; sulla tab Trofei ci pensa TrofeiContent.
-  useRegisterRefresh(tab === "classifica" ? loadStandings : NOOP);
+  useRegisterRefresh(tab === "classifica" ? refreshStandings : NOOP);
 
   const myEntry = standings.find((e) => e.displayName === myTeamName);
   const leader = standings[0];
@@ -136,9 +148,18 @@ export default function StandingsPage() {
         eyebrow={tab === "classifica" ? "Stagione 2025/26" : "Fanta Soccer Club"}
         title={tab === "classifica" ? "Classifica" : "Albo d'oro"}
         right={
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl"
-            style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)" }}>
-            🏆
+          <div className="flex items-center gap-1">
+            {tab === "classifica" && (
+              <button type="button" onClick={refreshStandings} disabled={refreshing} className="tap rounded-2xl text-lg disabled:opacity-50"
+                aria-label="Aggiorna la classifica"
+                style={{ background: "color-mix(in srgb, var(--accent) 11%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)", color: "var(--accent-soft)" }}>
+                <span style={{ display: "inline-block", animation: refreshing ? "spin .8s linear infinite" : "none" }}>↻</span>
+              </button>
+            )}
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl"
+              style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)" }}>
+              🏆
+            </div>
           </div>
         }
       >
@@ -154,16 +175,21 @@ export default function StandingsPage() {
 
       <TabPanel tabKey={tab} keys={TAB_KEYS}>
         {tab === "trofei" ? <TrofeiContent /> : (
-      <div className="px-4 pb-24 pt-4 flex flex-col gap-3">
+      <div className="px-4 pb-8 pt-4 flex flex-col gap-3">
 
         {loading && standings.length === 0 && Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="skeleton" style={{ height: i === 0 ? 96 : 60 }} />
         ))}
 
         {!loading && standings.length === 0 && (
-          <div className="flex flex-col items-center py-16 gap-3 text-center">
+          <div className="card-flat flex flex-col items-center py-10 px-5 gap-3 text-center">
             <span className="text-4xl">🏆</span>
-            <p className="text-white/50 text-sm">{sourceError || "Classifica non ancora disponibile."}</p>
+            <p className="text-white/75 text-sm leading-relaxed">{sourceError || "Classifica non ancora disponibile."}</p>
+            {isAdmin && sourceError && <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>Apri Bacheca → Gestione per controllare il link e sincronizzare le squadre.</p>}
+            <button type="button" onClick={refreshStandings} disabled={refreshing} className="btn-primary min-h-[44px] px-5 text-sm disabled:opacity-50">
+              {refreshing ? "Aggiorno…" : "Aggiorna classifica"}
+            </button>
+            {lastUpdated && <p className="text-xs" style={{ color: "var(--text-faint)" }}>Aggiornata alle {lastUpdated}</p>}
           </div>
         )}
 

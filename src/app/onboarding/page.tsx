@@ -20,6 +20,7 @@ export default function OnboardingPage() {
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [teamQuery, setTeamQuery] = useState("");
 
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -37,6 +38,9 @@ export default function OnboardingPage() {
   }, [router]);
 
   const available = teams.filter((t) => !t.claimed);
+  const filteredTeams = available.filter((team) =>
+    team.name.toLocaleLowerCase("it-IT").includes(teamQuery.trim().toLocaleLowerCase("it-IT"))
+  );
   const hasTeams = teams.length > 0;
 
   async function saveProfile(team: Team | null) {
@@ -88,7 +92,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-dvh pitch-bg flex flex-col items-center justify-center px-6">
+    <main className="min-h-dvh pitch-bg flex flex-col items-center justify-center px-5 py-6">
       <div className="w-full max-w-sm">
         {/* Progress */}
         <div className="flex gap-2 mb-8">
@@ -107,14 +111,18 @@ export default function OnboardingPage() {
             </div>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="text-white/60 text-sm font-medium block mb-1.5">Nome</label>
+                <label htmlFor="first-name" className="text-white/60 text-sm font-medium block mb-1.5">Nome</label>
                 <input
+                  id="first-name"
+                  autoComplete="given-name"
                   className="input w-full px-4 py-3.5"
                   placeholder="es. Marco" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               </div>
               <div>
-                <label className="text-white/60 text-sm font-medium block mb-1.5">Cognome</label>
+                <label htmlFor="last-name" className="text-white/60 text-sm font-medium block mb-1.5">Cognome</label>
                 <input
+                  id="last-name"
+                  autoComplete="family-name"
                   className="input w-full px-4 py-3.5"
                   placeholder="es. Rossi" value={lastName} onChange={(e) => setLastName(e.target.value)} />
               </div>
@@ -130,7 +138,27 @@ export default function OnboardingPage() {
               <p className="text-white/50 text-sm mt-1">Seleziona la squadra che ti appartiene</p>
             </div>
 
-            <div className="flex flex-col gap-2 max-h-[46vh] overflow-y-auto pr-1">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm text-white/55">{available.length} squadre disponibili</p>
+              {selectedTeam && <p className="text-sm font-semibold text-emerald-300" role="status">1 selezionata</p>}
+            </div>
+
+            {available.length > 0 && (
+              <div className="mb-3">
+                <label htmlFor="team-search" className="sr-only">Cerca la tua squadra</label>
+                <input
+                  id="team-search"
+                  type="search"
+                  autoComplete="off"
+                  value={teamQuery}
+                  onChange={(event) => setTeamQuery(event.target.value)}
+                  placeholder="Cerca squadra"
+                  className="input w-full px-4 py-3"
+                />
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 max-h-[36dvh] overflow-y-auto pr-1" role="radiogroup" aria-label="Scegli la tua squadra">
               {available.length === 0 && (
                 <p className="text-white/50 text-sm text-center py-4">
                   {hasTeams
@@ -138,11 +166,14 @@ export default function OnboardingPage() {
                     : "Nessuna squadra disponibile: l'admin deve ancora sincronizzare le squadre della lega."}
                 </p>
               )}
-              {available.map((t) => {
+              {available.length > 0 && filteredTeams.length === 0 && (
+                <p className="text-white/50 text-sm text-center py-4">Nessuna squadra corrisponde alla ricerca.</p>
+              )}
+              {filteredTeams.map((t) => {
                 const sel = selectedTeam?.id === t.id;
                 return (
-                  <button key={t.id} onClick={() => setSelectedTeam(t)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all active:scale-[0.98]"
+                  <button key={t.id} type="button" role="radio" aria-checked={sel} onClick={() => setSelectedTeam(t)}
+                    className="flex min-h-14 items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all active:scale-[0.98]"
                     style={{
                       background: sel ? "rgba(52,211,153,0.14)" : "rgba(255,255,255,0.055)",
                       border: `1px solid ${sel ? "#34d399" : "var(--border)"}`,
@@ -160,9 +191,9 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {error && <p className="text-red-400 text-sm text-center mt-3">{error}</p>}
+        {error && <p className="text-red-400 text-sm text-center mt-3" role="alert">{error}</p>}
 
-        <div className="mt-8 flex flex-col gap-3">
+        <div className="mt-5 flex flex-col gap-3">
           <button onClick={handleNext} disabled={saving || (step === 2 && !selectedTeam)}
             className="w-full py-4 font-bold rounded-2xl text-lg transition-all active:scale-95 disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, #0ec98f, #4ae8b8)", color: "#04281e", boxShadow: "0 10px 26px -10px rgba(20,220,160,0.5)" }}>

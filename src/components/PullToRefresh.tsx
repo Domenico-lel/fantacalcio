@@ -84,6 +84,9 @@ export default function PullToRefresh({
       <div className="flex-1 relative overflow-hidden">
         {/* Indicatore circolare */}
         <div
+          role="status"
+          aria-live="polite"
+          aria-label={refreshing ? "Aggiornamento in corso" : undefined}
           className="absolute top-0 left-0 right-0 z-30 flex justify-center pointer-events-none"
           style={{
             transform: `translateY(${indicator - 44}px)`,
@@ -105,10 +108,12 @@ export default function PullToRefresh({
 
         <div
           ref={scrollRef}
-          className="h-full overflow-y-auto pb-20"
+          className="h-full overflow-y-auto"
+          style={{ paddingBottom: "calc(var(--bottom-nav-height) + max(env(safe-area-inset-bottom, 0px), 8px))" }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
+          aria-busy={refreshing}
         >
           {/* transform solo durante il gesto: a riposo niente transform, così i
               position:fixed interni (es. il bottom-sheet giocatore) restano ancorati al viewport */}

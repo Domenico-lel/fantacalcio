@@ -20,7 +20,7 @@ export default function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <header className="sec-header sticky top-0 z-20 px-4 pt-3 pb-3">
+    <header className="sec-header sticky top-0 z-20 px-4 pt-2.5 pb-2.5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="eyebrow">{eyebrow}</p>
@@ -28,7 +28,7 @@ export default function PageHeader({
         </div>
         {right && <div className="flex-none">{right}</div>}
       </div>
-      {children && <div className="mt-3">{children}</div>}
+      {children && <div className="mt-2.5">{children}</div>}
     </header>
   );
 }

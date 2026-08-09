@@ -51,13 +51,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <DialogProvider>
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
       {/* Top bar — header app-style, piatto, mai scrollabile */}
-      <header className="flex-none flex items-center gap-3 px-4 pt-4 pb-3 safe-top">
+      <header className="flex-none flex min-h-[64px] items-center gap-3 px-4 pb-2 safe-top">
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em] leading-none" style={{ color: "var(--text-faint)" }}>
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] leading-none" style={{ color: "var(--text-faint)" }}>
             Fanta Soccer Club
           </span>
           <div className="flex items-center gap-1.5 min-w-0 mt-1">
-            <span className="font-display text-white text-[17px] font-bold leading-tight truncate">{teamLabel}</span>
+            <span className="font-display text-white text-[16px] font-bold leading-tight truncate">{teamLabel}</span>
             {viewer?.badges && viewer.badges.length > 0 && (
               <span className="flex-none"><BadgeRow ids={viewer.badges} compact size={16} /></span>
             )}
@@ -65,13 +65,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex-none rounded-full active:scale-95 transition-transform"
+          className="tap flex-none rounded-full active:scale-95 transition-transform"
           aria-label="Apri profilo"
         >
           {isImageAvatar(avatarSrc)
-            ? <img src={avatarSrc} alt="" className="w-10 h-10 rounded-full object-cover"
+            ? <img src={avatarSrc} alt="" className="w-11 h-11 rounded-full object-cover"
                 style={{ border: "2px solid var(--border-2)", boxShadow: "0 4px 14px -6px rgba(0,0,0,0.8)" }} />
-            : <span className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+            : <span className="w-11 h-11 rounded-full flex items-center justify-center text-xl"
                 style={{ background: "var(--surface-2)", border: "2px solid var(--border-2)" }}>{avatarSrc}</span>}
         </button>
       </header>
@@ -79,9 +79,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <PullToRefresh scrollRef={scrollRef}>{children}</PullToRefresh>
 
       {/* Bottom navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
+      <nav aria-label="Navigazione principale" className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
            style={{ background: "rgba(7,11,20,0.9)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderTop: "1px solid var(--border)" }}>
-        <div className="flex">
+        <div className="mx-auto grid w-full max-w-xl grid-cols-4">
           {NAV_ITEMS.map(({ href, label, icon: Icon, color }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
@@ -92,18 +92,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   // ri-tap sulla tab attiva → torna in cima (pattern iOS)
                   if (active) { e.preventDefault(); scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }
                 }}
-                className="flex-1 flex flex-col items-center gap-1 pt-2.5 pb-2 transition-colors"
+                aria-current={active ? "page" : undefined}
+                className="flex min-h-[64px] flex-col items-center justify-center gap-1 py-1.5 transition-colors"
                 style={{ color: active ? color : "var(--text-faint)" }}
               >
                 <div className="flex items-center justify-center rounded-full transition-all duration-200"
                   style={{
-                    width: 48, height: 30,
+                    width: 46, height: 29,
                     background: active ? `${color}1f` : "transparent",
                     boxShadow: active ? `0 6px 16px -8px ${color}` : "none",
                   }}>
                   <Icon active={active} />
                 </div>
-                <span className="text-[10px] tracking-wide" style={{ fontWeight: active ? 700 : 600 }}>{label}</span>
+                <span className="text-[11px] tracking-wide" style={{ fontWeight: active ? 700 : 600 }}>{label}</span>
               </Link>
             );
           })}

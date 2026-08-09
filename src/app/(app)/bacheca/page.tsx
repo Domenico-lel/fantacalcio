@@ -593,6 +593,7 @@ function GestioneTab() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [profiles, setProfiles] = useState<AdminProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState("");
   const [leagueUrl, setLeagueUrl] = useState("");
@@ -600,10 +601,16 @@ function GestioneTab() {
   const [leagueMsg, setLeagueMsg] = useState("");
 
   const load = useCallback(async () => {
-    const [t, p] = await Promise.all([fetchTeams(), adminListProfiles()]);
-    setTeams(t);
-    setProfiles(p);
-    setLoading(false);
+    setLoadError("");
+    try {
+      const [t, p] = await Promise.all([fetchTeams(), adminListProfiles()]);
+      setTeams(t);
+      setProfiles(p);
+    } catch {
+      setLoadError("Non riesco a caricare la gestione. Controlla la connessione e riprova.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { getLeagueUrlSetting().then(setLeagueUrl).catch(() => {}); }, []);
@@ -619,47 +626,79 @@ function GestioneTab() {
 
   const unassignedManagers = profiles.filter((p) => !p.teamRef);
   const freeTeams = teams.filter((t) => !t.claimed);
+  const hasLeagueUrl = leagueUrl.trim().length > 0;
+  const syncFailed = !!msg && !msg.startsWith("✓");
 
   async function sync() {
     setSyncing(true); setMsg("");
-    const res = await syncTeams();
-    setSyncing(false);
-    setMsg(res.error ?? `✓ Sincronizzate ${res.count} squadre dalla classifica`);
-    await load();
+    try {
+      const res = await syncTeams();
+      if (res.error) { setMsg(res.error); return; }
+      setMsg(`✓ Sincronizzate ${res.count} squadre dalla classifica`);
+      await load();
+    } catch {
+      setMsg("Sincronizzazione non riuscita. Controlla il link della lega e riprova.");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function saveLeagueUrl() {
     setLeagueBusy(true); setLeagueMsg("");
-    const res = await setLeagueUrlSetting(leagueUrl);
-    setLeagueBusy(false);
-    if (res.error) { setLeagueMsg(res.error); return; }
-    setLeagueUrl(res.url);
-    setLeagueMsg("✓ Link salvato. Ora puoi sincronizzare le squadre.");
+    try {
+      const res = await setLeagueUrlSetting(leagueUrl);
+      if (res.error) { setLeagueMsg(res.error); return; }
+      setLeagueUrl(res.url);
+      setLeagueMsg("✓ Link salvato. Ora puoi sincronizzare le squadre.");
+    } catch {
+      setLeagueMsg("Non riesco a salvare il link. Riprova tra poco.");
+    } finally {
+      setLeagueBusy(false);
+    }
   }
 
   return (
-    <div className="px-4 py-4 flex flex-col gap-3">
+    <div className="px-4 py-4 flex flex-col gap-4">
+      <section className="card p-4" aria-labelledby="league-connection-title">
+        <div className="flex items-start gap-3">
+          <span className="w-10 h-10 rounded-2xl flex items-center justify-center text-lg flex-none"
+            style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}>↻</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <h2 id="league-connection-title" className="font-display text-white font-bold text-base">Classifica della lega</h2>
+              <span className="chip">{teams.length ? `${teams.length} squadre` : "Da collegare"}</span>
+            </div>
+            <p className="text-sm leading-snug mt-1" style={{ color: "var(--text-dim)" }}>
+              Incolla il link della tua lega, salvalo e importa le squadre in un tap.
+            </p>
+          </div>
+        </div>
+
+        <label htmlFor="league-url" className="sr-only">Link della lega Fantacalcio</label>
+        <input id="league-url" value={leagueUrl} onChange={(e) => setLeagueUrl(e.target.value)}
+          placeholder="https://leghe.fantacalcio.it/nome-della-lega"
+          className="input mt-4 w-full px-3.5 py-3 text-sm" inputMode="url" autoCapitalize="none" autoCorrect="off" />
+
+        <div className="grid grid-cols-1 gap-2 mt-2 sm:grid-cols-2">
+          <button onClick={saveLeagueUrl} disabled={leagueBusy || !hasLeagueUrl}
+            className="btn-soft min-h-[44px] px-4 text-sm disabled:opacity-50">{leagueBusy ? "Salvo…" : "Salva link"}</button>
+          <button onClick={sync} disabled={syncing || !hasLeagueUrl}
+            className="btn-primary min-h-[44px] px-4 text-sm disabled:opacity-50">
+            {syncing ? "Sincronizzo…" : "Sincronizza ora"}
+          </button>
+        </div>
+        {leagueMsg && <p role={leagueMsg.startsWith("✓") ? "status" : "alert"} className="mt-3 text-sm" style={{ color: leagueMsg.startsWith("✓") ? "var(--success)" : "var(--danger)" }}>{leagueMsg}</p>}
+        {msg && <p role={syncFailed ? "alert" : "status"} className="mt-3 rounded-xl px-3 py-2.5 text-sm" style={{ background: syncFailed ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)", color: syncFailed ? "#fca5a5" : "#a7f3d0" }}>{msg}</p>}
+      </section>
+
       <AppReleaseToggle />
 
-      <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid var(--border)" }}>
-        <p className="text-white font-semibold text-sm">Link classifica Fantacalcio</p>
-        <p className="text-white/45 text-[11px] mt-0.5 mb-2">Apri la tua lega su leghe.fantacalcio.it e incolla qui il suo link.</p>
-        <div className="flex gap-2">
-          <input value={leagueUrl} onChange={(e) => setLeagueUrl(e.target.value)}
-            placeholder="https://leghe.fantacalcio.it/nome-della-lega"
-            className="input min-w-0 flex-1 px-3 py-2 text-xs" inputMode="url" />
-          <button onClick={saveLeagueUrl} disabled={leagueBusy || !leagueUrl.trim()}
-            className="btn-primary px-3 py-2 text-xs disabled:opacity-50">{leagueBusy ? "…" : "Salva"}</button>
+      {loadError && (
+        <div role="alert" className="card p-4 flex flex-col gap-3" style={{ borderColor: "rgba(248,113,113,0.38)" }}>
+          <p className="text-sm text-red-200">{loadError}</p>
+          <button type="button" onClick={load} className="btn-soft min-h-[44px] px-4 self-start text-sm font-bold">Riprova</button>
         </div>
-        {leagueMsg && <p className="text-white/60 text-[11px] mt-2">{leagueMsg}</p>}
-      </div>
-
-      <button onClick={sync} disabled={syncing}
-        className="w-full py-3 rounded-xl text-sm font-bold disabled:opacity-50"
-        style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", color: "var(--accent)" }}>
-        {syncing ? "Sincronizzo…" : "🔄 Sincronizza squadre dalla classifica"}
-      </button>
-      {msg && <p className="text-white/60 text-xs text-center">{msg}</p>}
+      )}
 
       {!loading && unassignedManagers.length > 0 && (
         <UnassignedManagers managers={unassignedManagers} freeTeams={freeTeams} reload={load} />
@@ -669,10 +708,11 @@ function GestioneTab() {
         <div key={i} className="skeleton" style={{ height: 56 }} />
       ))}
       {!loading && teams.length === 0 && (
-        <p className="text-white/50 text-sm text-center py-10">
-          Nessuna squadra. Premi &quot;Sincronizza&quot; per importarle dalla classifica.
+        <p className="text-white/50 text-sm text-center py-8">
+          Nessuna squadra importata: salva il link della lega e premi “Sincronizza ora”.
         </p>
       )}
+      {!loading && teams.length > 0 && <p className="eyebrow px-1">Squadre della lega · {teams.length}</p>}
       {teams.map((t) => <TeamAdminCard key={t.id} team={t} profiles={profilesByTeam.get(t.id) ?? []} onTeamsChange={load} />)}
       <div className="h-4" />
     </div>
