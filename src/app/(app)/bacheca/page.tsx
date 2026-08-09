@@ -16,6 +16,7 @@ import {
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
 import { isAppOpen, setAppOpen } from "@/app/release-actions";
+import { getLeagueUrlSetting, setLeagueUrlSetting } from "@/app/league-settings-actions";
 import { isImageAvatar } from "@/lib/avatar";
 import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
@@ -594,6 +595,9 @@ function GestioneTab() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState("");
+  const [leagueUrl, setLeagueUrl] = useState("");
+  const [leagueBusy, setLeagueBusy] = useState(false);
+  const [leagueMsg, setLeagueMsg] = useState("");
 
   const load = useCallback(async () => {
     const [t, p] = await Promise.all([fetchTeams(), adminListProfiles()]);
@@ -602,6 +606,7 @@ function GestioneTab() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { getLeagueUrlSetting().then(setLeagueUrl).catch(() => {}); }, []);
   useRegisterRefresh(load);
 
   // Una squadra può avere più allenatori → lista di profili per squadra.
@@ -623,9 +628,31 @@ function GestioneTab() {
     await load();
   }
 
+  async function saveLeagueUrl() {
+    setLeagueBusy(true); setLeagueMsg("");
+    const res = await setLeagueUrlSetting(leagueUrl);
+    setLeagueBusy(false);
+    if (res.error) { setLeagueMsg(res.error); return; }
+    setLeagueUrl(res.url);
+    setLeagueMsg("✓ Link salvato. Ora puoi sincronizzare le squadre.");
+  }
+
   return (
     <div className="px-4 py-4 flex flex-col gap-3">
       <AppReleaseToggle />
+
+      <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid var(--border)" }}>
+        <p className="text-white font-semibold text-sm">Link classifica Fantacalcio</p>
+        <p className="text-white/45 text-[11px] mt-0.5 mb-2">Apri la tua lega su leghe.fantacalcio.it e incolla qui il suo link.</p>
+        <div className="flex gap-2">
+          <input value={leagueUrl} onChange={(e) => setLeagueUrl(e.target.value)}
+            placeholder="https://leghe.fantacalcio.it/nome-della-lega"
+            className="input min-w-0 flex-1 px-3 py-2 text-xs" inputMode="url" />
+          <button onClick={saveLeagueUrl} disabled={leagueBusy || !leagueUrl.trim()}
+            className="btn-primary px-3 py-2 text-xs disabled:opacity-50">{leagueBusy ? "…" : "Salva"}</button>
+        </div>
+        {leagueMsg && <p className="text-white/60 text-[11px] mt-2">{leagueMsg}</p>}
+      </div>
 
       <button onClick={sync} disabled={syncing}
         className="w-full py-3 rounded-xl text-sm font-bold disabled:opacity-50"

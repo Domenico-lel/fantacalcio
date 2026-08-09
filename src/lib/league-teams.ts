@@ -1,7 +1,7 @@
 // Recupera l'elenco delle squadre dalla pagina classifica della lega
 // (stessa fonte/HTML usata da /api/standings).
 
-const LEAGUE_SLUG = process.env.FANTACALCIO_LEAGUE_SLUG ?? "";
+import { getLeagueSlug, leagueUrlFromSlug } from "@/lib/league-config";
 
 const HEADERS = {
   "User-Agent":
@@ -12,6 +12,11 @@ const HEADERS = {
 export interface LeagueTeam {
   name: string;
   teamId: string | null;
+}
+
+export interface LeagueTeamsResult {
+  teams: LeagueTeam[];
+  error: string | null;
 }
 
 function decode(s: string): string {
@@ -49,16 +54,26 @@ function parseTeams(html: string): LeagueTeam[] {
   return teams;
 }
 
-export async function fetchLeagueTeams(): Promise<LeagueTeam[]> {
-  if (!LEAGUE_SLUG) return [];
+export async function fetchLeagueTeams(): Promise<LeagueTeamsResult> {
+  const slug = await getLeagueSlug();
+  if (!slug) {
+    return { teams: [], error: "Link della lega non configurato: aggiungilo nella sezione Gestione." };
+  }
+
+  const url = leagueUrlFromSlug(slug);
   try {
-    const res = await fetch(`https://leghe.fantacalcio.it/${LEAGUE_SLUG}`, {
+    const res = await fetch(url, {
       headers: HEADERS,
       next: { revalidate: 600 },
     });
-    if (!res.ok) return [];
-    return parseTeams(await res.text());
+    if (!res.ok) {
+      return { teams: [], error: `La pagina della lega risponde ${res.status}. Controlla il link salvato in Gestione.` };
+    }
+    const teams = parseTeams(await res.text());
+    return teams.length > 0
+      ? { teams, error: null }
+      : { teams: [], error: "La pagina è raggiungibile, ma non contiene una classifica leggibile." };
   } catch {
-    return [];
+    return { teams: [], error: "Impossibile raggiungere la pagina della lega. Riprova tra poco." };
   }
 }

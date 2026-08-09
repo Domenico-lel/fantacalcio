@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getLeagueSlug, leagueUrlFromSlug } from "@/lib/league-config";
 
 export interface StandingEntry {
   position: number;
@@ -13,9 +14,6 @@ export interface StandingEntry {
   goalsFor: number;
   goalsAgainst: number;
 }
-
-const LEAGUE_SLUG = process.env.FANTACALCIO_LEAGUE_SLUG ?? "";
-const LEAGUE_URL = `https://leghe.fantacalcio.it/${LEAGUE_SLUG}`;
 
 const HEADERS = {
   "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
@@ -73,22 +71,26 @@ function parseStandingsFromHtml(html: string): StandingEntry[] {
   return standings;
 }
 
-async function fetchStandings(): Promise<StandingEntry[]> {
-  if (!LEAGUE_SLUG) return [];
+async function fetchStandings(): Promise<{ items: StandingEntry[]; error: string | null }> {
+  const slug = await getLeagueSlug();
+  if (!slug) return { items: [], error: "Link della lega non configurato" };
   try {
-    const res = await fetch(LEAGUE_URL, { headers: HEADERS, next: { revalidate: 600 } });
-    if (!res.ok) return [];
+    const res = await fetch(leagueUrlFromSlug(slug), { headers: HEADERS, next: { revalidate: 600 } });
+    if (!res.ok) return { items: [], error: `La pagina della lega risponde ${res.status}` };
     const html = await res.text();
-    return parseStandingsFromHtml(html);
+    const items = parseStandingsFromHtml(html);
+    return items.length > 0
+      ? { items, error: null }
+      : { items: [], error: "La pagina della lega non contiene una classifica leggibile" };
   } catch {
-    return [];
+    return { items: [], error: "Impossibile raggiungere la pagina della lega" };
   }
 }
 
 export async function GET() {
   const standings = await fetchStandings();
   return NextResponse.json(
-    { items: standings },
-    { headers: { "Cache-Control": "s-maxage=600, stale-while-revalidate=120" } }
+    standings,
+    { headers: { "Cache-Control": "no-store" } }
   );
 }

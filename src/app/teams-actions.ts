@@ -105,8 +105,8 @@ export async function syncTeams(): Promise<{ count: number; error: string | null
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { count: 0, error: "Solo l'admin può sincronizzare le squadre" };
 
-  const teams = await fetchLeagueTeams();
-  if (teams.length === 0) return { count: 0, error: "Nessuna squadra trovata nella classifica (controlla lo slug lega)" };
+  const { teams, error: fetchError } = await fetchLeagueTeams();
+  if (fetchError || teams.length === 0) return { count: 0, error: fetchError ?? "Nessuna squadra trovata nella classifica" };
 
   const db = createAdminClient();
   const rows = teams.map((t) => ({ name: t.name, team_id: t.teamId }));
