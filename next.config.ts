@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "img.clerk.com" },
       { protocol: "https", hostname: "images.clerk.dev" },
+      { protocol: "https", hostname: "crests.football-data.org" },
+      { protocol: "https", hostname: "a.espncdn.com" },
+      { protocol: "https", hostname: "eredivisie.b-cdn.net" },
     ],
   },
   // La sezione Trofei ora vive dentro /standings (Classifica). Le vecchie

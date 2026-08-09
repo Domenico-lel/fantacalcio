@@ -11,6 +11,7 @@ import {
   chooseStartingClub,
   createInitialCareer,
   simulateNextSeason,
+  upgradeCareerCatalog,
   type CareerSeason,
   type CareerState,
   type CountryCode,
@@ -74,7 +75,7 @@ function isCareerState(value: unknown): value is CareerState {
 }
 
 function parseState(value: Json): CareerState | null {
-  return isCareerState(value) ? value : null;
+  return isCareerState(value) ? upgradeCareerCatalog(value) : null;
 }
 
 function json(value: CareerState | CareerSeason): Json {
@@ -101,18 +102,6 @@ async function readHub(viewer: Viewer): Promise<CareerHub> {
     return { viewer, career: null, seasons: [], error: "Il salvataggio della carriera non è leggibile." };
   }
 
-  const seasonRes = await db
-    .from("fanta_career_seasons")
-    .select("summary")
-    .eq("career_id", own.data.id)
-    .order("season_no", { ascending: false });
-
-  const storedSeasons = seasonRes.error
-    ? []
-    : (seasonRes.data ?? [])
-        .map((row) => row.summary as unknown)
-        .filter((row): row is CareerSeason => !!row && typeof row === "object" && "index" in row);
-
   return {
     viewer,
     career: {
@@ -123,8 +112,10 @@ async function readHub(viewer: Viewer): Promise<CareerHub> {
       state,
       updatedAt: own.data.updated_at,
     },
-    seasons: storedSeasons.length > 0 ? storedSeasons : [...state.seasons].reverse(),
-    error: seasonRes.error ? schemaMessage(seasonRes.error.message) : null,
+    // Lo stato versionato e la fonte autorevole: contiene anche le stagioni
+    // convertite dal vecchio catalogo fittizio ai club reali.
+    seasons: [...state.seasons].reverse(),
+    error: null,
   };
 }
 

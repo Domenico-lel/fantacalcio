@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useState, type KeyboardEvent } from "react";
 import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
@@ -23,10 +24,12 @@ import {
   COUNTRY_OPTIONS,
   ROLE_OPTIONS,
   TRAINING_OPTIONS,
+  getClubByName,
   type CareerEvent,
   type CareerOffer,
   type CareerSeason,
   type CareerState,
+  type ClubDefinition,
   type CountryCode,
   type GameMode,
   type PreferredFoot,
@@ -173,6 +176,7 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
         {setupStep === null
           ? <ModePicker onPick={(mode) => { setDraft({ ...DEFAULT_DRAFT, gameMode: mode }); setSetupStep(1); }} />
           : <SetupWizard step={setupStep} setStep={setSetupStep} draft={draft} setDraft={setDraft} busy={busy} onSubmit={submitCareer} onCancel={() => setSetupStep(null)} />}
+        <ClubDataCredit />
       </div>
     );
   }
@@ -184,6 +188,7 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
         <PageHeader eyebrow="Primo contratto" title="Scegli il club" />
         {hub.error && <ErrorBanner message={hub.error} onRetry={reload} />}
         <StartingOffers state={state} busy={busy} onChoose={(name) => mutate(() => chooseCareerClub(name), "Hai firmato il primo contratto.")} />
+        <ClubDataCredit />
       </div>
     );
   }
@@ -227,6 +232,7 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
           <ArchiveTab seasons={hub.seasons} />
         )}
       </TabPanel>
+      <ClubDataCredit />
     </div>
   );
 }
@@ -293,6 +299,8 @@ function SetupWizard({ step, setStep, draft, setDraft, busy, onSubmit, onCancel 
   const roleCodes = ROLE_OPTIONS.map((role) => role.code);
   const feet: PreferredFoot[] = ["left", "right", "both"];
   const startModes: StartMode[] = ["academy", "freeAgent"];
+  const availableClubs = CLUBS_BY_COUNTRY[draft.nationality];
+  const clubNames = availableClubs.map((club) => club.name);
   const canContinue = step === 1 || (step === 2 && !!draft.firstName.trim() && !!draft.role && Number(draft.shirtNumber) >= 1 && Number(draft.shirtNumber) <= 99)
     || (step === 3 && (draft.startMode === "academy" || !!draft.startingClubName));
 
@@ -327,8 +335,8 @@ function SetupWizard({ step, setStep, draft, setDraft, busy, onSubmit, onCancel 
               })}
             </div>
             <div className="card-accent mt-4 p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold" style={{ color: "var(--accent-soft)" }}>{selectedCountry.league.name}</p><p className="mt-1 text-xs" style={{ color: "var(--text-dim)" }}>{selectedCountry.league.style}</p></div><strong className="font-display text-xl text-white">{selectedCountry.league.clubs}</strong></div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center"><SmallInfo label="Club" value={String(selectedCountry.league.clubs)} /><SmallInfo label="Partite" value={String(selectedCountry.league.leagueMatches)} /><SmallInfo label="Livello" value={String(selectedCountry.league.strength)} /></div>
+              <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold" style={{ color: "var(--accent-soft)" }}>{selectedCountry.league.name}</p><p className="mt-1 text-xs" style={{ color: "var(--text-dim)" }}>{selectedCountry.league.style}</p></div><strong className="font-display text-base text-white">{availableClubs.length} giocabili</strong></div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center"><SmallInfo label="Club giocabili" value={String(availableClubs.length)} /><SmallInfo label="Partite" value={String(selectedCountry.league.leagueMatches)} /><SmallInfo label="Livello" value={String(selectedCountry.league.strength)} /></div>
             </div>
           </div>
         )}
@@ -380,7 +388,43 @@ function SetupWizard({ step, setStep, draft, setDraft, busy, onSubmit, onCancel 
                 onClick={() => setDraft({ ...draft, startMode: "freeAgent" })}
                 onKeyDown={(event) => onRadioKeyDown(event, startModes, draft.startMode, (startMode) => setDraft({ ...draft, startMode, startingClubName: startMode === "academy" ? "" : draft.startingClubName }))} />
             </div></div>
-            {draft.startMode === "freeAgent" && <div><label htmlFor="career-club" className="mb-1.5 block text-xs font-bold text-white">Club iniziale</label><select id="career-club" className="input min-h-12 w-full px-3 text-sm" value={draft.startingClubName} onChange={(event) => setDraft({ ...draft, startingClubName: event.target.value })}><option value="">Scegli una squadra…</option>{CLUBS_BY_COUNTRY[draft.nationality].map((club) => <option key={club.name} value={club.name}>{club.name} · OVR {club.rating}</option>)}</select></div>}
+            {draft.startMode === "freeAgent" && (
+              <div>
+                <p id="career-club-label" className="mb-2 text-xs font-bold text-white">Club iniziale</p>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="career-club-label">
+                  {availableClubs.map((club, index) => {
+                    const selected = draft.startingClubName === club.name;
+                    return (
+                      <button
+                        key={club.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        aria-label={`${club.name}, valutazione ${club.rating}`}
+                        tabIndex={selected || (!draft.startingClubName && index === 0) ? 0 : -1}
+                        onClick={() => setDraft({ ...draft, startingClubName: club.name })}
+                        onKeyDown={(event) => onRadioKeyDown(
+                          event,
+                          clubNames,
+                          draft.startingClubName || clubNames[0] || "",
+                          (startingClubName) => setDraft({ ...draft, startingClubName }),
+                        )}
+                        className="relative min-h-[104px] rounded-2xl px-2.5 py-3 text-center transition-colors active:scale-[.985]"
+                        style={{
+                          background: selected ? "color-mix(in srgb, var(--accent) 13%, var(--surface-2))" : "rgba(255,255,255,.045)",
+                          border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+                        }}
+                      >
+                        <span className="mx-auto block w-fit"><ClubCrest club={club} size={46} /></span>
+                        <span className="mt-2 block min-h-8 text-xs font-bold leading-tight text-white">{club.name}</span>
+                        <span className="mt-1 block text-[11px] font-semibold" style={{ color: selected ? "var(--accent-soft)" : "var(--text-dim)" }}>OVR {club.rating}</span>
+                        {selected && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full" style={{ background: "var(--accent)" }} aria-hidden="true" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <button type="button" role="switch" aria-checked={draft.agentEnabled} onClick={() => setDraft({ ...draft, agentEnabled: !draft.agentEnabled })}
               className="card-flat flex min-h-[72px] w-full items-center gap-3 p-3 text-left">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl text-xl" style={{ background: "rgba(255,255,255,.06)" }} aria-hidden="true">🤝</span>
@@ -429,11 +473,24 @@ function CareerTab({ state, report, reportStep, busy, onReportNext, onReportClos
 
 function PlayerHero({ state }: { state: CareerState }) {
   const club = state.currentClub;
+  const catalogClub = club ? getClubByName(club.name) : undefined;
+  const displayClub = catalogClub ?? club;
   const country = countryFor(state.player.nationality);
   const role = roleFor(state.player.role);
-  return <section className="relative overflow-hidden rounded-3xl p-5" aria-label="Scheda giocatore" style={{ background: club ? `linear-gradient(145deg, ${club.colors[0]}dd, #0b1220 70%)` : "var(--surface)", border: "1px solid rgba(255,255,255,.13)" }}>
-    <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full blur-3xl" style={{ background: club?.colors[1] ?? "var(--accent)", opacity: .2 }} />
-    <div className="relative flex items-start gap-4"><div className="flex h-20 w-20 flex-none flex-col items-center justify-center rounded-3xl" style={{ background: "rgba(5,10,20,.55)", border: "1px solid rgba(255,255,255,.16)" }}><span className="text-[11px] font-bold uppercase" style={{ color: "var(--text-dim)" }}>OVR</span><strong className="font-display text-3xl font-extrabold text-white">{state.overall}</strong></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-dim)" }}><span>{country.flag}</span><span>#{state.player.shirtNumber}</span><span>{role.shortLabel}</span></div><h2 className="font-display mt-1 truncate text-xl font-extrabold text-white">{state.player.displayName}</h2><p className="mt-1 truncate text-sm font-semibold" style={{ color: "var(--accent-soft)" }}>{club?.name ?? "Svincolato"}</p><p className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>{club?.league}</p></div></div>
+  return <section className="relative overflow-hidden rounded-3xl p-5" aria-label="Scheda giocatore" style={{ background: displayClub ? `linear-gradient(145deg, ${displayClub.colors[0]}dd, #0b1220 70%)` : "var(--surface)", border: "1px solid rgba(255,255,255,.13)" }}>
+    <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full blur-3xl" style={{ background: displayClub?.colors[1] ?? "var(--accent)", opacity: .2 }} />
+    <div className="relative flex items-start gap-4">
+      <div className="relative flex h-20 w-20 flex-none items-center justify-center rounded-3xl" style={{ background: "rgba(5,10,20,.55)", border: "1px solid rgba(255,255,255,.16)" }}>
+        {displayClub ? <ClubCrest club={displayClub} size={58} /> : <span className="font-display text-2xl font-extrabold text-white">{state.overall}</span>}
+        {displayClub && <span className="absolute -bottom-2 rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white" style={{ background: "rgba(4,9,18,.92)", border: "1px solid rgba(255,255,255,.16)" }}>OVR {state.overall}</span>}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-dim)" }}><span>{country.flag}</span><span>#{state.player.shirtNumber}</span><span>{role.shortLabel}</span></div>
+        <h2 className="font-display mt-1 truncate text-xl font-extrabold text-white">{state.player.displayName}</h2>
+        <p className="mt-1 truncate text-sm font-semibold" style={{ color: "var(--accent-soft)" }}>{displayClub?.name ?? "Svincolato"}</p>
+        <p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{displayClub?.league}</p>
+      </div>
+    </div>
     <div className="relative mt-5 grid grid-cols-4 gap-2"><HeroStat label="Età" value={String(state.age)} /><HeroStat label="Valore" value={formatMoney(state.marketValue)} /><HeroStat label="Forma" value={String(state.form)} /><HeroStat label="GOAT" value={String(state.goatScore)} /></div>
   </section>;
 }
@@ -445,7 +502,8 @@ function TrainingPanel({ state, busy, onSimulate }: { state: CareerState; busy: 
 
 function SeasonReport({ season, immersive, step, onNext, onClose }: { season: CareerSeason; immersive: boolean; step: number; onNext: () => void; onClose: () => void }) {
   const maxStep = immersive ? 2 : 0;
-  return <section className="card-accent slide-up overflow-hidden" aria-live="polite"><div className="p-4" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent)" }}><div className="flex items-center justify-between gap-3"><div><p className="eyebrow">Report stagione</p><h3 className="font-display mt-1 text-xl font-extrabold text-white">{season.label} · {season.clubName}</h3></div><div className="rounded-2xl px-3 py-2 text-center" style={{ background: "rgba(0,0,0,.24)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>Media</span><strong className="font-display text-xl text-white">{season.averageRating.toFixed(2)}</strong></div></div>
+  const club = getClubByName(season.clubName);
+  return <section className="card-accent slide-up overflow-hidden" aria-live="polite"><div className="p-4" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent)" }}><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><ClubCrest club={club} clubName={season.clubName} size={48} /><div className="min-w-0"><p className="eyebrow">Report stagione</p><h3 className="font-display mt-1 truncate text-lg font-extrabold text-white">{season.label} · {club?.name ?? season.clubName}</h3></div></div><div className="flex-none rounded-2xl px-3 py-2 text-center" style={{ background: "rgba(0,0,0,.24)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>Media</span><strong className="font-display text-xl text-white">{season.averageRating.toFixed(2)}</strong></div></div>
       {(step === 0 || !immersive) && <div className="mt-4 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="GOAT" value={`+${season.goatPointsEarned}`} /></div>}
       {(step >= 1 || !immersive) && <div className="mt-4 card-flat p-3"><div className="grid grid-cols-3 gap-2 text-center"><SmallInfo label="Campionato" value={`${season.leaguePosition}°`} /><SmallInfo label="Coppa" value={season.cupResult} /><SmallInfo label="OVR" value={`${season.overallStart}→${season.overallEnd}`} /></div></div>}
       {(step >= 2 || !immersive) && <div className="mt-4 space-y-2">{[...season.trophies, ...season.awards].length > 0 ? <div className="flex flex-wrap gap-2">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div> : <p className="text-xs" style={{ color: "var(--text-dim)" }}>Nessun trofeo, ma ogni stagione costruisce la carriera.</p>}{season.events.map((event) => <p key={event.id} className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}><strong className="text-white">{event.title}.</strong> {event.description}</p>)}</div>}
@@ -459,7 +517,8 @@ function TransferPanel({ offers, busy, onAccept, onDecline }: { offers: CareerOf
 
 function OfferCard({ offer, busy, label, onClick }: { offer: CareerOffer; busy: boolean; label: string; onClick: () => void }) {
   const country = countryFor(offer.country);
-  return <article className="card p-4"><div className="flex items-start gap-3"><div className="flex h-12 w-12 flex-none items-center justify-center rounded-2xl text-2xl" style={{ background: "rgba(255,255,255,.055)" }}>{country.flag}</div><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)}</span><span className="chip">{offer.contractYears} anni</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
+  const club = getClubByName(offer.clubName);
+  return <article className="card p-4"><div className="flex items-start gap-3"><ClubCrest club={club} clubName={offer.clubName} size={48} /><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{club?.name ?? offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{country.flag} {offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)}</span><span className="chip">{offer.contractYears} anni</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
 }
 
 function StatsTab({ state, onReset }: { state: CareerState; onReset: () => void }) {
@@ -474,7 +533,25 @@ function StatsTab({ state, onReset }: { state: CareerState; onReset: () => void 
 }
 
 function ArchiveTab({ seasons }: { seasons: CareerSeason[] }) {
-  return <main className="px-4 py-4 pb-8"><p className="mb-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>Ogni stagione resta salvata con rendimento, crescita e traguardi.</p>{seasons.length === 0 ? <EmptyState icon="📚" title="Archivio vuoto" body="Completa la prima stagione per iniziare a scrivere la tua storia." /> : <div className="space-y-3">{seasons.map((season) => <article key={season.id} className="card p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="eyebrow">{season.label} · Età {season.age}</p><h3 className="font-display mt-1 truncate text-base font-bold text-white">{season.clubName}</h3><p className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>{season.leaguePosition}° in campionato · Coppa: {season.cupResult}</p></div><div className="rounded-xl px-2.5 py-2 text-center" style={{ background: "rgba(255,255,255,.055)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>OVR</span><strong className="text-white">{season.overallEnd}</strong></div></div><div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="Media" value={season.averageRating.toFixed(2)} /></div>{[...season.trophies, ...season.awards].length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div>}</article>)}</div>}</main>;
+  return <main className="px-4 py-4 pb-8">
+    <p className="mb-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>Ogni stagione resta salvata con rendimento, crescita e traguardi.</p>
+    {seasons.length === 0
+      ? <EmptyState icon="📚" title="Archivio vuoto" body="Completa la prima stagione per iniziare a scrivere la tua storia." />
+      : <div className="space-y-3">{seasons.map((season) => {
+        const club = getClubByName(season.clubName);
+        return <article key={season.id} className="card p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <ClubCrest club={club} clubName={season.clubName} size={44} />
+              <div className="min-w-0"><p className="eyebrow">{season.label} · Età {season.age}</p><h3 className="font-display mt-1 truncate text-base font-bold text-white">{club?.name ?? season.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{season.leaguePosition}° in campionato · Coppa: {season.cupResult}</p></div>
+            </div>
+            <div className="flex-none rounded-xl px-2.5 py-2 text-center" style={{ background: "rgba(255,255,255,.055)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>OVR</span><strong className="text-white">{season.overallEnd}</strong></div>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="Media" value={season.averageRating.toFixed(2)} /></div>
+          {[...season.trophies, ...season.awards].length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div>}
+        </article>;
+      })}</div>}
+  </main>;
 }
 
 function EventFeed({ events }: { events: CareerEvent[] }) {
@@ -499,7 +576,56 @@ function EmptyState({ icon, title, body }: { icon: string; title: string; body: 
 }
 
 function PlayerStrip({ state }: { state: CareerState }) {
-  return <div className="card-flat mt-4 flex items-center gap-3 p-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl font-display text-lg font-extrabold" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)" }}>{state.overall}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white">{state.player.displayName}</p><p className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>#{state.player.shirtNumber} · {roleFor(state.player.role).label} · {state.age} anni</p></div><strong className="text-xs" style={{ color: "var(--accent-soft)" }}>{formatMoney(state.marketValue)}</strong></div>;
+  const club = state.currentClub ? (getClubByName(state.currentClub.name) ?? state.currentClub) : undefined;
+  return <div className="card-flat mt-4 flex items-center gap-3 p-3">{club ? <ClubCrest club={club} size={48} /> : <div className="flex h-12 w-12 items-center justify-center rounded-2xl font-display text-lg font-extrabold" style={{ background: "var(--accent-grad)", color: "var(--accent-ink)" }}>{state.overall}</div>}<div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white">{state.player.displayName}</p><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{club ? `${club.name} · ` : ""}#{state.player.shirtNumber} · {roleFor(state.player.role).label} · {state.age} anni</p></div><strong className="text-xs" style={{ color: "var(--accent-soft)" }}>{formatMoney(state.marketValue)}</strong></div>;
+}
+
+function ClubCrest({ club, clubName, size = 48 }: { club?: ClubDefinition | null; clubName?: string; size?: number }) {
+  const resolvedClub = club ?? (clubName ? getClubByName(clubName) : undefined);
+  const name = (resolvedClub?.name ?? clubName?.trim()) || "Club";
+  const crestUrl = resolvedClub?.crestUrl;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showImage = !!crestUrl && failedUrl !== crestUrl;
+  const colors = resolvedClub?.colors ?? ["#172033", "#22d3ee"] as const;
+
+  return (
+    <span
+      className="relative inline-flex flex-none items-center justify-center overflow-hidden rounded-2xl"
+      role="img"
+      aria-label={`Stemma ${name}`}
+      style={{
+        width: size,
+        height: size,
+        background: `linear-gradient(145deg, ${colors[0]}, ${colors[1]})`,
+        border: "1px solid rgba(255,255,255,.16)",
+      }}
+    >
+      {showImage ? (
+        <Image
+          src={crestUrl}
+          alt=""
+          width={size}
+          height={size}
+          sizes={`${size}px`}
+          unoptimized
+          className="h-full w-full object-contain p-1"
+          onError={() => setFailedUrl(crestUrl)}
+        />
+      ) : (
+        <span className="font-display text-xs font-extrabold tracking-tight text-white" aria-hidden="true">{clubInitials(name)}</span>
+      )}
+    </span>
+  );
+}
+
+function ClubDataCredit() {
+  return (
+    <aside className="mx-4 mb-5 mt-1 text-center text-xs leading-relaxed" style={{ color: "var(--text-dim)" }} aria-label="Fonti dei dati dei club">
+      Data provided by <a href="https://www.football-data.org/" target="_blank" rel="noreferrer" aria-label="football-data.org, apre una nuova scheda" className="underline underline-offset-2">football-data.org</a>
+      {" · "}Alcuni stemmi <a href="https://www.espn.com/soccer/" target="_blank" rel="noreferrer" aria-label="ESPN Calcio, apre una nuova scheda" className="underline underline-offset-2">ESPN</a>
+      {" · "}Nomi e marchi appartengono ai rispettivi club.
+    </aside>
+  );
 }
 
 function GoatPill({ score }: { score: number }) {
@@ -509,6 +635,12 @@ function GoatPill({ score }: { score: number }) {
 function HeroStat({ label, value }: { label: string; value: string }) { return <div className="rounded-xl px-1.5 py-2 text-center" style={{ background: "rgba(4,9,18,.32)", border: "1px solid rgba(255,255,255,.07)" }}><span className="block truncate text-[11px]" style={{ color: "var(--text-dim)" }}>{label}</span><strong className="mt-0.5 block truncate text-sm text-white">{value}</strong></div>; }
 function BigStat({ label, value }: { label: string; value: number }) { return <div className="card-flat p-3 text-center"><strong className="font-display block text-xl text-white">{value}</strong><span className="mt-0.5 block text-[11px]" style={{ color: "var(--text-dim)" }}>{label}</span></div>; }
 function SmallInfo({ label, value }: { label: string; value: string }) { return <div><span className="block text-[11px]" style={{ color: "var(--text-faint)" }}>{label}</span><strong className="mt-0.5 block truncate text-xs text-white">{value}</strong></div>; }
+
+function clubInitials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return (words[0] ?? "FC").slice(0, 2).toLocaleUpperCase("it");
+  return `${words[0]?.[0] ?? ""}${words[words.length - 1]?.[0] ?? ""}`.toLocaleUpperCase("it");
+}
 
 function onRadioKeyDown<T extends string>(
   event: KeyboardEvent<HTMLButtonElement>,

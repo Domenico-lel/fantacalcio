@@ -1,9 +1,9 @@
 /**
  * Motore deterministico per la modalita Carriera single-player.
  *
- * Tutto il contenuto (club, campionati ed eventi) e originale e fittizio. Il
- * motore non usa rete, database o dipendenze esterne: lo stesso stato, seed e
- * scelta di allenamento producono sempre lo stesso risultato.
+ * Il catalogo usa club e campionati reali, ma il motore non usa rete, database
+ * o dipendenze esterne: lo stesso stato, seed e scelta di allenamento producono
+ * sempre lo stesso risultato.
  */
 
 export type CountryCode = "IT" | "ES" | "GB" | "DE" | "FR" | "PT" | "NL" | "BR" | "AR";
@@ -69,9 +69,14 @@ export interface TrainingOption {
 }
 
 export interface ClubDefinition {
+  /** Identificatore stabile e namespaced del provider dello stemma. */
+  id: string;
   name: string;
   country: CountryCode;
   league: string;
+  crestUrl: string;
+  /** Nomi usati dal vecchio catalogo e accettati nei salvataggi esistenti. */
+  legacyNames: readonly string[];
   rating: number;
   youthRating: number;
   prestige: number;
@@ -84,63 +89,63 @@ export const COUNTRY_OPTIONS: readonly CountryOption[] = [
     name: "Italia",
     flag: "🇮🇹",
     demonym: "Italiana",
-    league: { name: "Lega Aurora", shortName: "Aurora", strength: 88, clubs: 20, leagueMatches: 38, style: "Tattica e tecnica" },
+    league: { name: "Serie A", shortName: "Serie A", strength: 88, clubs: 20, leagueMatches: 38, style: "Tattica e tecnica" },
   },
   {
     code: "ES",
     name: "Spagna",
     flag: "🇪🇸",
     demonym: "Spagnola",
-    league: { name: "Liga del Sol", shortName: "Del Sol", strength: 89, clubs: 20, leagueMatches: 38, style: "Possesso e creativita" },
+    league: { name: "LaLiga", shortName: "LaLiga", strength: 89, clubs: 20, leagueMatches: 38, style: "Possesso e creativita" },
   },
   {
     code: "GB",
     name: "Inghilterra",
     flag: "🇬🇧",
     demonym: "Inglese",
-    league: { name: "Albion Crown League", shortName: "Crown", strength: 92, clubs: 20, leagueMatches: 38, style: "Ritmo e intensita" },
+    league: { name: "Premier League", shortName: "Premier", strength: 92, clubs: 20, leagueMatches: 38, style: "Ritmo e intensita" },
   },
   {
     code: "DE",
     name: "Germania",
     flag: "🇩🇪",
     demonym: "Tedesca",
-    league: { name: "Bundeskrone Liga", shortName: "Krone", strength: 86, clubs: 18, leagueMatches: 34, style: "Pressing e verticalita" },
+    league: { name: "Bundesliga", shortName: "Bundesliga", strength: 86, clubs: 18, leagueMatches: 34, style: "Pressing e verticalita" },
   },
   {
     code: "FR",
     name: "Francia",
     flag: "🇫🇷",
     demonym: "Francese",
-    league: { name: "Ligue Lumiere", shortName: "Lumiere", strength: 84, clubs: 18, leagueMatches: 34, style: "Atletismo e talento" },
+    league: { name: "Ligue 1", shortName: "Ligue 1", strength: 84, clubs: 18, leagueMatches: 34, style: "Atletismo e talento" },
   },
   {
     code: "PT",
     name: "Portogallo",
     flag: "🇵🇹",
     demonym: "Portoghese",
-    league: { name: "Liga Navegadores", shortName: "Navegadores", strength: 79, clubs: 18, leagueMatches: 34, style: "Tecnica e giovani" },
+    league: { name: "Primeira Liga", shortName: "Primeira", strength: 79, clubs: 18, leagueMatches: 34, style: "Tecnica e giovani" },
   },
   {
     code: "NL",
     name: "Paesi Bassi",
     flag: "🇳🇱",
     demonym: "Olandese",
-    league: { name: "Oranje Elite", shortName: "Oranje", strength: 78, clubs: 18, leagueMatches: 34, style: "Gioco offensivo" },
+    league: { name: "Eredivisie", shortName: "Eredivisie", strength: 78, clubs: 18, leagueMatches: 34, style: "Gioco offensivo" },
   },
   {
     code: "BR",
     name: "Brasile",
     flag: "🇧🇷",
     demonym: "Brasiliana",
-    league: { name: "Serie Verdeoro", shortName: "Verdeoro", strength: 80, clubs: 20, leagueMatches: 38, style: "Estro e uno contro uno" },
+    league: { name: "Brasileirão Série A", shortName: "Brasileirão", strength: 80, clubs: 20, leagueMatches: 38, style: "Estro e uno contro uno" },
   },
   {
     code: "AR",
     name: "Argentina",
     flag: "🇦🇷",
     demonym: "Argentina",
-    league: { name: "Liga del Plata", shortName: "Del Plata", strength: 78, clubs: 20, leagueMatches: 38, style: "Carattere e tecnica" },
+    league: { name: "Liga Profesional Argentina", shortName: "Liga Profesional", strength: 78, clubs: 20, leagueMatches: 38, style: "Carattere e tecnica" },
   },
 ] as const;
 
@@ -169,15 +174,36 @@ export const TRAINING_OPTIONS: readonly TrainingOption[] = [
   { code: "recovery", label: "Recupero", description: "Riduce gli infortuni e preserva la forma." },
 ] as const;
 
+type ClubProvider = "football-data" | "espn";
+type ClubRow = readonly [
+  providerId: number,
+  name: string,
+  legacyName: string,
+  rating: number,
+  youthRating: number,
+  prestige: number,
+  primary: string,
+  secondary: string,
+  customCrestUrl?: string,
+];
+
 function makeClubs(
   country: CountryCode,
   league: string,
-  rows: readonly (readonly [string, number, number, number, string, string])[],
+  provider: ClubProvider,
+  rows: readonly ClubRow[],
 ): readonly ClubDefinition[] {
-  return rows.map(([name, rating, youthRating, prestige, primary, secondary]) => ({
+  return rows.map(([providerId, name, legacyName, rating, youthRating, prestige, primary, secondary, customCrestUrl]) => ({
+    id: `${provider}:${providerId}`,
     name,
     country,
     league,
+    crestUrl: customCrestUrl ?? (
+      provider === "football-data"
+        ? `https://crests.football-data.org/${providerId}.png`
+        : `https://a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/${providerId}.png&h=96&w=96`
+    ),
+    legacyNames: [legacyName],
     rating,
     youthRating,
     prestige,
@@ -186,95 +212,95 @@ function makeClubs(
 }
 
 export const CLUBS_BY_COUNTRY: Record<CountryCode, readonly ClubDefinition[]> = {
-  IT: makeClubs("IT", "Lega Aurora", [
-    ["Torri Milano", 88, 87, 94, "#111827", "#38bdf8"],
-    ["Reale Torino", 84, 84, 88, "#7f1d1d", "#fbbf24"],
-    ["Lupi Capitolini", 83, 82, 87, "#991b1b", "#f59e0b"],
-    ["Partenope Azzurra", 82, 85, 85, "#0369a1", "#e0f2fe"],
-    ["Giglio Firenze", 78, 81, 76, "#581c87", "#f5d0fe"],
-    ["Grifoni Genova", 73, 77, 67, "#1e3a8a", "#dc2626"],
-    ["Emilia Calcio", 69, 79, 58, "#be123c", "#f8fafc"],
-    ["Salento United", 65, 74, 50, "#facc15", "#dc2626"],
+  IT: makeClubs("IT", "Serie A", "football-data", [
+    [108, "Inter", "Torri Milano", 88, 87, 94, "#111827", "#38bdf8"],
+    [109, "Juventus", "Reale Torino", 84, 84, 88, "#111827", "#f8fafc"],
+    [100, "Roma", "Lupi Capitolini", 83, 82, 87, "#991b1b", "#f59e0b"],
+    [113, "Napoli", "Partenope Azzurra", 82, 85, 85, "#0369a1", "#e0f2fe"],
+    [99, "Fiorentina", "Giglio Firenze", 78, 81, 76, "#581c87", "#f5d0fe"],
+    [107, "Genoa", "Grifoni Genova", 73, 77, 67, "#1e3a8a", "#dc2626"],
+    [103, "Bologna", "Emilia Calcio", 69, 79, 58, "#be123c", "#1e3a8a"],
+    [5890, "Lecce", "Salento United", 65, 74, 50, "#facc15", "#dc2626"],
   ]),
-  ES: makeClubs("ES", "Liga del Sol", [
-    ["Real Castiglia", 90, 90, 97, "#f8fafc", "#f59e0b"],
-    ["Catalunya Blau", 89, 93, 96, "#1d4ed8", "#be123c"],
-    ["Atletico Manzanares", 85, 83, 89, "#dc2626", "#f8fafc"],
-    ["Costa Valencia", 80, 86, 80, "#f97316", "#111827"],
-    ["Siviglia Dorada", 78, 80, 76, "#b91c1c", "#f8fafc"],
-    ["Leoni di Bilbao", 76, 84, 74, "#dc2626", "#f8fafc"],
-    ["Galizia Verde", 70, 77, 61, "#16a34a", "#f8fafc"],
-    ["Isola Majorca", 66, 73, 52, "#e11d48", "#111827"],
+  ES: makeClubs("ES", "LaLiga", "football-data", [
+    [86, "Real Madrid", "Real Castiglia", 90, 90, 97, "#f8fafc", "#f59e0b"],
+    [81, "FC Barcelona", "Catalunya Blau", 89, 93, 96, "#1d4ed8", "#be123c"],
+    [78, "Atlético de Madrid", "Atletico Manzanares", 85, 83, 89, "#dc2626", "#f8fafc"],
+    [95, "Valencia CF", "Costa Valencia", 80, 86, 80, "#f97316", "#111827"],
+    [559, "Sevilla FC", "Siviglia Dorada", 78, 80, 76, "#b91c1c", "#f8fafc"],
+    [77, "Athletic Club", "Leoni di Bilbao", 76, 84, 74, "#dc2626", "#f8fafc"],
+    [558, "RC Celta", "Galizia Verde", 70, 77, 61, "#38bdf8", "#f8fafc"],
+    [89, "RCD Mallorca", "Isola Majorca", 66, 73, 52, "#e11d48", "#111827"],
   ]),
-  GB: makeClubs("GB", "Albion Crown League", [
-    ["North London Forge", 90, 88, 95, "#ef4444", "#f8fafc"],
-    ["Manchester Sky", 90, 91, 96, "#38bdf8", "#f8fafc"],
-    ["Mersey Reds", 89, 86, 95, "#dc2626", "#f8fafc"],
-    ["West London Royal", 84, 88, 89, "#1d4ed8", "#f8fafc"],
-    ["Tyneside Magpies", 82, 80, 83, "#111827", "#f8fafc"],
-    ["Birmingham Lions", 76, 82, 72, "#7c3aed", "#38bdf8"],
-    ["Brighton Waves", 72, 83, 65, "#2563eb", "#f8fafc"],
-    ["Nottingham Oaks", 67, 76, 57, "#b91c1c", "#f8fafc"],
+  GB: makeClubs("GB", "Premier League", "football-data", [
+    [57, "Arsenal", "North London Forge", 90, 88, 95, "#ef4444", "#f8fafc"],
+    [65, "Manchester City", "Manchester Sky", 90, 91, 96, "#38bdf8", "#f8fafc"],
+    [64, "Liverpool", "Mersey Reds", 89, 86, 95, "#dc2626", "#f8fafc"],
+    [61, "Chelsea", "West London Royal", 84, 88, 89, "#1d4ed8", "#f8fafc"],
+    [67, "Newcastle United", "Tyneside Magpies", 82, 80, 83, "#111827", "#f8fafc"],
+    [58, "Aston Villa", "Birmingham Lions", 76, 82, 72, "#7c3aed", "#38bdf8"],
+    [397, "Brighton & Hove Albion", "Brighton Waves", 72, 83, 65, "#2563eb", "#f8fafc"],
+    [351, "Nottingham Forest", "Nottingham Oaks", 67, 76, 57, "#b91c1c", "#f8fafc"],
   ]),
-  DE: makeClubs("DE", "Bundeskrone Liga", [
-    ["Bavaria Rot", 89, 92, 96, "#dc2626", "#f8fafc"],
-    ["Rhein Schwarz", 84, 89, 88, "#111827", "#facc15"],
-    ["Leipzig Falken", 82, 88, 82, "#f8fafc", "#dc2626"],
-    ["Hanse Hamburg", 78, 81, 78, "#1d4ed8", "#f8fafc"],
-    ["Stoccarda Motori", 76, 84, 72, "#dc2626", "#f8fafc"],
-    ["Berlino Union", 72, 78, 65, "#b91c1c", "#f8fafc"],
-    ["Foresta Friburgo", 69, 82, 59, "#111827", "#dc2626"],
-    ["Kieler Wellen", 64, 75, 48, "#2563eb", "#f8fafc"],
+  DE: makeClubs("DE", "Bundesliga", "football-data", [
+    [5, "FC Bayern München", "Bavaria Rot", 89, 92, 96, "#dc2626", "#f8fafc"],
+    [4, "Borussia Dortmund", "Rhein Schwarz", 84, 89, 88, "#111827", "#facc15"],
+    [721, "RB Leipzig", "Leipzig Falken", 82, 88, 82, "#f8fafc", "#dc2626"],
+    [19, "Eintracht Frankfurt", "Kieler Wellen", 79, 84, 82, "#e1000f", "#111827"],
+    [7, "Hamburger SV", "Hanse Hamburg", 78, 81, 78, "#1d4ed8", "#f8fafc"],
+    [10, "VfB Stuttgart", "Stoccarda Motori", 76, 84, 72, "#dc2626", "#f8fafc"],
+    [28, "1. FC Union Berlin", "Berlino Union", 72, 78, 65, "#b91c1c", "#f8fafc"],
+    [17, "SC Freiburg", "Foresta Friburgo", 69, 82, 59, "#111827", "#dc2626"],
   ]),
-  FR: makeClubs("FR", "Ligue Lumiere", [
-    ["Paris Etoile", 89, 86, 94, "#172554", "#ef4444"],
-    ["Olympique Mediterranee", 82, 84, 86, "#38bdf8", "#f8fafc"],
-    ["Monaco Principato", 81, 91, 82, "#dc2626", "#f8fafc"],
-    ["Lione Lumiere", 78, 88, 79, "#1d4ed8", "#dc2626"],
-    ["Lilla Fiandre", 75, 82, 72, "#b91c1c", "#f8fafc"],
-    ["Riviera Nizza", 72, 78, 65, "#111827", "#dc2626"],
-    ["Bretagna Armor", 68, 80, 57, "#e11d48", "#111827"],
-    ["Loira Verde", 64, 77, 51, "#16a34a", "#facc15"],
+  FR: makeClubs("FR", "Ligue 1", "football-data", [
+    [524, "Paris Saint-Germain", "Paris Etoile", 89, 86, 94, "#172554", "#ef4444"],
+    [516, "Olympique de Marseille", "Olympique Mediterranee", 82, 84, 86, "#38bdf8", "#f8fafc"],
+    [548, "AS Monaco", "Monaco Principato", 81, 91, 82, "#dc2626", "#f8fafc"],
+    [523, "Olympique Lyonnais", "Lione Lumiere", 78, 88, 79, "#1d4ed8", "#dc2626"],
+    [546, "RC Lens", "Loira Verde", 77, 83, 78, "#dc2626", "#facc15"],
+    [521, "LOSC Lille", "Lilla Fiandre", 75, 82, 72, "#b91c1c", "#f8fafc"],
+    [522, "OGC Nice", "Riviera Nizza", 72, 78, 65, "#111827", "#dc2626"],
+    [529, "Stade Rennais FC", "Bretagna Armor", 68, 80, 57, "#e11d48", "#111827"],
   ]),
-  PT: makeClubs("PT", "Liga Navegadores", [
-    ["Lisboa Aquile", 84, 92, 90, "#dc2626", "#f8fafc"],
-    ["Porto Draghi", 83, 89, 89, "#1d4ed8", "#f8fafc"],
-    ["Leoni di Alvalade", 82, 93, 87, "#16a34a", "#f8fafc"],
-    ["Braga Arcivescovi", 76, 84, 72, "#dc2626", "#f8fafc"],
-    ["Vitoria Castello", 71, 80, 63, "#111827", "#f8fafc"],
-    ["Faro Atlantico", 68, 76, 57, "#111827", "#facc15"],
-    ["Madeira Maritima", 65, 75, 51, "#15803d", "#dc2626"],
-    ["Azzorre Naviganti", 62, 78, 45, "#0e7490", "#f8fafc"],
+  PT: makeClubs("PT", "Primeira Liga", "football-data", [
+    [1903, "SL Benfica", "Lisboa Aquile", 84, 92, 90, "#dc2626", "#f8fafc"],
+    [503, "FC Porto", "Porto Draghi", 83, 89, 89, "#1d4ed8", "#f8fafc"],
+    [498, "Sporting CP", "Leoni di Alvalade", 82, 93, 87, "#16a34a", "#f8fafc"],
+    [5613, "SC Braga", "Braga Arcivescovi", 76, 84, 72, "#dc2626", "#f8fafc"],
+    [5543, "Vitória SC", "Vitoria Castello", 71, 80, 63, "#111827", "#f8fafc"],
+    [5531, "FC Famalicão", "Faro Atlantico", 68, 76, 57, "#111827", "#facc15"],
+    [5530, "Santa Clara", "Madeira Maritima", 65, 75, 51, "#dc2626", "#f8fafc"],
+    [496, "Rio Ave FC", "Azzorre Naviganti", 62, 78, 45, "#15803d", "#f8fafc"],
   ]),
-  NL: makeClubs("NL", "Oranje Elite", [
-    ["Amsterdam Tulipani", 83, 95, 91, "#dc2626", "#f8fafc"],
-    ["Rotterdam Porto", 80, 89, 85, "#dc2626", "#111827"],
-    ["Eindhoven Luce", 81, 92, 87, "#dc2626", "#f8fafc"],
-    ["Utrecht Torri", 74, 85, 70, "#dc2626", "#f8fafc"],
-    ["Alkmaar Formaggi", 73, 87, 68, "#dc2626", "#f8fafc"],
-    ["Arnhem Aquile", 68, 80, 58, "#facc15", "#111827"],
-    ["Groninga Nord", 65, 79, 52, "#16a34a", "#f8fafc"],
-    ["Breda Baronia", 62, 76, 46, "#facc15", "#111827"],
+  NL: makeClubs("NL", "Eredivisie", "football-data", [
+    [678, "Ajax", "Amsterdam Tulipani", 83, 95, 91, "#dc2626", "#f8fafc", "https://eredivisie.b-cdn.net/production/clubs/ajax/Ajax_Logo.png?height=256&quality=90&width=256"],
+    [675, "Feyenoord", "Rotterdam Porto", 80, 89, 85, "#dc2626", "#111827"],
+    [674, "PSV", "Eindhoven Luce", 81, 92, 87, "#dc2626", "#f8fafc"],
+    [676, "FC Utrecht", "Utrecht Torri", 74, 85, 70, "#dc2626", "#f8fafc"],
+    [682, "AZ", "Alkmaar Formaggi", 73, 87, 68, "#dc2626", "#f8fafc"],
+    [666, "FC Twente", "Arnhem Aquile", 68, 80, 58, "#dc2626", "#f8fafc"],
+    [677, "FC Groningen", "Groninga Nord", 65, 79, 52, "#16a34a", "#f8fafc"],
+    [673, "sc Heerenveen", "Breda Baronia", 62, 76, 46, "#2563eb", "#f8fafc"],
   ]),
-  BR: makeClubs("BR", "Serie Verdeoro", [
-    ["Rio Rubro", 82, 91, 91, "#dc2626", "#111827"],
-    ["Selva Paulista", 83, 89, 90, "#15803d", "#f8fafc"],
-    ["Baixada Oceano", 78, 95, 86, "#f8fafc", "#111827"],
-    ["Metropoli Alvinegra", 80, 86, 88, "#111827", "#f8fafc"],
-    ["Porto Alegre Tricolore", 76, 83, 78, "#2563eb", "#111827"],
-    ["Bahia Tricolore", 71, 82, 66, "#2563eb", "#dc2626"],
-    ["Goias Cerrado", 67, 79, 57, "#16a34a", "#f8fafc"],
-    ["Recife Sol", 64, 78, 51, "#f59e0b", "#dc2626"],
+  BR: makeClubs("BR", "Brasileirão Série A", "espn", [
+    [819, "Flamengo", "Rio Rubro", 82, 91, 91, "#dc2626", "#111827"],
+    [2029, "Palmeiras", "Selva Paulista", 83, 89, 90, "#15803d", "#f8fafc"],
+    [2674, "Santos", "Baixada Oceano", 78, 95, 86, "#f8fafc", "#111827"],
+    [874, "Corinthians", "Metropoli Alvinegra", 80, 86, 88, "#111827", "#f8fafc"],
+    [3445, "Fluminense", "Recife Sol", 77, 86, 81, "#7a1538", "#00843d"],
+    [6273, "Grêmio", "Porto Alegre Tricolore", 76, 83, 78, "#2563eb", "#111827"],
+    [2026, "São Paulo", "Goias Cerrado", 76, 87, 82, "#f8fafc", "#dc2626"],
+    [9967, "Bahia", "Bahia Tricolore", 71, 82, 66, "#2563eb", "#dc2626"],
   ]),
-  AR: makeClubs("AR", "Liga del Plata", [
-    ["Buenos Aires Azul", 82, 91, 92, "#1d4ed8", "#facc15"],
-    ["Monumental Rojo", 83, 93, 93, "#f8fafc", "#dc2626"],
-    ["Avellaneda Diablo", 78, 86, 83, "#dc2626", "#f8fafc"],
-    ["Academia Celeste", 77, 88, 81, "#38bdf8", "#f8fafc"],
-    ["Rosario Canaglia", 73, 84, 71, "#1d4ed8", "#facc15"],
-    ["Cordoba Talleres", 71, 83, 67, "#1d4ed8", "#f8fafc"],
-    ["La Plata Bosque", 67, 80, 58, "#15803d", "#f8fafc"],
-    ["Mendoza Andes", 63, 78, 49, "#0e7490", "#f8fafc"],
+  AR: makeClubs("AR", "Liga Profesional Argentina", "espn", [
+    [5, "Boca Juniors", "Buenos Aires Azul", 82, 91, 92, "#1d4ed8", "#facc15"],
+    [16, "River Plate", "Monumental Rojo", 83, 93, 93, "#f8fafc", "#dc2626"],
+    [11, "Independiente", "Avellaneda Diablo", 78, 86, 83, "#dc2626", "#f8fafc"],
+    [15, "Racing Club", "Academia Celeste", 77, 88, 81, "#38bdf8", "#f8fafc"],
+    [8, "Estudiantes de La Plata", "Mendoza Andes", 74, 86, 77, "#dc2626", "#f8fafc"],
+    [17, "Rosario Central", "Rosario Canaglia", 73, 84, 71, "#1d4ed8", "#facc15"],
+    [19, "Talleres", "Cordoba Talleres", 71, 83, 67, "#1d4ed8", "#f8fafc"],
+    [9, "Gimnasia La Plata", "La Plata Bosque", 67, 80, 58, "#15803d", "#f8fafc"],
   ]),
 };
 
@@ -333,9 +359,12 @@ export interface CareerEvent {
 
 export interface CareerOffer {
   id: string;
+  /** Assenti soltanto nei salvataggi creati prima del catalogo 2026. */
+  clubId?: string;
   clubName: string;
   country: CountryCode;
   league: string;
+  crestUrl?: string;
   clubRating: number;
   squadRole: SquadRole;
   contractYears: number;
@@ -586,11 +615,143 @@ function findCountry(code: CountryCode): CountryOption {
   return country;
 }
 
+const ALL_CLUBS: readonly ClubDefinition[] = Object.values(CLUBS_BY_COUNTRY).flat();
+
+const LEGACY_LEAGUE_NAMES: Readonly<Record<string, string>> = {
+  "Lega Aurora": "Serie A",
+  "Liga del Sol": "LaLiga",
+  "Albion Crown League": "Premier League",
+  "Bundeskrone Liga": "Bundesliga",
+  "Ligue Lumiere": "Ligue 1",
+  "Liga Navegadores": "Primeira Liga",
+  "Oranje Elite": "Eredivisie",
+  "Serie Verdeoro": "Brasileirão Série A",
+  "Liga del Plata": "Liga Profesional Argentina",
+};
+
+function normalizeCatalogName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("it")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+const CLUB_LOOKUP = new Map<string, ClubDefinition>();
+for (const club of ALL_CLUBS) {
+  CLUB_LOOKUP.set(normalizeCatalogName(club.id), club);
+  CLUB_LOOKUP.set(normalizeCatalogName(club.name), club);
+  for (const legacyName of club.legacyNames) CLUB_LOOKUP.set(normalizeCatalogName(legacyName), club);
+}
+
+/** Risolve sia i nomi correnti sia quelli fittizi presenti nei vecchi salvataggi. */
+export function getClubByName(name: string): ClubDefinition | undefined {
+  return CLUB_LOOKUP.get(normalizeCatalogName(name));
+}
+
 function findClub(name: string): ClubDefinition | undefined {
-  const normalized = name.trim().toLocaleLowerCase("it");
-  return Object.values(CLUBS_BY_COUNTRY)
-    .flat()
-    .find((club) => club.name.toLocaleLowerCase("it") === normalized);
+  return getClubByName(name);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const CATALOG_TEXT_REPLACEMENTS: readonly (readonly [string, string])[] = [
+  ...ALL_CLUBS.flatMap((club) => club.legacyNames.map((legacyName) => [legacyName, club.name] as const)),
+  ...Object.entries(LEGACY_LEAGUE_NAMES),
+].sort(([left], [right]) => right.length - left.length);
+
+function upgradeCatalogText(value: string): string {
+  return CATALOG_TEXT_REPLACEMENTS.reduce(
+    (result, [legacyName, currentName]) => result.replace(new RegExp(escapeRegExp(legacyName), "gi"), currentName),
+    value,
+  );
+}
+
+function currentLeague(country: CountryCode, fallback: string): string {
+  return findCountry(country).league.name || fallback;
+}
+
+/**
+ * Aggiorna in memoria un salvataggio creato con il catalogo fittizio.
+ *
+ * È intenzionalmente idempotente: puo essere richiamata ad ogni caricamento,
+ * cosi anche gli stati parzialmente migrati ricevono stemmi e metadati correnti.
+ */
+export function upgradeCareerCatalog(state: CareerState): CareerState {
+  const currentClubDefinition = state.currentClub ? findClub(state.currentClub.name) : undefined;
+  const currentClub = state.currentClub
+    ? currentClubDefinition
+      ? {
+          ...currentClubDefinition,
+          joinedSeason: state.currentClub.joinedSeason,
+          contractUntil: state.currentClub.contractUntil,
+          squadRole: state.currentClub.squadRole,
+        }
+      : {
+          ...state.currentClub,
+          league: currentLeague(state.currentClub.country, state.currentClub.league),
+        }
+    : null;
+
+  const upgradeEvent = (event: CareerEvent): CareerEvent => ({
+    ...event,
+    title: upgradeCatalogText(event.title),
+    description: upgradeCatalogText(event.description),
+  });
+
+  const pendingOffers = state.pendingOffers.map((offer): CareerOffer => {
+    const club = findClub(offer.clubName);
+    return club
+      ? {
+          ...offer,
+          clubId: club.id,
+          clubName: club.name,
+          country: club.country,
+          league: club.league,
+          crestUrl: club.crestUrl,
+          clubRating: club.rating,
+          message: upgradeCatalogText(offer.message),
+        }
+      : {
+          ...offer,
+          league: currentLeague(offer.country, offer.league),
+          message: upgradeCatalogText(offer.message),
+        };
+  });
+
+  const seasons = state.seasons.map((season): CareerSeason => {
+    const club = findClub(season.clubName);
+    return {
+      ...season,
+      clubName: club?.name ?? upgradeCatalogText(season.clubName),
+      country: club?.country ?? season.country,
+      league: club?.league ?? currentLeague(season.country, season.league),
+      trophies: season.trophies.map(upgradeCatalogText),
+      awards: season.awards.map(upgradeCatalogText),
+      events: season.events.map(upgradeEvent),
+    };
+  });
+
+  return {
+    ...state,
+    currentClub,
+    pendingOffers,
+    seasons,
+    trophyCabinet: state.trophyCabinet.map((honour) => ({
+      ...honour,
+      name: upgradeCatalogText(honour.name),
+    })),
+    awardCabinet: state.awardCabinet.map((honour) => ({
+      ...honour,
+      name: upgradeCatalogText(honour.name),
+    })),
+    feed: state.feed.map(upgradeEvent),
+  };
 }
 
 function squadRoleFor(overall: number, clubRating: number): SquadRole {
@@ -632,9 +793,11 @@ function offerFromClub(state: CareerState, club: ClubDefinition, index: number, 
 
   return {
     id: `offer-${hashString(`${state.id}|${state.seasonIndex}|${club.name}|${index}`).toString(36)}`,
+    clubId: club.id,
     clubName: club.name,
     country: club.country,
     league: club.league,
+    crestUrl: club.crestUrl,
     clubRating: club.rating,
     squadRole,
     contractYears,
