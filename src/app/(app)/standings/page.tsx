@@ -66,6 +66,7 @@ export default function StandingsPage() {
   const [standings, setStandings] = useState<StandingEntryWithLogo[]>([]);
   const [loading, setLoading] = useState(true);
   const [overrides, setOverrides] = useState<Record<string, StandingsTeamInfo>>({});
+  const [sourceError, setSourceError] = useState("");
 
   useEffect(() => {
     // Identità autorevole dal server (stessa fonte dell'header), con paint immediato dalla cache.
@@ -100,6 +101,7 @@ export default function StandingsPage() {
       const res = await fetch("/api/standings");
       if (!res.ok) throw new Error("Failed to fetch standings");
       const data = await res.json();
+      setSourceError(data.error || "");
       const withLogos: StandingEntryWithLogo[] = (data.items || []).map((entry: any) => {
         const ov = overrides[entry.teamName];
         const displayName = ov?.displayName || entry.teamName;
@@ -113,6 +115,7 @@ export default function StandingsPage() {
       setStandings(withLogos);
     } catch {
       setStandings([]);
+      setSourceError("Impossibile caricare la classifica. Riprova tra poco.");
     } finally {
       setLoading(false);
     }
@@ -160,7 +163,7 @@ export default function StandingsPage() {
         {!loading && standings.length === 0 && (
           <div className="flex flex-col items-center py-16 gap-3 text-center">
             <span className="text-4xl">🏆</span>
-            <p className="text-white/50 text-sm">Classifica non ancora disponibile.</p>
+            <p className="text-white/50 text-sm">{sourceError || "Classifica non ancora disponibile."}</p>
           </div>
         )}
 
