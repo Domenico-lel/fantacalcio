@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
 import TabPanel from "@/components/TabPanel";
@@ -9,11 +9,14 @@ import { useConfirm, useToast } from "@/components/Dialog";
 import { useRegisterRefresh } from "@/components/PullToRefresh";
 import {
   acceptCareerTransfer,
+  acknowledgeCareerReport,
   advanceCareerSeason,
   chooseCareerClub,
+  continueCareerChoice,
   createCareer,
   declineCareerTransfers,
   fetchCareerHub,
+  resolveCareerChoice,
   restartCareer,
   type CareerHub,
   type CareerMutationResult,
@@ -25,9 +28,15 @@ import {
   ROLE_OPTIONS,
   TRAINING_OPTIONS,
   getClubByName,
+  type CareerDecision,
+  type CareerDecisionEffects,
+  type CareerDecisionOption,
+  type CareerDecisionProbability,
+  type CareerDecisionResult,
   type CareerEvent,
   type CareerOffer,
   type CareerSeason,
+  type CareerSeasonPreparation,
   type CareerState,
   type ClubDefinition,
   type CountryCode,
@@ -73,8 +82,6 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
   const [setupStep, setSetupStep] = useState<SetupStep | null>(null);
   const [draft, setDraft] = useState<SetupDraft>(DEFAULT_DRAFT);
   const [busy, setBusy] = useState(false);
-  const [report, setReport] = useState<CareerSeason | null>(null);
-  const [reportStep, setReportStep] = useState(0);
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -144,11 +151,52 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
       toast("Ricarica la carriera prima di simulare la stagione.", "error");
       return;
     }
-    const result = await mutate(() => advanceCareerSeason(choice, expectedVersion));
-    if (result && !result.error && result.season) {
-      setReport(result.season);
-      setReportStep(0);
+    await mutate(() => advanceCareerSeason(choice, expectedVersion));
+  }
+
+  async function resolveDecision(decisionId: string, optionId: string) {
+    const expectedVersion = hub.career?.dbVersion;
+    if (!expectedVersion) {
+      toast("Ricarica la carriera prima di confermare la scelta.", "error");
+      return;
     }
+    await mutate(() => resolveCareerChoice(decisionId, optionId, expectedVersion));
+  }
+
+  async function continueDecision(decisionId: string) {
+    const expectedVersion = hub.career?.dbVersion;
+    if (!expectedVersion) {
+      toast("Ricarica la carriera prima di continuare.", "error");
+      return;
+    }
+    await mutate(() => continueCareerChoice(decisionId, expectedVersion));
+  }
+
+  async function closeReport(seasonId: string) {
+    const expectedVersion = hub.career?.dbVersion;
+    if (!expectedVersion) {
+      toast("Ricarica la carriera prima di continuare.", "error");
+      return;
+    }
+    await mutate(() => acknowledgeCareerReport(seasonId, expectedVersion));
+  }
+
+  async function acceptTransfer(clubName: string) {
+    const expectedVersion = hub.career?.dbVersion;
+    if (!expectedVersion) {
+      toast("Ricarica la carriera prima di accettare l'offerta.", "error");
+      return;
+    }
+    await mutate(() => acceptCareerTransfer(clubName, expectedVersion), "Trasferimento completato.");
+  }
+
+  async function declineTransfers() {
+    const expectedVersion = hub.career?.dbVersion;
+    if (!expectedVersion) {
+      toast("Ricarica la carriera prima di rispondere alle offerte.", "error");
+      return;
+    }
+    await mutate(() => declineCareerTransfers(expectedVersion), "Resti nel tuo club.");
   }
 
   async function reset() {
@@ -161,7 +209,6 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
     if (!ok) return;
     const result = await mutate(restartCareer);
     if (result && !result.error) {
-      setReport(null);
       setSetupStep(null);
       setTab("career");
       toast("Puoi creare un nuovo giocatore.", "success");
@@ -216,14 +263,13 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
         {tab === "career" ? (
           <CareerTab
             state={state}
-            report={report}
-            reportStep={reportStep}
             busy={busy}
-            onReportNext={() => setReportStep((value) => value + 1)}
-            onReportClose={() => setReport(null)}
+            onReportClose={closeReport}
+            onResolveDecision={resolveDecision}
+            onContinueDecision={continueDecision}
             onSimulate={simulate}
-            onAcceptTransfer={(name) => mutate(() => acceptCareerTransfer(name), "Trasferimento completato.")}
-            onDeclineTransfers={() => mutate(declineCareerTransfers, "Resti nel tuo club.")}
+            onAcceptTransfer={acceptTransfer}
+            onDeclineTransfers={declineTransfers}
             onReset={reset}
           />
         ) : tab === "stats" ? (
@@ -455,20 +501,90 @@ function StartingOffers({ state, busy, onChoose }: { state: CareerState; busy: b
   return <main className="px-4 py-5"><div className="card-accent p-4"><p className="eyebrow">Inizio carriera · {state.seasonYear}</p><h2 className="font-display mt-2 text-xl font-bold text-white">Tre club credono in te</h2><p className="mt-1.5 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>A {state.age} anni arriva il primo bivio. Confronta livello, ruolo previsto e contratto.</p></div><div className="mt-4 space-y-3">{state.pendingOffers.map((offer) => <OfferCard key={offer.id} offer={offer} busy={busy} label="Firma" onClick={() => onChoose(offer.clubName)} />)}</div><PlayerStrip state={state} /></main>;
 }
 
-function CareerTab({ state, report, reportStep, busy, onReportNext, onReportClose, onSimulate, onAcceptTransfer, onDeclineTransfers, onReset }: {
-  state: CareerState; report: CareerSeason | null; reportStep: number; busy: boolean;
-  onReportNext: () => void; onReportClose: () => void; onSimulate: (choice: TrainingChoice) => void;
-  onAcceptTransfer: (name: string) => void; onDeclineTransfers: () => void; onReset: () => void;
+function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDecision, onSimulate, onAcceptTransfer, onDeclineTransfers, onReset }: {
+  state: CareerState;
+  busy: boolean;
+  onReportClose: (seasonId: string) => void;
+  onResolveDecision: (decisionId: string, optionId: string) => void;
+  onContinueDecision: (decisionId: string) => void;
+  onSimulate: (choice: TrainingChoice) => void;
+  onAcceptTransfer: (name: string) => void;
+  onDeclineTransfers: () => void;
+  onReset: () => void;
 }) {
-  return <main className="px-4 py-4 pb-8 space-y-4">
-    {report && <SeasonReport season={report} immersive={state.gameMode === "realistic"} step={reportStep} onNext={onReportNext} onClose={onReportClose} />}
-    <PlayerHero state={state} />
-    {!report && (state.stage === "retired" ? <RetiredCard state={state} onReset={onReset} /> : <>
-      {state.pendingOffers.length > 0 && <TransferPanel offers={state.pendingOffers} busy={busy} onAccept={onAcceptTransfer} onDecline={onDeclineTransfers} />}
-      {state.pendingOffers.length === 0 && <TrainingPanel state={state} busy={busy} onSimulate={onSimulate} />}
-    </>)}
-    {!report && <EventFeed events={state.feed.slice(0, 6)} />}
-  </main>;
+  const pendingReport = state.pendingSeasonReportId
+    ? state.seasons.find((season) => season.id === state.pendingSeasonReportId)
+    : undefined;
+
+  if (pendingReport) {
+    return (
+      <main className="px-4 py-4 pb-8">
+        <SeasonReport
+          key={pendingReport.id}
+          season={pendingReport}
+          immersive={state.gameMode === "realistic"}
+          busy={busy}
+          onClose={() => onReportClose(pendingReport.id)}
+        />
+      </main>
+    );
+  }
+
+  if (state.pendingSeasonReportId) {
+    return (
+      <main className="px-4 py-4 pb-8">
+        <ReportRecoveryCard
+          seasonId={state.pendingSeasonReportId}
+          busy={busy}
+          onContinue={onReportClose}
+        />
+      </main>
+    );
+  }
+
+  if (state.lastDecisionResult) {
+    return (
+      <main className="px-4 py-4 pb-8">
+        <DecisionResultPanel
+          key={state.lastDecisionResult.id}
+          result={state.lastDecisionResult}
+          state={state}
+          busy={busy}
+          onContinue={onContinueDecision}
+        />
+      </main>
+    );
+  }
+
+  if (state.pendingDecision) {
+    return (
+      <main className="px-4 py-4 pb-8">
+        <DecisionPanel
+          key={state.pendingDecision.id}
+          decision={state.pendingDecision}
+          state={state}
+          busy={busy}
+          onConfirm={onResolveDecision}
+        />
+      </main>
+    );
+  }
+
+  return (
+    <main className="px-4 py-4 pb-8 space-y-4">
+      <PlayerHero state={state} />
+      {state.stage === "retired" ? (
+        <RetiredCard state={state} onReset={onReset} />
+      ) : state.pendingOffers.length > 0 ? (
+        <TransferPanel offers={state.pendingOffers} busy={busy} onAccept={onAcceptTransfer} onDecline={onDeclineTransfers} />
+      ) : state.seasonPreparation ? (
+        <SeasonReadyPanel state={state} preparation={state.seasonPreparation} busy={busy} onSimulate={onSimulate} />
+      ) : (
+        <FlowRecoveryCard />
+      )}
+      <EventFeed events={state.feed.slice(0, 6)} />
+    </main>
+  );
 }
 
 function PlayerHero({ state }: { state: CareerState }) {
@@ -495,19 +611,281 @@ function PlayerHero({ state }: { state: CareerState }) {
   </section>;
 }
 
-function TrainingPanel({ state, busy, onSimulate }: { state: CareerState; busy: boolean; onSimulate: (choice: TrainingChoice) => void }) {
-  const choices = trainingForRole(state.player.role);
-  return <section><div className="mb-3 flex items-end justify-between gap-3 px-1"><div><p className="eyebrow">Pre-stagione</p><h3 className="font-display mt-1 text-lg font-bold text-white">Scegli come crescere</h3></div><span className="text-xs" style={{ color: "var(--text-dim)" }}>{state.seasonYear}/{String(state.seasonYear + 1).slice(-2)}</span></div><div className="space-y-2">{choices.map((choice, index) => <button key={choice.code} type="button" disabled={busy} onClick={() => onSimulate(choice.code)} className="card w-full min-h-[82px] p-3 text-left active:scale-[.985] transition-transform"><div className="flex items-center gap-3"><span className="flex h-11 w-11 flex-none items-center justify-center rounded-xl text-xl" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }} aria-hidden="true">{index === 0 ? "⚖️" : index === 1 ? roleTrainingIcon(state.player.role) : "🧘"}</span><span className="min-w-0 flex-1"><strong className="block text-sm text-white">{choice.label}</strong><span className="mt-1 block text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{choice.description}</span></span><span style={{ color: "var(--accent)" }} aria-hidden="true">›</span></div></button>)}</div>{busy && <p className="mt-3 text-center text-xs" role="status" style={{ color: "var(--accent-soft)" }}>Simulazione della stagione…</p>}</section>;
+function DecisionPanel({ decision, state, busy, onConfirm }: {
+  decision: CareerDecision;
+  state: CareerState;
+  busy: boolean;
+  onConfirm: (decisionId: string, optionId: string) => void;
+}) {
+  const [selectedOptionId, setSelectedOptionId] = useState("");
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const selectedOption = decision.options.find((option) => option.id === selectedOptionId);
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
+  return (
+    <section className="space-y-4" aria-labelledby={`${decision.id}-title`} aria-busy={busy}>
+      <div className="card-accent overflow-hidden p-4" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--accent) 13%, var(--surface-2)), var(--surface))" }}>
+        <div className="flex items-center justify-between gap-3">
+          <p className="eyebrow">{decision.phase === "preSeason" ? "Inizio stagione" : "Fine stagione"}</p>
+          <span className="chip">{seasonLabel(decision.seasonYear)}</span>
+        </div>
+        <h2 id={`${decision.id}-title`} ref={titleRef} tabIndex={-1} className="font-display mt-2 text-2xl font-extrabold leading-tight text-white outline-none">{decision.title}</h2>
+        <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{decision.description}</p>
+        <p className="mt-3 rounded-2xl px-3 py-2.5 text-xs leading-relaxed" style={{ color: "var(--accent-soft)", background: "color-mix(in srgb, var(--accent) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}>{decision.context}</p>
+        <DecisionContextStrip state={state} />
+      </div>
+
+      <fieldset disabled={busy}>
+        <legend className="eyebrow mb-3 px-1">Scegli una strategia</legend>
+        <div className="space-y-3">
+          {decision.options.map((option) => (
+            <DecisionOptionCard
+              key={option.id}
+              decisionId={decision.id}
+              option={option}
+              selected={option.id === selectedOptionId}
+              onSelect={setSelectedOptionId}
+            />
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="rounded-2xl p-2" style={{ background: "color-mix(in srgb, var(--bg) 92%, transparent)", border: "1px solid var(--border)" }}>
+        <button
+          type="button"
+          disabled={!selectedOption || busy}
+          onClick={() => selectedOption && onConfirm(decision.id, selectedOption.id)}
+          className="btn-primary min-h-12 w-full px-4 py-3 text-sm"
+        >
+          {busy ? "Calcolo dell'esito…" : selectedOption ? `Conferma: ${selectedOption.label}` : "Seleziona una strategia"}
+        </button>
+      </div>
+      {busy ? <p className="sr-only" role="status" aria-live="polite">La scelta viene salvata e l'esito viene calcolato.</p> : null}
+    </section>
+  );
 }
 
-function SeasonReport({ season, immersive, step, onNext, onClose }: { season: CareerSeason; immersive: boolean; step: number; onNext: () => void; onClose: () => void }) {
+function DecisionOptionCard({ decisionId, option, selected, onSelect }: {
+  decisionId: string;
+  option: CareerDecisionOption;
+  selected: boolean;
+  onSelect: (optionId: string) => void;
+}) {
+  const detailId = `${decisionId}-${option.id}-details`;
+  return (
+    <label className="card block min-h-12 cursor-pointer p-4 transition-colors focus-within:ring-2 focus-within:ring-cyan-300/70" style={{ background: selected ? "color-mix(in srgb, var(--accent) 9%, var(--surface-2))" : undefined, borderColor: selected ? "var(--accent)" : undefined }}>
+      <input
+        type="radio"
+        className="sr-only"
+        name={`decision-${decisionId}`}
+        value={option.id}
+        checked={selected}
+        aria-describedby={detailId}
+        onChange={() => onSelect(option.id)}
+      />
+      <span className="flex items-start gap-3">
+        <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full" style={{ border: `2px solid ${selected ? "var(--accent)" : "var(--text-faint)"}` }} aria-hidden="true">
+          {selected ? <span className="h-3 w-3 rounded-full" style={{ background: "var(--accent)" }} /> : null}
+        </span>
+        <span className="min-w-0 flex-1">
+          <strong className="block text-base text-white">{option.label}</strong>
+          <span className="mt-1 block text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{option.description}</span>
+          <span className="mt-2 block text-[11px] font-semibold" style={{ color: "var(--accent-soft)" }}>{option.hint}</span>
+        </span>
+      </span>
+      <div id={detailId} className="mt-4">
+        <ProbabilityBreakdown probabilities={option.probabilities} />
+      </div>
+    </label>
+  );
+}
+
+function ProbabilityBreakdown({ probabilities }: { probabilities: CareerDecisionProbability[] }) {
+  const possibleOutcomes = probabilities.filter((item) => item.percentage > 0);
+  const summary = possibleOutcomes.map((item) => `${item.label} ${item.percentage}%`).join(", ");
+  return (
+    <div>
+      <div className="flex h-2.5 overflow-hidden rounded-full" role="img" aria-label={`Probabilità: ${summary}`} style={{ background: "rgba(255,255,255,.06)" }}>
+        {possibleOutcomes.map((item) => (
+          <span key={item.outcome} style={{ width: `${item.percentage}%`, background: decisionOutcomeColor(item.outcome) }} />
+        ))}
+      </div>
+      <ul className="mt-3 space-y-2" aria-label="Possibili esiti e conseguenze">
+        {possibleOutcomes.map((item) => (
+          <li key={item.outcome} className="rounded-xl px-2.5 py-2" style={{ background: "rgba(255,255,255,.035)" }}>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: decisionOutcomeColor(item.outcome) }} aria-hidden="true" />
+              <span className="min-w-0 flex-1 font-semibold text-white">{item.label}</span>
+              <strong style={{ color: decisionOutcomeColor(item.outcome) }}>{item.percentage}%</strong>
+            </div>
+            <p className="mt-1 pl-[18px] text-[11px] leading-relaxed" style={{ color: "var(--text-dim)" }}>{item.effectSummary}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function DecisionResultPanel({ result, state, busy, onContinue }: {
+  result: CareerDecisionResult;
+  state: CareerState;
+  busy: boolean;
+  onContinue: (decisionId: string) => void;
+}) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const outcomeColor = decisionOutcomeColor(result.outcome);
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
+  return (
+    <section className="card-accent slide-up overflow-hidden" aria-labelledby={`${result.id}-title`} aria-busy={busy}>
+      <div className="p-5" style={{ background: `linear-gradient(145deg, color-mix(in srgb, ${outcomeColor} 15%, transparent), transparent)` }}>
+        <div className="flex items-center justify-between gap-3">
+          <p className="eyebrow">{result.phase === "preSeason" ? "Esito pre-stagione" : "Esito fine stagione"}</p>
+          <span className="chip">{seasonLabel(result.seasonYear)}</span>
+        </div>
+        <div className="mt-5 flex h-16 w-16 items-center justify-center rounded-3xl text-3xl" style={{ background: `color-mix(in srgb, ${outcomeColor} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${outcomeColor} 42%, transparent)` }} aria-hidden="true">
+          {decisionOutcomeIcon(result.outcome)}
+        </div>
+        <p className="mt-4 text-xs font-extrabold uppercase tracking-[.14em]" style={{ color: outcomeColor }} role="status" aria-live="polite">{result.outcomeLabel} · {result.probability}%</p>
+        <h2 id={`${result.id}-title`} ref={titleRef} tabIndex={-1} className="font-display mt-1 text-2xl font-extrabold leading-tight text-white outline-none">{result.title}</h2>
+        <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{result.description}</p>
+
+        <div className="card-flat mt-4 p-3">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span style={{ color: "var(--text-dim)" }}>Strategia scelta</span>
+            <strong className="text-right text-white">{result.optionLabel}</strong>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+            <span style={{ color: "var(--text-dim)" }}>Estrazione deterministica</span>
+            <strong className="text-white">{result.roll}/100</strong>
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs font-semibold leading-relaxed" style={{ color: "var(--accent-soft)" }}>{result.effectSummary}</p>
+        <DecisionEffectChips effects={result.effects} />
+        <DecisionContextStrip state={state} />
+
+        <button type="button" disabled={busy} onClick={() => onContinue(result.decisionId)} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">
+          {busy ? "Salvataggio…" : result.phase === "preSeason" ? "Prepara la stagione" : "Continua l'estate"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function DecisionEffectChips({ effects }: { effects: CareerDecisionEffects }) {
+  const items = decisionEffectItems(effects);
+  if (items.length === 0) return <p className="mt-3 text-xs" style={{ color: "var(--text-dim)" }}>Nessuna variazione immediata.</p>;
+  return (
+    <ul className="mt-3 flex flex-wrap gap-2" aria-label="Effetti applicati">
+      {items.map((item) => (
+        <li key={item.label} className="chip" style={{ color: item.good ? "#86efac" : "#fda4af" }}>
+          {item.label} {formatSigned(item.value)}{item.suffix}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DecisionContextStrip({ state }: { state: CareerState }) {
+  return (
+    <div className="mt-4 grid grid-cols-4 gap-2">
+      <HeroStat label="OVR" value={String(state.overall)} />
+      <HeroStat label="Forma" value={String(state.form)} />
+      <HeroStat label="Reputaz." value={String(state.reputation)} />
+      <HeroStat label="Ruolo" value={squadRoleCompactLabel(state.currentClub?.squadRole ?? "prospect")} />
+    </div>
+  );
+}
+
+function SeasonReadyPanel({ state, preparation, busy, onSimulate }: {
+  state: CareerState;
+  preparation: CareerSeasonPreparation;
+  busy: boolean;
+  onSimulate: (choice: TrainingChoice) => void;
+}) {
+  const training = TRAINING_OPTIONS.find((item) => item.code === preparation.trainingChoice);
+  const sourceDecision = state.decisionHistory?.find((item) => item.decisionId === preparation.decisionId);
+  return (
+    <section className="card-accent p-4" aria-labelledby="season-ready-title" aria-busy={busy}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="eyebrow">Stagione pronta</p>
+        <span className="chip">{seasonLabel(state.seasonYear)}</span>
+      </div>
+      <h3 id="season-ready-title" className="font-display mt-2 text-xl font-extrabold text-white">È il momento di scendere in campo</h3>
+      <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>
+        {sourceDecision ? `${sourceDecision.optionLabel} ha definito la preparazione.` : "La preparazione è stata completata."} La simulazione applicherà davvero bonus e rischi ottenuti.
+      </p>
+      <div className="card-flat mt-4 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs" style={{ color: "var(--text-dim)" }}>Piano tecnico</span>
+          <strong className="text-sm text-white">{training?.label ?? preparation.trainingChoice}</strong>
+        </div>
+        <PreparationModifiers preparation={preparation} />
+      </div>
+      <button type="button" disabled={busy} onClick={() => onSimulate(preparation.trainingChoice)} className="btn-primary mt-4 min-h-12 w-full px-4 py-3 text-sm">
+        {busy ? "Simulazione della stagione…" : "Simula la stagione"}
+      </button>
+      <p className="mt-2 text-center text-[11px]" style={{ color: "var(--text-faint)" }}>Il risultato completo viene salvato automaticamente.</p>
+      {busy ? <p className="sr-only" role="status" aria-live="polite">Simulazione e salvataggio della stagione in corso.</p> : null}
+    </section>
+  );
+}
+
+function PreparationModifiers({ preparation }: { preparation: CareerSeasonPreparation }) {
+  const items = [
+    { label: "Rendimento", value: preparation.performance * 100, suffix: "%" },
+    { label: "Crescita", value: preparation.growth, suffix: "" },
+    { label: "Rischio fisico", value: preparation.injuryRiskPercent, suffix: "%" },
+    { label: "Gerarchie", value: preparation.squadRoleSteps, suffix: "" },
+  ].filter((item) => item.value !== 0);
+  if (items.length === 0) return null;
+  return <div className="mt-3 flex flex-wrap gap-1.5">{items.map((item) => <span key={item.label} className="chip">{item.label} {formatSigned(item.value)}{item.suffix}</span>)}</div>;
+}
+
+function FlowRecoveryCard() {
+  return (
+    <section className="card p-4" role="status">
+      <p className="eyebrow">Sincronizzazione carriera</p>
+      <h3 className="font-display mt-1 text-lg font-bold text-white">Prepariamo la prossima scelta</h3>
+      <p className="mt-2 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>Aggiorna la schermata tra un istante. I progressi già salvati non andranno persi.</p>
+    </section>
+  );
+}
+
+function ReportRecoveryCard({ seasonId, busy, onContinue }: { seasonId: string; busy: boolean; onContinue: (seasonId: string) => void }) {
+  return (
+    <section className="card-accent p-5 text-center" role="alert">
+      <span className="text-4xl" aria-hidden="true">📋</span>
+      <h2 className="font-display mt-3 text-xl font-extrabold text-white">Report già salvato</h2>
+      <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>Il riepilogo non è più disponibile, ma la stagione è al sicuro nell'archivio.</p>
+      <button type="button" disabled={busy} onClick={() => onContinue(seasonId)} className="btn-primary mt-4 min-h-12 w-full px-4 py-3 text-sm">{busy ? "Salvataggio…" : "Continua"}</button>
+    </section>
+  );
+}
+
+function SeasonReport({ season, immersive, busy, onClose }: { season: CareerSeason; immersive: boolean; busy: boolean; onClose: () => void }) {
+  const [step, setStep] = useState(0);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const maxStep = immersive ? 2 : 0;
   const club = getClubByName(season.clubName);
-  return <section className="card-accent slide-up overflow-hidden" aria-live="polite"><div className="p-4" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent)" }}><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><ClubCrest club={club} clubName={season.clubName} size={48} /><div className="min-w-0"><p className="eyebrow">Report stagione</p><h3 className="font-display mt-1 truncate text-lg font-extrabold text-white">{season.label} · {club?.name ?? season.clubName}</h3></div></div><div className="flex-none rounded-2xl px-3 py-2 text-center" style={{ background: "rgba(0,0,0,.24)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>Media</span><strong className="font-display text-xl text-white">{season.averageRating.toFixed(2)}</strong></div></div>
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
+  return <section className="card-accent slide-up overflow-hidden" aria-labelledby={`${season.id}-report-title`} aria-busy={busy}><div className="p-4" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent)" }}><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><ClubCrest club={club} clubName={season.clubName} size={48} /><div className="min-w-0"><p className="eyebrow">Report stagione</p><h3 id={`${season.id}-report-title`} ref={titleRef} tabIndex={-1} className="font-display mt-1 truncate text-lg font-extrabold text-white outline-none">{season.label} · {club?.name ?? season.clubName}</h3></div></div><div className="flex-none rounded-2xl px-3 py-2 text-center" style={{ background: "rgba(0,0,0,.24)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>Media</span><strong className="font-display text-xl text-white">{season.averageRating.toFixed(2)}</strong></div></div>
+      <p className="sr-only" role="status" aria-live="polite">Passaggio {Math.min(step, maxStep) + 1} di {maxStep + 1} del report.</p>
       {(step === 0 || !immersive) && <div className="mt-4 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="GOAT" value={`+${season.goatPointsEarned}`} /></div>}
       {(step >= 1 || !immersive) && <div className="mt-4 card-flat p-3"><div className="grid grid-cols-3 gap-2 text-center"><SmallInfo label="Campionato" value={`${season.leaguePosition}°`} /><SmallInfo label="Coppa" value={season.cupResult} /><SmallInfo label="OVR" value={`${season.overallStart}→${season.overallEnd}`} /></div></div>}
       {(step >= 2 || !immersive) && <div className="mt-4 space-y-2">{[...season.trophies, ...season.awards].length > 0 ? <div className="flex flex-wrap gap-2">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div> : <p className="text-xs" style={{ color: "var(--text-dim)" }}>Nessun trofeo, ma ogni stagione costruisce la carriera.</p>}{season.events.map((event) => <p key={event.id} className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}><strong className="text-white">{event.title}.</strong> {event.description}</p>)}</div>}
-      <button type="button" onClick={step < maxStep ? onNext : onClose} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">{step < maxStep ? "Continua" : season.retiredAfterSeason ? "Guarda la carriera" : "Vai alla nuova stagione"}</button>
+      <button type="button" disabled={busy} onClick={step < maxStep ? () => setStep((value) => value + 1) : onClose} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">{busy ? "Salvataggio…" : step < maxStep ? "Continua" : season.retiredAfterSeason ? "Guarda la carriera" : "Scelte di fine stagione"}</button>
     </div></section>;
 }
 
@@ -518,7 +896,7 @@ function TransferPanel({ offers, busy, onAccept, onDecline }: { offers: CareerOf
 function OfferCard({ offer, busy, label, onClick }: { offer: CareerOffer; busy: boolean; label: string; onClick: () => void }) {
   const country = countryFor(offer.country);
   const club = getClubByName(offer.clubName);
-  return <article className="card p-4"><div className="flex items-start gap-3"><ClubCrest club={club} clubName={offer.clubName} size={48} /><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{club?.name ?? offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{country.flag} {offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)}</span><span className="chip">{offer.contractYears} anni</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
+  return <article className="card p-4"><div className="flex items-start gap-3"><ClubCrest club={club} clubName={offer.clubName} size={48} /><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{club?.name ?? offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{country.flag} {offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)}</span><span className="chip">{offer.contractYears} anni</span><span className="chip">Interesse {offer.interest}%</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
 }
 
 function StatsTab({ state, onReset }: { state: CareerState; onReset: () => void }) {
@@ -642,6 +1020,52 @@ function clubInitials(name: string) {
   return `${words[0]?.[0] ?? ""}${words[words.length - 1]?.[0] ?? ""}`.toLocaleUpperCase("it");
 }
 
+function seasonLabel(year: number) {
+  return `${year}/${String(year + 1).slice(-2)}`;
+}
+
+function decisionOutcomeColor(outcome: CareerDecisionProbability["outcome"]) {
+  if (outcome === "greatSuccess") return "#34d399";
+  if (outcome === "success") return "#22d3ee";
+  if (outcome === "neutral") return "#94a3b8";
+  return "#fb7185";
+}
+
+function decisionOutcomeIcon(outcome: CareerDecisionProbability["outcome"]) {
+  if (outcome === "greatSuccess") return "🏆";
+  if (outcome === "success") return "✓";
+  if (outcome === "neutral") return "≈";
+  return "↘";
+}
+
+interface DecisionEffectItem {
+  label: string;
+  value: number;
+  suffix: string;
+  good: boolean;
+}
+
+function decisionEffectItems(effects: CareerDecisionEffects): DecisionEffectItem[] {
+  return [
+    { label: "OVR", value: effects.overall, suffix: "", good: effects.overall > 0 },
+    { label: "Potenziale", value: effects.potential, suffix: "", good: effects.potential > 0 },
+    { label: "Reputazione", value: effects.reputation, suffix: "", good: effects.reputation > 0 },
+    { label: "Forma", value: effects.form, suffix: "", good: effects.form > 0 },
+    { label: "Valore", value: effects.marketValuePercent, suffix: "%", good: effects.marketValuePercent > 0 },
+    { label: "Gerarchie", value: effects.squadRoleSteps, suffix: "", good: effects.squadRoleSteps > 0 },
+    { label: "Rendimento", value: effects.seasonPerformance * 100, suffix: "%", good: effects.seasonPerformance > 0 },
+    { label: "Crescita", value: effects.seasonGrowth, suffix: "", good: effects.seasonGrowth > 0 },
+    { label: "Rischio fisico", value: effects.injuryRiskPercent, suffix: "%", good: effects.injuryRiskPercent < 0 },
+    { label: "Interesse club", value: effects.offerInterest, suffix: "", good: effects.offerInterest > 0 },
+    { label: "Contratto", value: effects.contractYears, suffix: effects.contractYears === 1 ? " anno" : " anni", good: effects.contractYears > 0 },
+  ].filter((item) => item.value !== 0);
+}
+
+function formatSigned(value: number) {
+  const rounded = Number.isInteger(value) ? String(value) : value.toFixed(1).replace(".0", "");
+  return value > 0 ? `+${rounded}` : rounded;
+}
+
 function onRadioKeyDown<T extends string>(
   event: KeyboardEvent<HTMLButtonElement>,
   values: T[],
@@ -665,10 +1089,5 @@ function onRadioKeyDown<T extends string>(
 function countryFor(code: CountryCode) { return COUNTRY_OPTIONS.find((country) => country.code === code) ?? COUNTRY_OPTIONS[0]; }
 function roleFor(code: Role) { return ROLE_OPTIONS.find((role) => role.code === code) ?? ROLE_OPTIONS[0]; }
 function squadRoleLabel(role: CareerOffer["squadRole"]) { return role === "star" ? "Stella" : role === "starter" ? "Titolare" : role === "rotation" ? "Rotazione" : "Prospetto"; }
+function squadRoleCompactLabel(role: CareerOffer["squadRole"]) { return role === "star" ? "Stella" : role === "starter" ? "Tit." : role === "rotation" ? "Rot." : "Prosp."; }
 function formatMoney(value: number) { if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`; if (value >= 1_000) return `€${Math.round(value / 1_000)}K`; return `€${value}`; }
-function roleTrainingIcon(role: Role) { return role === "GK" ? "🧤" : ["RB", "CB", "LB", "DM"].includes(role) ? "🛡️" : ["CM", "AM"].includes(role) ? "🎯" : "🥅"; }
-function trainingForRole(role: Role) {
-  const specialist: TrainingChoice = role === "GK" ? "goalkeeping" : ["RB", "CB", "LB", "DM"].includes(role) ? "defending" : ["CM", "AM"].includes(role) ? "playmaking" : "finishing";
-  const codes: TrainingChoice[] = ["balanced", specialist, "recovery"];
-  return codes.map((code) => TRAINING_OPTIONS.find((item) => item.code === code) ?? TRAINING_OPTIONS[0]);
-}

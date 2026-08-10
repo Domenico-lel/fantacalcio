@@ -8,10 +8,16 @@ import {
   ROLE_OPTIONS,
   TRAINING_OPTIONS,
   acceptTransfer,
+  acknowledgeSeasonReport,
   chooseStartingClub,
+  continueCareerDecision,
   createInitialCareer,
+  declineTransferOffers,
+  normalizeCareerDecisionState,
+  resolveCareerDecision,
   simulateNextSeason,
   upgradeCareerCatalog,
+  type CareerDecisionResult,
   type CareerSeason,
   type CareerState,
   type CountryCode,
@@ -55,6 +61,7 @@ export interface CareerHub {
 export interface CareerMutationResult {
   hub: CareerHub;
   season?: CareerSeason;
+  decision?: CareerDecisionResult;
   error: string | null;
 }
 
@@ -75,7 +82,7 @@ function isCareerState(value: unknown): value is CareerState {
 }
 
 function parseState(value: Json): CareerState | null {
-  return isCareerState(value) ? upgradeCareerCatalog(value) : null;
+  return isCareerState(value) ? normalizeCareerDecisionState(upgradeCareerCatalog(value)) : null;
 }
 
 function json(value: CareerState | CareerSeason): Json {
@@ -288,9 +295,25 @@ export async function advanceCareerSeason(choice: TrainingChoice, expectedVersio
   return { hub: await readHub(viewer), season: error ? undefined : simulation.season, error };
 }
 
-export async function acceptCareerTransfer(clubName: string): Promise<CareerMutationResult> {
+function validExpectedVersion(value: number): boolean {
+  return Number.isInteger(value) && value >= 1;
+}
+
+function validMutationId(value: string): boolean {
+  return value.trim().length > 0 && value.length <= 160;
+}
+
+export async function resolveCareerChoice(
+  decisionId: string,
+  optionId: string,
+  expectedVersion: number,
+): Promise<CareerMutationResult> {
   const viewer = await getCurrentViewer();
   if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  if (!validMutationId(decisionId) || !validMutationId(optionId) || !validExpectedVersion(expectedVersion)) {
+    return { hub: await readHub(viewer), error: "Scelta non valida. Ricarica e riprova." };
+  }
+
   const db = createAdminClient();
   const own = await getOwnCareerRow(db, viewer.userId);
   if (own.error || !own.data) {
@@ -299,6 +322,155 @@ export async function acceptCareerTransfer(clubName: string): Promise<CareerMuta
   }
   const state = parseState(own.data.state);
   if (!state) return { hub: await readHub(viewer), error: "Salvataggio non valido." };
+
+  const alreadyResolved = state.decisionHistory?.find(
+    (item) => item.decisionId === decisionId && item.optionId === optionId,
+  );
+  if (own.data.version !== expectedVersion) {
+    return alreadyResolved
+      ? { hub: await readHub(viewer), decision: alreadyResolved, error: null }
+      : {
+          hub: await readHub(viewer),
+          error: "La decisione è cambiata su un altro dispositivo. Ho ricaricato i progressi.",
+        };
+  }
+
+  let resolution: ReturnType<typeof resolveCareerDecision>;
+  try {
+    resolution = resolveCareerDecision(state, decisionId, optionId);
+  } catch (cause) {
+    return {
+      hub: await readHub(viewer),
+      error: cause instanceof Error ? cause.message : "Non riesco ad applicare questa scelta.",
+    };
+  }
+
+  const error = await saveState(db, own.data, resolution.state);
+  revalidatePath("/carriera");
+  return {
+    hub: await readHub(viewer),
+    decision: error ? undefined : resolution.result,
+    error,
+  };
+}
+
+export async function continueCareerChoice(
+  decisionId: string,
+  expectedVersion: number,
+): Promise<CareerMutationResult> {
+  const viewer = await getCurrentViewer();
+  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  if (!validMutationId(decisionId) || !validExpectedVersion(expectedVersion)) {
+    return { hub: await readHub(viewer), error: "Decisione non valida. Ricarica e riprova." };
+  }
+
+  const db = createAdminClient();
+  const own = await getOwnCareerRow(db, viewer.userId);
+  if (own.error || !own.data) {
+    const error = schemaMessage(own.error?.message ?? "Carriera non trovata.");
+    return { hub: await readHub(viewer), error };
+  }
+  const state = parseState(own.data.state);
+  if (!state) return { hub: await readHub(viewer), error: "Salvataggio non valido." };
+
+  if (own.data.version !== expectedVersion) {
+    const wasContinued = state.pendingDecision?.id !== decisionId
+      && !!state.decisionHistory?.some((item) => item.decisionId === decisionId);
+    return wasContinued
+      ? { hub: await readHub(viewer), error: null }
+      : {
+          hub: await readHub(viewer),
+          error: "La decisione è cambiata su un altro dispositivo. Ho ricaricato i progressi.",
+        };
+  }
+
+  let next: CareerState;
+  try {
+    next = continueCareerDecision(state, decisionId);
+  } catch (cause) {
+    return {
+      hub: await readHub(viewer),
+      error: cause instanceof Error ? cause.message : "Non riesco a continuare la carriera.",
+    };
+  }
+
+  const error = await saveState(db, own.data, next);
+  revalidatePath("/carriera");
+  return { hub: await readHub(viewer), error };
+}
+
+export async function acknowledgeCareerReport(
+  seasonId: string,
+  expectedVersion: number,
+): Promise<CareerMutationResult> {
+  const viewer = await getCurrentViewer();
+  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  if (!validMutationId(seasonId) || !validExpectedVersion(expectedVersion)) {
+    return { hub: await readHub(viewer), error: "Report non valido. Ricarica e riprova." };
+  }
+
+  const db = createAdminClient();
+  const own = await getOwnCareerRow(db, viewer.userId);
+  if (own.error || !own.data) {
+    const error = schemaMessage(own.error?.message ?? "Carriera non trovata.");
+    return { hub: await readHub(viewer), error };
+  }
+  const state = parseState(own.data.state);
+  if (!state) return { hub: await readHub(viewer), error: "Salvataggio non valido." };
+
+  if (own.data.version !== expectedVersion) {
+    const wasAcknowledged = state.pendingSeasonReportId !== seasonId
+      && state.seasons.some((season) => season.id === seasonId);
+    return wasAcknowledged
+      ? { hub: await readHub(viewer), error: null }
+      : {
+          hub: await readHub(viewer),
+          error: "Il report è cambiato su un altro dispositivo. Ho ricaricato i progressi.",
+        };
+  }
+
+  let next: CareerState;
+  try {
+    next = acknowledgeSeasonReport(state, seasonId);
+  } catch (cause) {
+    return {
+      hub: await readHub(viewer),
+      error: cause instanceof Error ? cause.message : "Non riesco a chiudere il report.",
+    };
+  }
+
+  const error = await saveState(db, own.data, next);
+  revalidatePath("/carriera");
+  return { hub: await readHub(viewer), error };
+}
+
+export async function acceptCareerTransfer(
+  clubName: string,
+  expectedVersion: number,
+): Promise<CareerMutationResult> {
+  const viewer = await getCurrentViewer();
+  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  if (!validExpectedVersion(expectedVersion)) {
+    return { hub: await readHub(viewer), error: "Versione della carriera non valida. Ricarica e riprova." };
+  }
+  const db = createAdminClient();
+  const own = await getOwnCareerRow(db, viewer.userId);
+  if (own.error || !own.data) {
+    const error = schemaMessage(own.error?.message ?? "Carriera non trovata.");
+    return { hub: await readHub(viewer), error };
+  }
+  const state = parseState(own.data.state);
+  if (!state) return { hub: await readHub(viewer), error: "Salvataggio non valido." };
+  if (own.data.version !== expectedVersion) {
+    const alreadyAccepted = state.currentClub?.name.toLocaleLowerCase("it") === clubName.trim().toLocaleLowerCase("it")
+      && state.pendingOffers.length === 0;
+    return alreadyAccepted
+      ? { hub: await readHub(viewer), error: null }
+      : {
+          hub: await readHub(viewer),
+          error: "Le offerte sono cambiate su un altro dispositivo. Ho ricaricato il mercato.",
+        };
+  }
 
   let next: CareerState;
   try {
@@ -311,9 +483,12 @@ export async function acceptCareerTransfer(clubName: string): Promise<CareerMuta
   return { hub: await readHub(viewer), error };
 }
 
-export async function declineCareerTransfers(): Promise<CareerMutationResult> {
+export async function declineCareerTransfers(expectedVersion: number): Promise<CareerMutationResult> {
   const viewer = await getCurrentViewer();
   if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  if (!validExpectedVersion(expectedVersion)) {
+    return { hub: await readHub(viewer), error: "Versione della carriera non valida. Ricarica e riprova." };
+  }
   const db = createAdminClient();
   const own = await getOwnCareerRow(db, viewer.userId);
   if (own.error || !own.data) {
@@ -322,7 +497,25 @@ export async function declineCareerTransfers(): Promise<CareerMutationResult> {
   }
   const state = parseState(own.data.state);
   if (!state) return { hub: await readHub(viewer), error: "Salvataggio non valido." };
-  const error = await saveState(db, own.data, { ...state, pendingOffers: [] });
+  if (own.data.version !== expectedVersion) {
+    return state.pendingOffers.length === 0
+      ? { hub: await readHub(viewer), error: null }
+      : {
+          hub: await readHub(viewer),
+          error: "Le offerte sono cambiate su un altro dispositivo. Ho ricaricato il mercato.",
+        };
+  }
+
+  let next: CareerState;
+  try {
+    next = declineTransferOffers(state);
+  } catch (cause) {
+    return {
+      hub: await readHub(viewer),
+      error: cause instanceof Error ? cause.message : "Non riesco a rifiutare le offerte.",
+    };
+  }
+  const error = await saveState(db, own.data, next);
   revalidatePath("/carriera");
   return { hub: await readHub(viewer), error };
 }

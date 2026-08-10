@@ -37,6 +37,8 @@ export type TrainingChoice =
 export type CareerStage = "choosingClub" | "active" | "retired";
 export type EventTone = "positive" | "neutral" | "negative" | "special";
 export type SquadRole = "prospect" | "rotation" | "starter" | "star";
+export type CareerDecisionPhase = "preSeason" | "postSeason";
+export type CareerDecisionOutcome = "greatSuccess" | "success" | "neutral" | "failure";
 
 export interface LeagueMetadata {
   name: string;
@@ -350,6 +352,7 @@ export interface CareerEvent {
     | "award"
     | "transfer"
     | "contract"
+    | "decision"
     | "retirement";
   title: string;
   description: string;
@@ -372,6 +375,91 @@ export interface CareerOffer {
   transferFee: number;
   interest: number;
   message: string;
+}
+
+/**
+ * Effetti numerici di un singolo ramo decisionale.
+ *
+ * I delta percentuali sono relativi (es. -20 riduce il rischio del 20%).
+ * I modificatori stagionali vengono consumati dalla simulazione successiva;
+ * tutti gli altri effetti sono applicati subito allo stato persistito.
+ */
+export interface CareerDecisionEffects {
+  overall: number;
+  potential: number;
+  reputation: number;
+  form: number;
+  marketValuePercent: number;
+  squadRoleSteps: number;
+  seasonPerformance: number;
+  seasonGrowth: number;
+  injuryRiskPercent: number;
+  offerInterest: number;
+  contractYears: number;
+}
+
+export interface CareerDecisionProbability {
+  outcome: CareerDecisionOutcome;
+  label: string;
+  percentage: number;
+  tone: EventTone;
+  title: string;
+  description: string;
+  effects: CareerDecisionEffects;
+  /** Testo pronto per una card mobile, derivato dagli stessi delta applicati. */
+  effectSummary: string;
+}
+
+export interface CareerDecisionOption {
+  id: string;
+  label: string;
+  description: string;
+  hint: string;
+  trainingChoice?: TrainingChoice;
+  probabilities: CareerDecisionProbability[];
+}
+
+export interface CareerDecision {
+  id: string;
+  phase: CareerDecisionPhase;
+  seasonIndex: number;
+  seasonYear: number;
+  title: string;
+  description: string;
+  context: string;
+  options: CareerDecisionOption[];
+}
+
+export interface CareerDecisionResult {
+  id: string;
+  decisionId: string;
+  phase: CareerDecisionPhase;
+  seasonIndex: number;
+  seasonYear: number;
+  optionId: string;
+  optionLabel: string;
+  outcome: CareerDecisionOutcome;
+  outcomeLabel: string;
+  probability: number;
+  /** Numero intero deterministico compreso fra 1 e 100. */
+  roll: number;
+  title: string;
+  description: string;
+  effects: CareerDecisionEffects;
+  effectSummary: string;
+}
+
+/** Modificatori guadagnati nella PRE e consumati da una sola stagione. */
+export interface CareerSeasonPreparation {
+  decisionId: string;
+  optionId: string;
+  outcome: CareerDecisionOutcome;
+  seasonIndex: number;
+  trainingChoice: TrainingChoice;
+  performance: number;
+  growth: number;
+  injuryRiskPercent: number;
+  squadRoleSteps: number;
 }
 
 export interface CareerHonour {
@@ -476,6 +564,16 @@ export interface CareerState {
   pendingOffers: CareerOffer[];
   feed: CareerEvent[];
   retiredAtAge: number | null;
+  /** Campi opzionali per leggere senza migrazione distruttiva i salvataggi v1. */
+  pendingDecision?: CareerDecision | null;
+  queuedDecision?: CareerDecision | null;
+  lastDecisionResult?: CareerDecisionResult | null;
+  decisionHistory?: CareerDecisionResult[];
+  seasonPreparation?: CareerSeasonPreparation | null;
+  /** Blocca la POST finche il riepilogo della stagione non e stato visto. */
+  pendingSeasonReportId?: string | null;
+  /** Offerte generate a fine stagione ma nascoste finche la POST non termina. */
+  queuedOffers?: CareerOffer[];
 }
 
 interface RoleProfile {
@@ -704,7 +802,7 @@ export function upgradeCareerCatalog(state: CareerState): CareerState {
     description: upgradeCatalogText(event.description),
   });
 
-  const pendingOffers = state.pendingOffers.map((offer): CareerOffer => {
+  const upgradeOffer = (offer: CareerOffer): CareerOffer => {
     const club = findClub(offer.clubName);
     return club
       ? {
@@ -722,7 +820,9 @@ export function upgradeCareerCatalog(state: CareerState): CareerState {
           league: currentLeague(offer.country, offer.league),
           message: upgradeCatalogText(offer.message),
         };
-  });
+  };
+  const pendingOffers = state.pendingOffers.map(upgradeOffer);
+  const queuedOffers = (state.queuedOffers ?? []).map(upgradeOffer);
 
   const seasons = state.seasons.map((season): CareerSeason => {
     const club = findClub(season.clubName);
@@ -737,10 +837,11 @@ export function upgradeCareerCatalog(state: CareerState): CareerState {
     };
   });
 
-  return {
+  return normalizeCareerDecisionState({
     ...state,
     currentClub,
     pendingOffers,
+    queuedOffers,
     seasons,
     trophyCabinet: state.trophyCabinet.map((honour) => ({
       ...honour,
@@ -751,7 +852,7 @@ export function upgradeCareerCatalog(state: CareerState): CareerState {
       name: upgradeCatalogText(honour.name),
     })),
     feed: state.feed.map(upgradeEvent),
-  };
+  });
 }
 
 function squadRoleFor(overall: number, clubRating: number): SquadRole {
@@ -876,6 +977,492 @@ function roleDepartment(role: Role): RoleOption["department"] {
   return ROLE_OPTIONS.find((option) => option.code === role)?.department ?? "Attacco";
 }
 
+const EMPTY_DECISION_EFFECTS: CareerDecisionEffects = {
+  overall: 0,
+  potential: 0,
+  reputation: 0,
+  form: 0,
+  marketValuePercent: 0,
+  squadRoleSteps: 0,
+  seasonPerformance: 0,
+  seasonGrowth: 0,
+  injuryRiskPercent: 0,
+  offerInterest: 0,
+  contractYears: 0,
+};
+
+const DECISION_OUTCOME_META: Record<CareerDecisionOutcome, { label: string; tone: EventTone }> = {
+  greatSuccess: { label: "Grande riuscita", tone: "special" },
+  success: { label: "Riuscita", tone: "positive" },
+  neutral: { label: "Esito neutro", tone: "neutral" },
+  failure: { label: "Fallimento", tone: "negative" },
+};
+
+const SQUAD_ROLE_ORDER: readonly SquadRole[] = ["prospect", "rotation", "starter", "star"];
+
+function decisionEffects(overrides: Partial<CareerDecisionEffects> = {}): CareerDecisionEffects {
+  return { ...EMPTY_DECISION_EFFECTS, ...overrides };
+}
+
+function signed(value: number, suffix: string): string {
+  return `${value > 0 ? "+" : ""}${value}${suffix}`;
+}
+
+/** Restituisce la descrizione compatta degli stessi delta applicati dal motore. */
+export function describeCareerDecisionEffects(effects: CareerDecisionEffects): string {
+  const parts: string[] = [];
+  if (effects.overall) parts.push(signed(effects.overall, " OVR"));
+  if (effects.potential) parts.push(signed(effects.potential, " POT"));
+  if (effects.reputation) parts.push(signed(effects.reputation, " reputazione"));
+  if (effects.form) parts.push(signed(effects.form, " forma"));
+  if (effects.marketValuePercent) parts.push(signed(effects.marketValuePercent, "% valore"));
+  if (effects.squadRoleSteps) {
+    parts.push(effects.squadRoleSteps > 0 ? "+1 livello titolarità" : "-1 livello titolarità");
+  }
+  if (effects.seasonPerformance) parts.push(signed(round(effects.seasonPerformance, 2), " rendimento"));
+  if (effects.seasonGrowth) parts.push(signed(round(effects.seasonGrowth, 2), " crescita"));
+  if (effects.injuryRiskPercent) parts.push(signed(effects.injuryRiskPercent, "% rischio infortunio"));
+  if (effects.offerInterest) parts.push(signed(effects.offerInterest, " interesse mercato"));
+  if (effects.contractYears) parts.push(signed(effects.contractYears, " anno contratto"));
+  return parts.length > 0 ? parts.join(" · ") : "Nessuna variazione";
+}
+
+function probabilityBranch(
+  outcome: CareerDecisionOutcome,
+  percentage: number,
+  title: string,
+  description: string,
+  effects: CareerDecisionEffects,
+): CareerDecisionProbability {
+  const meta = DECISION_OUTCOME_META[outcome];
+  return {
+    outcome,
+    label: percentage === 100 ? "Conseguenza certa" : meta.label,
+    percentage,
+    tone: meta.tone,
+    title,
+    description,
+    effects,
+    effectSummary: describeCareerDecisionEffects(effects),
+  };
+}
+
+function validateDecisionOptions(options: readonly CareerDecisionOption[]): void {
+  for (const option of options) {
+    const total = option.probabilities.reduce((sum, item) => sum + item.percentage, 0);
+    if (total !== 100 || option.probabilities.some((item) => !Number.isInteger(item.percentage) || item.percentage < 0)) {
+      throw new Error(`Le probabilità di ${option.id} devono essere interi non negativi con somma 100.`);
+    }
+  }
+}
+
+function shiftSquadRole(role: SquadRole, steps: number): SquadRole {
+  const index = SQUAD_ROLE_ORDER.indexOf(role);
+  return SQUAD_ROLE_ORDER[clamp(index + Math.trunc(steps), 0, SQUAD_ROLE_ORDER.length - 1)] as SquadRole;
+}
+
+function specialistTrainingFor(role: Role): TrainingChoice {
+  return ROLE_PROFILES[role].training[0] ?? "balanced";
+}
+
+function createPreSeasonDecision(state: CareerState): CareerDecision {
+  if (!state.currentClub) throw new Error("Serve un club per creare la scelta di inizio stagione.");
+  const readiness = clamp(Math.round((state.form - 50) / 12) - Math.max(0, state.age - 31), -10, 10);
+  const campSuccess = clamp(60 + readiness, 45, 75);
+  const individualGreat = clamp(22 + Math.round((state.potential - state.overall) / 7), 20, 30);
+  const individualFailure = clamp(15 + Math.max(0, state.age - 30) * 2 - Math.round((state.form - 50) / 15), 8, 28);
+  const individualNeutral = 15;
+  const individualSuccess = 100 - individualGreat - individualNeutral - individualFailure;
+  const specialist = specialistTrainingFor(state.player.role);
+  const id = `decision-pre-${hashString(`${state.id}|${state.seasonIndex}|${state.currentClub.id}`).toString(36)}`;
+
+  const options: CareerDecisionOption[] = [
+    {
+      id: `${id}-ritiro`,
+      label: "Partecipa al ritiro",
+      description: "Affronta il ritiro con la nuova rosa e prova a convincere subito lo staff.",
+      hint: "Scelta diretta: puoi guadagnare o perdere un punto OVR.",
+      trainingChoice: "balanced",
+      probabilities: [
+        probabilityBranch("greatSuccess", 0, "Ritiro perfetto", "Superi ogni aspettativa dello staff.", decisionEffects({ overall: 2, form: 12, squadRoleSteps: 1, seasonPerformance: 0.14, seasonGrowth: 0.7, injuryRiskPercent: -10 })),
+        probabilityBranch("success", campSuccess, "Ritiro riuscito", "Il lavoro estivo ti fa partire un passo avanti.", decisionEffects({ overall: 1, form: 8, seasonPerformance: 0.08, seasonGrowth: 0.4, injuryRiskPercent: -5 })),
+        probabilityBranch("neutral", 0, "Ritiro regolare", "Il ritiro non cambia le gerarchie.", decisionEffects()),
+        probabilityBranch("failure", 100 - campSuccess, "Ritiro complicato", "Carichi e pressione ti fanno perdere terreno.", decisionEffects({ overall: -1, form: -8, squadRoleSteps: -1, seasonPerformance: -0.08, seasonGrowth: -0.35, injuryRiskPercent: 20 })),
+      ],
+    },
+    {
+      id: `${id}-personale`,
+      label: "Preparazione personale",
+      description: "Segui un programma specifico per il tuo ruolo, con un tetto più alto ma più rischio.",
+      hint: "Quattro esiti possibili, dal salto di qualità al sovraccarico.",
+      trainingChoice: specialist,
+      probabilities: [
+        probabilityBranch("greatSuccess", individualGreat, "Salto di qualità", "Il programma su misura trasforma un tuo punto debole in un'arma.", decisionEffects({ overall: 2, potential: 1, reputation: 2, form: 12, marketValuePercent: 10, seasonPerformance: 0.2, seasonGrowth: 1.1, injuryRiskPercent: 5 })),
+        probabilityBranch("success", individualSuccess, "Lavoro ripagato", "Arrivi alla prima giornata più pronto e sicuro.", decisionEffects({ overall: 1, reputation: 1, form: 7, marketValuePercent: 5, seasonPerformance: 0.12, seasonGrowth: 0.65, injuryRiskPercent: 8 })),
+        probabilityBranch("neutral", individualNeutral, "Progressi limitati", "Il lavoro è utile, ma non cambia ancora il tuo livello.", decisionEffects({ form: 2, seasonPerformance: 0.03, seasonGrowth: 0.15, injuryRiskPercent: 10 })),
+        probabilityBranch("failure", individualFailure, "Carico eccessivo", "Il programma è troppo intenso e lascia scorie.", decisionEffects({ overall: -1, reputation: -1, form: -10, marketValuePercent: -6, seasonPerformance: -0.12, seasonGrowth: -0.55, injuryRiskPercent: 30 })),
+      ],
+    },
+    {
+      id: `${id}-salta`,
+      label: "Salta il ritiro",
+      description: "Recuperi energie, ma perdi inevitabilmente terreno nelle gerarchie.",
+      hint: "Esito certo: nessun tiro nascosto.",
+      trainingChoice: "recovery",
+      probabilities: [
+        probabilityBranch("greatSuccess", 0, "Nessun bonus", "Saltare il ritiro non può produrre una grande riuscita.", decisionEffects()),
+        probabilityBranch("success", 0, "Nessun bonus", "Saltare il ritiro non migliora la posizione in squadra.", decisionEffects()),
+        probabilityBranch("neutral", 100, "Gerarchie perse", "Lo staff premia chi ha lavorato con il gruppo.", decisionEffects({ form: 4, squadRoleSteps: -1, seasonPerformance: -0.08, injuryRiskPercent: -25 })),
+        probabilityBranch("failure", 0, "Nessun rischio casuale", "La conseguenza è già nota prima della scelta.", decisionEffects()),
+      ],
+    },
+  ];
+  validateDecisionOptions(options);
+  return {
+    id,
+    phase: "preSeason",
+    seasonIndex: state.seasonIndex,
+    seasonYear: state.seasonYear,
+    title: `Ritiro con ${state.currentClub.name}`,
+    description: "Come vuoi preparare la nuova stagione? Ogni conseguenza è visibile prima della scelta.",
+    context: `${state.seasonYear}/${String(state.seasonYear + 1).slice(-2)} · ${state.age} anni`,
+    options,
+  };
+}
+
+function createPostSeasonDecision(state: CareerState, season: CareerSeason): CareerDecision {
+  if (!state.currentClub) throw new Error("Serve un club per creare la scelta di fine stagione.");
+  const highRiskSuccess = clamp(50 + Math.round((season.averageRating - 7) * 6) - Math.max(0, state.age - 31), 38, 62);
+  const mediaSuccess = clamp(48 + Math.round((season.averageRating - 6.8) * 5), 38, 62);
+  const agentGreat = clamp(18 + Math.round(state.reputation / 20), 18, 23);
+  const agentFailure = clamp(16 - Math.round(state.reputation / 25), 12, 16);
+  const agentNeutral = 20;
+  const agentSuccess = 100 - agentGreat - agentNeutral - agentFailure;
+  const id = `decision-post-${hashString(`${state.id}|${season.id}|${state.currentClub.id}`).toString(36)}`;
+
+  const options: CareerDecisionOption[] = [
+    {
+      id: `${id}-extra`,
+      label: "Allenamento extra",
+      description: "Rinunci alle vacanze per tentare un salto immediato di livello.",
+      hint: "Alto rischio: il premio è +3 OVR, l'insuccesso costa -1 OVR.",
+      probabilities: [
+        probabilityBranch("greatSuccess", 0, "Nessun esito nascosto", "Questa scelta ha due soli risultati possibili.", decisionEffects()),
+        probabilityBranch("success", highRiskSuccess, "Estate straordinaria", "Il lavoro extra produce un miglioramento fuori scala.", decisionEffects({ overall: 3, potential: 1, reputation: 2, form: 5, marketValuePercent: 12 })),
+        probabilityBranch("neutral", 0, "Nessun pareggio", "Questa scelta ha due soli risultati possibili.", decisionEffects()),
+        probabilityBranch("failure", 100 - highRiskSuccess, "Sovraccarico", "Senza recupero il fisico presenta il conto.", decisionEffects({ overall: -1, form: -12, reputation: -1, marketValuePercent: -7 })),
+      ],
+    },
+    {
+      id: `${id}-recupero`,
+      label: "Stacca e recupera",
+      description: "Scegli un'estate controllata per ritrovare energie senza rischiare.",
+      hint: "Esito certo e contenuto.",
+      probabilities: [
+        probabilityBranch("greatSuccess", 0, "Nessun bonus casuale", "Il recupero ha un effetto noto.", decisionEffects()),
+        probabilityBranch("success", 100, "Batterie ricaricate", "Il riposo programmato restituisce lucidità e forma.", decisionEffects({ form: 8, marketValuePercent: 2 })),
+        probabilityBranch("neutral", 0, "Nessun esito neutro", "Il recupero produce sempre il beneficio dichiarato.", decisionEffects()),
+        probabilityBranch("failure", 0, "Nessun rischio", "Questa opzione non può fallire.", decisionEffects()),
+      ],
+    },
+    {
+      id: `${id}-media`,
+      label: "Spingi la tua immagine",
+      description: "Usa il momento per aumentare reputazione e valore commerciale.",
+      hint: "Più visibilità, ma una campagna sbagliata può distrarti.",
+      probabilities: [
+        probabilityBranch("greatSuccess", 12, "Volto della stagione", "La campagna diventa virale e ti porta in una nuova dimensione.", decisionEffects({ reputation: 6, form: 3, marketValuePercent: 16 })),
+        probabilityBranch("success", mediaSuccess, "Immagine in crescita", "Sponsor e tifosi rispondono bene.", decisionEffects({ reputation: 3, marketValuePercent: 8 })),
+        probabilityBranch("neutral", Math.max(0, 100 - 12 - mediaSuccess - 14), "Campagna tiepida", "La visibilità cresce senza cambiare davvero la carriera.", decisionEffects({ reputation: 1, form: -1, marketValuePercent: 2 })),
+        probabilityBranch("failure", 14, "Distrazione mediatica", "Le iniziative fuori campo irritano staff e tifosi.", decisionEffects({ reputation: -3, form: -6, marketValuePercent: -6 })),
+      ],
+    },
+    state.agentEnabled
+      ? {
+          id: `${id}-agente`,
+          label: "Chiama il tuo agente",
+          description: "Muovi il mercato e prova ad alzare l'interesse dei club.",
+          hint: "L'esito modifica concretamente le offerte accodate.",
+          probabilities: [
+            probabilityBranch("greatSuccess", agentGreat, "Asta internazionale", "Più club entrano in corsa e l'interesse sale.", decisionEffects({ reputation: 3, marketValuePercent: 8, offerInterest: 24 })),
+            probabilityBranch("success", agentSuccess, "Contatti utili", "Il tuo agente apre porte interessanti.", decisionEffects({ reputation: 1, marketValuePercent: 4, offerInterest: 14 })),
+            probabilityBranch("neutral", agentNeutral, "Sondaggi senza offerta", "I contatti non cambiano il mercato.", decisionEffects({ offerInterest: 3 })),
+            probabilityBranch("failure", agentFailure, "Mossa controproducente", "Il rumore di mercato indebolisce la tua posizione.", decisionEffects({ reputation: -2, form: -4, marketValuePercent: -5, offerInterest: -12 })),
+          ],
+        }
+      : {
+          id: `${id}-fedelta`,
+          label: "Conferma la fiducia al club",
+          description: "Senza agente, scegli stabilità e continuità con la società.",
+          hint: "Esito certo: rinnovo e piccolo bonus reputazione.",
+          probabilities: [
+            probabilityBranch("greatSuccess", 0, "Nessun bonus casuale", "La conseguenza è già nota.", decisionEffects()),
+            probabilityBranch("success", 100, "Patto rinnovato", "Club e tifosi apprezzano la scelta di continuità.", decisionEffects({ reputation: 1, form: 3, contractYears: 1 })),
+            probabilityBranch("neutral", 0, "Nessun esito neutro", "La scelta produce sempre l'effetto dichiarato.", decisionEffects()),
+            probabilityBranch("failure", 0, "Nessun rischio", "Questa scelta non può fallire.", decisionEffects()),
+          ],
+        },
+  ];
+  validateDecisionOptions(options);
+  return {
+    id,
+    phase: "postSeason",
+    seasonIndex: season.index,
+    seasonYear: season.year,
+    title: "Come chiudi la stagione?",
+    description: "Scegli come usare l'estate. Percentuali ed effetti sono dichiarati prima del tiro.",
+    context: `${season.clubName} · voto ${season.averageRating.toFixed(2)} · ${season.appearances} presenze`,
+    options,
+  };
+}
+
+/**
+ * Inizializza i nuovi campi e crea la PRE mancante nei salvataggi precedenti.
+ * La funzione e pura e idempotente: non risolve scelte e non consuma casualita.
+ */
+export function normalizeCareerDecisionState(state: CareerState): CareerState {
+  const normalized: CareerState = {
+    ...state,
+    pendingDecision: state.pendingDecision ?? null,
+    queuedDecision: state.queuedDecision ?? null,
+    lastDecisionResult: state.lastDecisionResult ?? null,
+    decisionHistory: state.decisionHistory ?? [],
+    seasonPreparation: state.seasonPreparation ?? null,
+    pendingSeasonReportId: state.pendingSeasonReportId ?? null,
+    queuedOffers: state.queuedOffers ?? [],
+  };
+
+  if (
+    normalized.stage === "active" &&
+    normalized.currentClub &&
+    !normalized.pendingDecision &&
+    !normalized.queuedDecision &&
+    !normalized.lastDecisionResult &&
+    !normalized.pendingSeasonReportId &&
+    normalized.pendingOffers.length === 0 &&
+    (normalized.queuedOffers?.length ?? 0) === 0 &&
+    normalized.seasonPreparation?.seasonIndex !== normalized.seasonIndex
+  ) {
+    return { ...normalized, pendingDecision: createPreSeasonDecision(normalized) };
+  }
+  return normalized;
+}
+
+function applyImmediateDecisionEffects(state: CareerState, effects: CareerDecisionEffects): CareerState {
+  const overall = clamp(state.overall + effects.overall, 45, 99);
+  const potential = clamp(state.potential + effects.potential, overall, 97);
+  const reputation = clamp(state.reputation + effects.reputation, 0, 100);
+  const form = clamp(state.form + effects.form, 0, 100);
+  const clubRating = state.currentClub?.rating ?? 66;
+  const calculatedValue = calculateMarketValue(overall, state.age, reputation, clubRating);
+  const marketValue = state.stage === "retired"
+    ? 0
+    : roundMoney(calculatedValue * (1 + effects.marketValuePercent / 100));
+  const currentClub = state.currentClub
+    ? {
+        ...state.currentClub,
+        squadRole: shiftSquadRole(state.currentClub.squadRole, effects.squadRoleSteps),
+        contractUntil: effects.contractYears > 0
+          ? Math.max(state.currentClub.contractUntil, state.seasonYear) + effects.contractYears
+          : state.currentClub.contractUntil,
+      }
+    : null;
+  const queuedOffers = (state.queuedOffers ?? []).map((offer) => ({
+    ...offer,
+    interest: clamp(offer.interest + effects.offerInterest, 1, 99),
+  }));
+  return { ...state, overall, potential, reputation, form, marketValue, currentClub, queuedOffers };
+}
+
+function makeDecisionMarketOffers(state: CareerState, decisionId: string, count: number): CareerOffer[] {
+  if (!state.currentClub || state.stage === "retired" || count <= 0) return [];
+  const rng = new SeededRandom(`${state.seed}|decision-market|${decisionId}|${state.overall}|${state.reputation}`);
+  const alreadyOffered = new Set((state.queuedOffers ?? []).map((offer) => offer.clubName.toLocaleLowerCase("it")));
+  return ALL_CLUBS
+    .filter((club) => club.name !== state.currentClub?.name)
+    .filter((club) => !alreadyOffered.has(club.name.toLocaleLowerCase("it")))
+    .filter((club) => club.rating >= Math.max(62, state.overall - 5) && club.rating <= Math.min(92, state.overall + 10))
+    .map((club) => ({ club, score: Math.abs(club.rating - (state.overall + 3)) + rng.between(0, 12) }))
+    .sort((left, right) => left.score - right.score)
+    .slice(0, count)
+    .map(({ club }, index) => offerFromClub(state, club, 70 + index, false));
+}
+
+function applyDecisionMarketOutcome(
+  state: CareerState,
+  decisionId: string,
+  offerInterest: number,
+): CareerState {
+  const existing = [...(state.queuedOffers ?? [])];
+  const additions = offerInterest >= 14
+    ? makeDecisionMarketOffers(state, decisionId, offerInterest >= 20 ? 2 : 1).map((offer) => ({
+        ...offer,
+        interest: clamp(offer.interest + offerInterest, 1, 99),
+      }))
+    : [];
+  const uniqueByClub = new Map<string, CareerOffer>();
+  for (const offer of [...existing, ...additions]) {
+    const key = offer.clubName.trim().toLocaleLowerCase("it");
+    const previous = uniqueByClub.get(key);
+    if (!previous || offer.interest > previous.interest) uniqueByClub.set(key, offer);
+  }
+
+  let offers = [...uniqueByClub.values()].sort((left, right) => right.interest - left.interest);
+  if (offerInterest < 0 && offers.length > 0) {
+    // Un contatto andato male fa ritirare la proposta meno convinta.
+    offers = offers.slice(0, offers.length - 1);
+  }
+  return { ...state, queuedOffers: offers.slice(0, 4) };
+}
+
+function selectDecisionBranch(
+  state: CareerState,
+  decision: CareerDecision,
+  option: CareerDecisionOption,
+): { branch: CareerDecisionProbability; roll: number } {
+  const rng = new SeededRandom(`${state.seed}|decision-roll|${decision.id}|${option.id}`);
+  const roll = rng.int(1, 100);
+  let cumulative = 0;
+  for (const branch of option.probabilities) {
+    cumulative += branch.percentage;
+    if (roll <= cumulative) return { branch, roll };
+  }
+  throw new Error("Le probabilità della scelta non coprono il tiro.");
+}
+
+/** Risolve una scelta una sola volta; ripetere gli stessi input restituisce lo stesso risultato. */
+export function resolveCareerDecision(
+  rawState: CareerState,
+  decisionId: string,
+  optionId: string,
+): { state: CareerState; result: CareerDecisionResult } {
+  const state = normalizeCareerDecisionState(rawState);
+  const previous = (state.decisionHistory ?? []).find((item) => item.decisionId === decisionId);
+  if (previous) {
+    if (previous.optionId !== optionId) throw new Error("Questa scelta è già stata risolta con un'altra opzione.");
+    return { state, result: previous };
+  }
+  const decision = state.pendingDecision;
+  if (!decision || decision.id !== decisionId) throw new Error("Questa decisione non è più disponibile.");
+  const option = decision.options.find((item) => item.id === optionId);
+  if (!option) throw new Error("Opzione non valida.");
+  const { branch, roll } = selectDecisionBranch(state, decision, option);
+  const result: CareerDecisionResult = {
+    id: `result-${hashString(`${decision.id}|${option.id}|${branch.outcome}`).toString(36)}`,
+    decisionId: decision.id,
+    phase: decision.phase,
+    seasonIndex: decision.seasonIndex,
+    seasonYear: decision.seasonYear,
+    optionId: option.id,
+    optionLabel: option.label,
+    outcome: branch.outcome,
+    outcomeLabel: branch.label,
+    probability: branch.percentage,
+    roll,
+    title: branch.title,
+    description: branch.description,
+    effects: branch.effects,
+    effectSummary: branch.effectSummary,
+  };
+
+  let next = applyImmediateDecisionEffects(state, branch.effects);
+  if (decision.phase === "preSeason") {
+    next = {
+      ...next,
+      seasonPreparation: {
+        decisionId: decision.id,
+        optionId: option.id,
+        outcome: branch.outcome,
+        seasonIndex: state.seasonIndex,
+        trainingChoice: option.trainingChoice ?? "balanced",
+        performance: branch.effects.seasonPerformance,
+        growth: branch.effects.seasonGrowth,
+        injuryRiskPercent: branch.effects.injuryRiskPercent,
+        squadRoleSteps: branch.effects.squadRoleSteps,
+      },
+    };
+  } else if (state.agentEnabled && branch.effects.offerInterest !== 0) {
+    next = applyDecisionMarketOutcome(next, decision.id, branch.effects.offerInterest);
+  }
+
+  const decisionEvent = makeEvent(
+    {
+      id: state.id,
+      seasonIndex: decision.seasonIndex,
+      age: decision.phase === "postSeason" ? Math.max(14, state.age - 1) : state.age,
+    },
+    state.feed.length + (state.decisionHistory?.length ?? 0) + 1,
+    "decision",
+    result.title,
+    `${result.description} ${result.effectSummary}.`,
+    branch.tone,
+    branch.effects.overall + branch.effects.reputation + Math.round(branch.effects.form / 4),
+  );
+  next = {
+    ...next,
+    pendingDecision: null,
+    lastDecisionResult: result,
+    decisionHistory: [...(state.decisionHistory ?? []), result].slice(-80),
+    feed: [decisionEvent, ...state.feed].slice(0, 40),
+  };
+  return { state: next, result };
+}
+
+/**
+ * Conferma la schermata esito. La PRE abilita la simulazione; la POST sblocca
+ * il mercato oppure crea immediatamente la PRE dell'anno successivo.
+ */
+export function continueCareerDecision(rawState: CareerState, decisionId: string): CareerState {
+  const state = normalizeCareerDecisionState(rawState);
+  const result = state.lastDecisionResult;
+  if (!result) {
+    if ((state.decisionHistory ?? []).some((item) => item.decisionId === decisionId)) return state;
+    throw new Error("Non c'è un esito da confermare.");
+  }
+  if (result.decisionId !== decisionId) throw new Error("L'esito non appartiene a questa decisione.");
+  let next: CareerState = { ...state, lastDecisionResult: null };
+  if (result.phase === "preSeason") return next;
+  if (next.stage === "retired") {
+    return { ...next, pendingOffers: [], queuedOffers: [], pendingDecision: null, queuedDecision: null };
+  }
+  const offers = next.queuedOffers ?? [];
+  next = { ...next, queuedOffers: [], pendingOffers: offers };
+  return offers.length > 0 ? next : normalizeCareerDecisionState(next);
+}
+
+/** Rende visibile la POST soltanto dopo che il report stagionale e stato letto. */
+export function acknowledgeSeasonReport(rawState: CareerState, seasonId: string): CareerState {
+  const state = normalizeCareerDecisionState(rawState);
+  if (!state.pendingSeasonReportId) {
+    if (state.seasons.some((season) => season.id === seasonId)) return state;
+    throw new Error("Report stagionale non disponibile.");
+  }
+  if (state.pendingSeasonReportId !== seasonId) throw new Error("Questo non è il report in attesa.");
+  if (state.stage === "retired" && !state.queuedDecision) {
+    return { ...state, pendingSeasonReportId: null };
+  }
+  if (!state.queuedDecision || state.queuedDecision.phase !== "postSeason") {
+    throw new Error("La decisione di fine stagione non è disponibile.");
+  }
+  return {
+    ...state,
+    pendingSeasonReportId: null,
+    pendingDecision: state.queuedDecision,
+    queuedDecision: null,
+  };
+}
+
+/** Rifiuta tutte le offerte e apre la PRE della nuova stagione. */
+export function declineTransferOffers(rawState: CareerState): CareerState {
+  const state = normalizeCareerDecisionState(rawState);
+  if (state.stage !== "active" || !state.currentClub) throw new Error("Non puoi gestire offerte in questo momento.");
+  if (state.pendingDecision || state.lastDecisionResult || state.pendingSeasonReportId) {
+    throw new Error("Completa prima la decisione di fine stagione.");
+  }
+  if (state.pendingOffers.length === 0) return normalizeCareerDecisionState(state);
+  return normalizeCareerDecisionState({ ...state, pendingOffers: [] });
+}
+
 export function createInitialCareer(input: CreateCareerInput, seed: string | number): CareerState {
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
@@ -945,6 +1532,13 @@ export function createInitialCareer(input: CreateCareerInput, seed: string | num
     pendingOffers: [],
     feed: [],
     retiredAtAge: null,
+    pendingDecision: null,
+    queuedDecision: null,
+    lastDecisionResult: null,
+    decisionHistory: [],
+    seasonPreparation: null,
+    pendingSeasonReportId: null,
+    queuedOffers: [],
   };
 
   if (input.startMode === "freeAgent" && input.startingClubName) {
@@ -1016,7 +1610,7 @@ export function chooseStartingClub(state: CareerState, clubName: string): Career
     4,
   );
 
-  return {
+  return normalizeCareerDecisionState({
     ...state,
     stage: "active",
     currentClub: {
@@ -1028,7 +1622,7 @@ export function chooseStartingClub(state: CareerState, clubName: string): Career
     marketValue: calculateMarketValue(state.overall, state.age, state.reputation, club.rating),
     pendingOffers: [],
     feed: [debutEvent, ...state.feed].slice(0, 40),
-  };
+  });
 }
 
 function seasonTrophies(
@@ -1118,26 +1712,40 @@ function makeTransferOffers(state: CareerState, season: CareerSeason): CareerOff
 }
 
 export function simulateNextSeason(
-  state: CareerState,
-  choice: TrainingChoice,
+  rawState: CareerState,
+  choice?: TrainingChoice,
 ): { state: CareerState; season: CareerSeason; offers?: CareerOffer[] } {
-  if (state.stage === "retired") throw new Error("La carriera e terminata.");
+  const state = normalizeCareerDecisionState(rawState);
+  if (state.stage === "retired") throw new Error("La carriera è terminata.");
   if (state.stage !== "active" || !state.currentClub) throw new Error("Scegli una squadra prima di simulare la stagione.");
-  if (!TRAINING_OPTIONS.some((item) => item.code === choice)) throw new Error("Allenamento non valido.");
+  if (state.pendingSeasonReportId) throw new Error("Leggi prima il report della stagione appena conclusa.");
+  if (state.pendingDecision) throw new Error("Completa prima la scelta di inizio stagione.");
+  if (state.lastDecisionResult) throw new Error("Conferma prima l'esito della scelta.");
+  if (state.pendingOffers.length > 0 || (state.queuedOffers?.length ?? 0) > 0) {
+    throw new Error("Gestisci prima le offerte di mercato.");
+  }
+  const preparation = state.seasonPreparation;
+  if (!preparation || preparation.seasonIndex !== state.seasonIndex) {
+    throw new Error("Completa la preparazione prima di simulare la stagione.");
+  }
+  const trainingChoice = preparation.trainingChoice;
+  if (choice && choice !== trainingChoice) throw new Error("L'allenamento è già determinato dalla scelta di inizio stagione.");
+  if (!TRAINING_OPTIONS.some((item) => item.code === trainingChoice)) throw new Error("Allenamento non valido.");
 
   const club = state.currentClub;
   const country = findCountry(club.country);
   const profile = ROLE_PROFILES[state.player.role];
   const mode = MODE_CONFIG[state.gameMode];
-  const rng = new SeededRandom(`${state.seed}|season|${state.seasonIndex}|${club.name}|${choice}`);
+  const rng = new SeededRandom(`${state.seed}|season|${state.seasonIndex}|${club.name}|${trainingChoice}`);
   const events: CareerEvent[] = [];
   let eventIndex = 0;
 
-  const roleNow = squadRoleFor(state.overall, club.rating);
+  const roleNow = shiftSquadRole(squadRoleFor(state.overall, club.rating), preparation.squadRoleSteps);
   const roleMinutes: Record<SquadRole, number> = { prospect: 0.38, rotation: 0.62, starter: 0.82, star: 0.93 };
   const baseMatches = country.league.leagueMatches + rng.int(4, 11);
-  const recoveryFactor = choice === "recovery" ? 0.38 : choice === "athleticism" ? 1.12 : 1;
-  const injuryProbability = clamp((0.115 + Math.max(0, state.age - 30) * 0.012) * mode.injury * recoveryFactor, 0.025, 0.42);
+  const recoveryFactor = trainingChoice === "recovery" ? 0.38 : trainingChoice === "athleticism" ? 1.12 : 1;
+  const preparationInjuryFactor = Math.max(0.2, 1 + preparation.injuryRiskPercent / 100);
+  const injuryProbability = clamp((0.115 + Math.max(0, state.age - 30) * 0.012) * mode.injury * recoveryFactor * preparationInjuryFactor, 0.015, 0.5);
   const injured = rng.chance(injuryProbability);
   const gamesLost = injured ? rng.int(3, rng.chance(0.16) ? 17 : 10) : 0;
 
@@ -1166,14 +1774,14 @@ export function simulateNextSeason(
   const starts = clamp(Math.round(appearances * (startRate[roleNow] + rng.between(-0.06, 0.06))), 0, appearances);
   const minutes = Math.round(starts * rng.between(74, 87) + (appearances - starts) * rng.between(18, 34));
 
-  const trainingFit = roleTrainingFit(state.player.role, choice);
+  const trainingFit = roleTrainingFit(state.player.role, trainingChoice);
   const formNoise = (rng.next() + rng.next() + rng.next() - 1.5) * 0.75;
   const qualityDelta = (state.overall - club.rating) / 24;
-  const baseRating = 6.55 + qualityDelta + (state.form - 50) / 85 + (trainingFit - 1) * 0.32 + formNoise;
+  const baseRating = 6.55 + qualityDelta + (state.form - 50) / 85 + (trainingFit - 1) * 0.32 + preparation.performance + formNoise;
   const averageRating = round(clamp(baseRating * mode.performance + (mode.performance - 1) * 2.2, 5.45, 9.42), 2);
   const attackQuality = clamp((state.overall - 48) / 34, 0.35, 1.55) * clamp((averageRating - 5.4) / 1.7, 0.45, 1.7);
-  const trainingGoalBoost = choice === "finishing" ? 1.18 : 1;
-  const trainingAssistBoost = choice === "playmaking" ? 1.18 : 1;
+  const trainingGoalBoost = trainingChoice === "finishing" ? 1.18 : 1;
+  const trainingAssistBoost = trainingChoice === "playmaking" ? 1.18 : 1;
   const goals = sampleCount(rng, appearances * profile.goalRate * attackQuality * trainingGoalBoost, 0.5);
   const assists = sampleCount(rng, appearances * profile.assistRate * attackQuality * trainingAssistBoost, 0.48);
   const teamCleanSheetRate = clamp(0.16 + (club.rating - 62) / 115, 0.14, 0.44);
@@ -1202,7 +1810,7 @@ export function simulateNextSeason(
   const ageGrowth = state.age <= 20 ? 2.2 : state.age <= 23 ? 1.45 : state.age <= 27 ? 0.55 : state.age <= 30 ? 0.05 : -0.65 - (state.age - 31) * 0.36;
   const potentialPull = state.age <= 25 ? Math.max(0, state.potential - state.overall) * 0.075 : 0;
   const injuryPenalty = injured ? gamesLost / 10 : 0;
-  const rawGrowth = (ageGrowth + performanceGrowth + potentialPull) * trainingFit * mode.growth - injuryPenalty;
+  const rawGrowth = (ageGrowth + performanceGrowth + potentialPull) * trainingFit * mode.growth + preparation.growth - injuryPenalty;
   const overallChange = clamp(Math.round(rawGrowth + rng.between(-0.75, 0.75)), state.age >= 33 ? -4 : -2, state.age <= 23 ? 6 : 4);
   const overallEnd = clamp(state.overall + overallChange, 45, 99);
   const potentialEnd = clamp(
@@ -1343,7 +1951,7 @@ export function simulateNextSeason(
     country: club.country,
     league: club.league,
     squadRole: roleNow,
-    trainingChoice: choice,
+    trainingChoice,
     overallStart: state.overall,
     overallEnd,
     potentialEnd,
@@ -1427,20 +2035,34 @@ export function simulateNextSeason(
     awardCabinet: mergeHonours(state.awardCabinet, awards, state.seasonYear),
     goatScore: state.goatScore + seasonGoatPoints,
     pendingOffers: [],
+    pendingDecision: null,
+    queuedDecision: null,
+    lastDecisionResult: null,
+    seasonPreparation: null,
+    pendingSeasonReportId: season.id,
+    queuedOffers: [],
     feed: [...events].reverse().concat(state.feed).slice(0, 40),
     retiredAtAge: retiredAfterSeason ? nextAge : null,
   };
 
-  const offers = retiredAfterSeason || !state.agentEnabled ? [] : makeTransferOffers(nextState, season);
-  nextState = { ...nextState, pendingOffers: offers };
-  return offers.length > 0 ? { state: nextState, season, offers } : { state: nextState, season };
+  const queuedOffers = retiredAfterSeason || !state.agentEnabled ? [] : makeTransferOffers(nextState, season);
+  nextState = {
+    ...nextState,
+    queuedOffers,
+    queuedDecision: retiredAfterSeason ? null : createPostSeasonDecision(nextState, season),
+  };
+  return { state: nextState, season };
 }
 
-export function acceptTransfer(state: CareerState, clubName: string): CareerState {
+export function acceptTransfer(rawState: CareerState, clubName: string): CareerState {
+  const state = normalizeCareerDecisionState(rawState);
   if (state.stage !== "active" || !state.currentClub) throw new Error("Non puoi accettare trasferimenti in questo momento.");
+  if (state.pendingDecision || state.lastDecisionResult || state.pendingSeasonReportId) {
+    throw new Error("Completa prima la decisione di fine stagione.");
+  }
   const normalized = clubName.trim().toLocaleLowerCase("it");
   const offer = state.pendingOffers.find((item) => item.clubName.toLocaleLowerCase("it") === normalized);
-  if (!offer) throw new Error("L'offerta selezionata non e piu disponibile.");
+  if (!offer) throw new Error("L'offerta selezionata non è più disponibile.");
   const club = findClub(offer.clubName);
   if (!club) throw new Error("Squadra non disponibile.");
 
@@ -1454,7 +2076,8 @@ export function acceptTransfer(state: CareerState, clubName: string): CareerStat
     6,
   );
 
-  return {
+  const reputation = clamp(state.reputation + (club.prestige > state.currentClub.prestige ? 2 : 0), 0, 100);
+  return normalizeCareerDecisionState({
     ...state,
     currentClub: {
       ...club,
@@ -1462,9 +2085,9 @@ export function acceptTransfer(state: CareerState, clubName: string): CareerStat
       contractUntil: state.seasonYear + offer.contractYears,
       squadRole: offer.squadRole,
     },
-    reputation: clamp(state.reputation + (club.prestige > state.currentClub.prestige ? 2 : 0), 0, 100),
-    marketValue: calculateMarketValue(state.overall, state.age, state.reputation, club.rating),
+    reputation,
+    marketValue: calculateMarketValue(state.overall, state.age, reputation, club.rating),
     pendingOffers: [],
     feed: [transferEvent, ...state.feed].slice(0, 40),
-  };
+  });
 }
