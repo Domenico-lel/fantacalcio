@@ -548,7 +548,6 @@ function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDe
         <DecisionResultPanel
           key={state.lastDecisionResult.id}
           result={state.lastDecisionResult}
-          state={state}
           busy={busy}
           onContinue={onContinueDecision}
         />
@@ -562,7 +561,6 @@ function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDe
         <DecisionPanel
           key={state.pendingDecision.id}
           decision={state.pendingDecision}
-          state={state}
           busy={busy}
           onConfirm={onResolveDecision}
         />
@@ -611,127 +609,102 @@ function PlayerHero({ state }: { state: CareerState }) {
   </section>;
 }
 
-function DecisionPanel({ decision, state, busy, onConfirm }: {
+function DecisionPanel({ decision, busy, onConfirm }: {
   decision: CareerDecision;
-  state: CareerState;
   busy: boolean;
   onConfirm: (decisionId: string, optionId: string) => void;
 }) {
-  const [selectedOptionId, setSelectedOptionId] = useState("");
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const selectedOption = decision.options.find((option) => option.id === selectedOptionId);
 
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
 
   return (
-    <section className="space-y-4" aria-labelledby={`${decision.id}-title`} aria-busy={busy}>
-      <div className="card-accent overflow-hidden p-4" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--accent) 13%, var(--surface-2)), var(--surface))" }}>
+    <section className="space-y-3" aria-labelledby={`${decision.id}-title`} aria-busy={busy}>
+      <div className="px-1 pb-1">
         <div className="flex items-center justify-between gap-3">
           <p className="eyebrow">{decision.phase === "preSeason" ? "Inizio stagione" : "Fine stagione"}</p>
           <span className="chip">{seasonLabel(decision.seasonYear)}</span>
         </div>
-        <h2 id={`${decision.id}-title`} ref={titleRef} tabIndex={-1} className="font-display mt-2 text-2xl font-extrabold leading-tight text-white outline-none">{decision.title}</h2>
-        <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{decision.description}</p>
-        <p className="mt-3 rounded-2xl px-3 py-2.5 text-xs leading-relaxed" style={{ color: "var(--accent-soft)", background: "color-mix(in srgb, var(--accent) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}>{decision.context}</p>
-        <DecisionContextStrip state={state} />
+        <h2 id={`${decision.id}-title`} ref={titleRef} tabIndex={-1} className="font-display mt-2 text-xl font-extrabold leading-tight text-white outline-none">{decision.title}</h2>
       </div>
 
       <fieldset disabled={busy}>
-        <legend className="eyebrow mb-3 px-1">Scegli una strategia</legend>
-        <div className="space-y-3">
+        <legend className="sr-only">Scegli una strategia</legend>
+        <div className="space-y-2.5">
           {decision.options.map((option) => (
             <DecisionOptionCard
               key={option.id}
-              decisionId={decision.id}
               option={option}
-              selected={option.id === selectedOptionId}
-              onSelect={setSelectedOptionId}
+              busy={busy}
+              onSelect={() => onConfirm(decision.id, option.id)}
             />
           ))}
         </div>
       </fieldset>
-
-      <div className="rounded-2xl p-2" style={{ background: "color-mix(in srgb, var(--bg) 92%, transparent)", border: "1px solid var(--border)" }}>
-        <button
-          type="button"
-          disabled={!selectedOption || busy}
-          onClick={() => selectedOption && onConfirm(decision.id, selectedOption.id)}
-          className="btn-primary min-h-12 w-full px-4 py-3 text-sm"
-        >
-          {busy ? "Calcolo dell'esito…" : selectedOption ? `Conferma: ${selectedOption.label}` : "Seleziona una strategia"}
-        </button>
-      </div>
       {busy ? <p className="sr-only" role="status" aria-live="polite">La scelta viene salvata e l'esito viene calcolato.</p> : null}
     </section>
   );
 }
 
-function DecisionOptionCard({ decisionId, option, selected, onSelect }: {
-  decisionId: string;
+function DecisionOptionCard({ option, busy, onSelect }: {
   option: CareerDecisionOption;
-  selected: boolean;
-  onSelect: (optionId: string) => void;
+  busy: boolean;
+  onSelect: () => void;
 }) {
-  const detailId = `${decisionId}-${option.id}-details`;
+  const hasRisk = option.probabilities.filter((item) => item.percentage > 0).length > 1;
   return (
-    <label className="card block min-h-12 cursor-pointer p-4 transition-colors focus-within:ring-2 focus-within:ring-[var(--accent)]" style={{ background: selected ? "color-mix(in srgb, var(--accent) 9%, var(--surface-2))" : undefined, borderColor: selected ? "var(--accent)" : undefined }}>
-      <input
-        type="radio"
-        className="sr-only"
-        name={`decision-${decisionId}`}
-        value={option.id}
-        checked={selected}
-        aria-describedby={detailId}
-        onChange={() => onSelect(option.id)}
-      />
+    <button type="button" disabled={busy} onClick={onSelect} className="card block min-h-12 w-full p-3.5 text-left transition-transform active:scale-[.99]">
       <span className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full" style={{ border: `2px solid ${selected ? "var(--accent)" : "var(--text-faint)"}` }} aria-hidden="true">
-          {selected ? <span className="h-3 w-3 rounded-full" style={{ background: "var(--accent)" }} /> : null}
-        </span>
         <span className="min-w-0 flex-1">
           <strong className="block text-base text-white">{option.label}</strong>
-          <span className="mt-1 block text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{option.description}</span>
-          <span className="mt-2 block text-[11px] font-semibold" style={{ color: "var(--accent-soft)" }}>{option.hint}</span>
+          <span className="mt-1 block text-xs leading-snug" style={{ color: "var(--text-dim)" }}>{option.description}</span>
         </span>
+        <span className="mt-1 text-lg" style={{ color: "var(--accent)" }} aria-hidden="true">›</span>
       </span>
-      <div id={detailId} className="mt-4">
-        <ProbabilityBreakdown probabilities={option.probabilities} />
-      </div>
-    </label>
+      {hasRisk ? <div className="mt-3"><ProbabilityBreakdown probabilities={option.probabilities} /></div> : null}
+    </button>
   );
 }
 
 function ProbabilityBreakdown({ probabilities }: { probabilities: CareerDecisionProbability[] }) {
   const possibleOutcomes = probabilities.filter((item) => item.percentage > 0);
-  const summary = possibleOutcomes.map((item) => `${item.label} ${item.percentage}%`).join(", ");
+  const isCertain = possibleOutcomes.length === 1 && possibleOutcomes[0]?.percentage === 100;
+  if (isCertain) return null;
   return (
-    <div>
-      <div className="flex h-2.5 overflow-hidden rounded-full" role="img" aria-label={`Probabilità: ${summary}`} style={{ background: "rgba(255,255,255,.06)" }}>
-        {possibleOutcomes.map((item) => (
-          <span key={item.outcome} style={{ width: `${item.percentage}%`, background: decisionOutcomeColor(item.outcome) }} />
-        ))}
-      </div>
-      <ul className="mt-3 space-y-2" aria-label="Possibili esiti e conseguenze">
-        {possibleOutcomes.map((item) => (
-          <li key={item.outcome} className="rounded-xl px-2.5 py-2" style={{ background: "rgba(255,255,255,.035)" }}>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: decisionOutcomeColor(item.outcome) }} aria-hidden="true" />
-              <span className="min-w-0 flex-1 font-semibold text-white">{item.label}</span>
-              <strong style={{ color: decisionOutcomeColor(item.outcome) }}>{item.percentage}%</strong>
-            </div>
-            <p className="mt-1 pl-[18px] text-[11px] leading-relaxed" style={{ color: "var(--text-dim)" }}>{item.effectSummary}</p>
+    <ul className="grid grid-cols-2 gap-1.5" aria-label="Possibili esiti">
+      {possibleOutcomes.map((item) => {
+        const effect = primaryDecisionEffect(item.effects);
+        return (
+          <li key={item.outcome} className="flex min-h-9 items-center gap-1.5 rounded-xl px-2.5 py-2" style={{ background: "rgba(255,255,255,.045)" }} aria-label={`${item.label}, ${item.percentage}%, ${effect}`}>
+            <span className="h-2 w-2 flex-none rounded-full" style={{ background: decisionOutcomeColor(item.outcome) }} aria-hidden="true" />
+            <strong className="flex-none text-xs" style={{ color: decisionOutcomeColor(item.outcome) }}>{item.percentage}%</strong>
+            <span className="min-w-0 truncate text-[11px] font-semibold text-white">· {effect}</span>
           </li>
-        ))}
-      </ul>
-    </div>
+        );
+      })}
+    </ul>
   );
 }
 
-function DecisionResultPanel({ result, state, busy, onContinue }: {
+function primaryDecisionEffect(effects: CareerDecisionEffects): string {
+  if (effects.overall) return `${formatSigned(effects.overall)} OVR`;
+  if (effects.potential) return `${formatSigned(effects.potential)} POT`;
+  if (effects.squadRoleSteps) return effects.squadRoleSteps > 0 ? "Ruolo ↑" : "Ruolo ↓";
+  if (effects.offerInterest) return effects.offerInterest > 0 ? "Mercato ↑" : "Mercato ↓";
+  if (effects.contractYears) return `${formatSigned(effects.contractYears)} anno contratto`;
+  if (effects.form) return `${formatSigned(effects.form)} forma`;
+  if (effects.reputation) return `${formatSigned(effects.reputation)} reputaz.`;
+  if (effects.marketValuePercent) return `${formatSigned(effects.marketValuePercent)}% valore`;
+  if (effects.seasonGrowth) return effects.seasonGrowth > 0 ? "Crescita ↑" : "Crescita ↓";
+  if (effects.seasonPerformance) return effects.seasonPerformance > 0 ? "Rendimento ↑" : "Rendimento ↓";
+  if (effects.injuryRiskPercent) return effects.injuryRiskPercent < 0 ? "Rischio ↓" : "Rischio ↑";
+  return "Nessun cambio";
+}
+
+function DecisionResultPanel({ result, busy, onContinue }: {
   result: CareerDecisionResult;
-  state: CareerState;
   busy: boolean;
   onContinue: (decisionId: string) => void;
 }) {
@@ -744,34 +717,20 @@ function DecisionResultPanel({ result, state, busy, onContinue }: {
 
   return (
     <section className="card-accent slide-up overflow-hidden" aria-labelledby={`${result.id}-title`} aria-busy={busy}>
-      <div className="p-5" style={{ background: `linear-gradient(145deg, color-mix(in srgb, ${outcomeColor} 15%, transparent), transparent)` }}>
+      <div className="p-4" style={{ background: `linear-gradient(145deg, color-mix(in srgb, ${outcomeColor} 15%, transparent), transparent)` }}>
         <div className="flex items-center justify-between gap-3">
           <p className="eyebrow">{result.phase === "preSeason" ? "Esito pre-stagione" : "Esito fine stagione"}</p>
           <span className="chip">{seasonLabel(result.seasonYear)}</span>
         </div>
-        <div className="mt-5 flex h-16 w-16 items-center justify-center rounded-3xl text-3xl" style={{ background: `color-mix(in srgb, ${outcomeColor} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${outcomeColor} 42%, transparent)` }} aria-hidden="true">
+        <div className="mt-4 flex h-14 w-14 items-center justify-center rounded-2xl text-2xl" style={{ background: `color-mix(in srgb, ${outcomeColor} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${outcomeColor} 42%, transparent)` }} aria-hidden="true">
           {decisionOutcomeIcon(result.outcome)}
         </div>
-        <p className="mt-4 text-xs font-extrabold uppercase tracking-[.14em]" style={{ color: outcomeColor }} role="status" aria-live="polite">{result.outcomeLabel} · {result.probability}%</p>
+        <p className="mt-3 text-xs font-extrabold uppercase tracking-[.14em]" style={{ color: outcomeColor }} role="status" aria-live="polite">{result.outcomeLabel} · {result.probability}%</p>
         <h2 id={`${result.id}-title`} ref={titleRef} tabIndex={-1} className="font-display mt-1 text-2xl font-extrabold leading-tight text-white outline-none">{result.title}</h2>
         <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{result.description}</p>
-
-        <div className="card-flat mt-4 p-3">
-          <div className="flex items-center justify-between gap-3 text-xs">
-            <span style={{ color: "var(--text-dim)" }}>Strategia scelta</span>
-            <strong className="text-right text-white">{result.optionLabel}</strong>
-          </div>
-          <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-            <span style={{ color: "var(--text-dim)" }}>Estrazione deterministica</span>
-            <strong className="text-white">{result.roll}/100</strong>
-          </div>
-        </div>
-
-        <p className="mt-4 text-xs font-semibold leading-relaxed" style={{ color: "var(--accent-soft)" }}>{result.effectSummary}</p>
         <DecisionEffectChips effects={result.effects} />
-        <DecisionContextStrip state={state} />
 
-        <button type="button" disabled={busy} onClick={() => onContinue(result.decisionId)} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">
+        <button type="button" disabled={busy} onClick={() => onContinue(result.decisionId)} className="btn-primary mt-4 min-h-12 w-full px-4 py-3 text-sm">
           {busy ? "Salvataggio…" : result.phase === "preSeason" ? "Prepara la stagione" : "Continua l'estate"}
         </button>
       </div>
@@ -784,23 +743,12 @@ function DecisionEffectChips({ effects }: { effects: CareerDecisionEffects }) {
   if (items.length === 0) return <p className="mt-3 text-xs" style={{ color: "var(--text-dim)" }}>Nessuna variazione immediata.</p>;
   return (
     <ul className="mt-3 flex flex-wrap gap-2" aria-label="Effetti applicati">
-      {items.map((item) => (
+      {items.slice(0, 3).map((item) => (
         <li key={item.label} className="chip" style={{ color: item.good ? "#86efac" : "#fda4af" }}>
           {item.label} {formatSigned(item.value)}{item.suffix}
         </li>
       ))}
     </ul>
-  );
-}
-
-function DecisionContextStrip({ state }: { state: CareerState }) {
-  return (
-    <div className="mt-4 grid grid-cols-4 gap-2">
-      <HeroStat label="OVR" value={String(state.overall)} />
-      <HeroStat label="Forma" value={String(state.form)} />
-      <HeroStat label="Reputaz." value={String(state.reputation)} />
-      <HeroStat label="Ruolo" value={squadRoleCompactLabel(state.currentClub?.squadRole ?? "prospect")} />
-    </div>
   );
 }
 
@@ -811,7 +759,6 @@ function SeasonReadyPanel({ state, preparation, busy, onSimulate }: {
   onSimulate: (choice: TrainingChoice) => void;
 }) {
   const training = TRAINING_OPTIONS.find((item) => item.code === preparation.trainingChoice);
-  const sourceDecision = state.decisionHistory?.find((item) => item.decisionId === preparation.decisionId);
   return (
     <section className="card-accent p-4" aria-labelledby="season-ready-title" aria-busy={busy}>
       <div className="flex items-center justify-between gap-3">
@@ -819,34 +766,16 @@ function SeasonReadyPanel({ state, preparation, busy, onSimulate }: {
         <span className="chip">{seasonLabel(state.seasonYear)}</span>
       </div>
       <h3 id="season-ready-title" className="font-display mt-2 text-xl font-extrabold text-white">È il momento di scendere in campo</h3>
-      <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>
-        {sourceDecision ? `${sourceDecision.optionLabel} ha definito la preparazione.` : "La preparazione è stata completata."} La simulazione applicherà davvero bonus e rischi ottenuti.
-      </p>
-      <div className="card-flat mt-4 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs" style={{ color: "var(--text-dim)" }}>Piano tecnico</span>
-          <strong className="text-sm text-white">{training?.label ?? preparation.trainingChoice}</strong>
-        </div>
-        <PreparationModifiers preparation={preparation} />
+      <div className="card-flat mt-3 flex items-center justify-between gap-3 p-3">
+        <span className="text-xs" style={{ color: "var(--text-dim)" }}>Piano scelto</span>
+        <strong className="text-sm text-white">{training?.label ?? preparation.trainingChoice}</strong>
       </div>
-      <button type="button" disabled={busy} onClick={() => onSimulate(preparation.trainingChoice)} className="btn-primary mt-4 min-h-12 w-full px-4 py-3 text-sm">
+      <button type="button" disabled={busy} onClick={() => onSimulate(preparation.trainingChoice)} className="btn-primary mt-3 min-h-12 w-full px-4 py-3 text-sm">
         {busy ? "Simulazione della stagione…" : "Simula la stagione"}
       </button>
-      <p className="mt-2 text-center text-[11px]" style={{ color: "var(--text-faint)" }}>Il risultato completo viene salvato automaticamente.</p>
       {busy ? <p className="sr-only" role="status" aria-live="polite">Simulazione e salvataggio della stagione in corso.</p> : null}
     </section>
   );
-}
-
-function PreparationModifiers({ preparation }: { preparation: CareerSeasonPreparation }) {
-  const items = [
-    { label: "Rendimento", value: preparation.performance * 100, suffix: "%" },
-    { label: "Crescita", value: preparation.growth, suffix: "" },
-    { label: "Rischio fisico", value: preparation.injuryRiskPercent, suffix: "%" },
-    { label: "Gerarchie", value: preparation.squadRoleSteps, suffix: "" },
-  ].filter((item) => item.value !== 0);
-  if (items.length === 0) return null;
-  return <div className="mt-3 flex flex-wrap gap-1.5">{items.map((item) => <span key={item.label} className="chip">{item.label} {formatSigned(item.value)}{item.suffix}</span>)}</div>;
 }
 
 function FlowRecoveryCard() {
@@ -1089,5 +1018,4 @@ function onRadioKeyDown<T extends string>(
 function countryFor(code: CountryCode) { return COUNTRY_OPTIONS.find((country) => country.code === code) ?? COUNTRY_OPTIONS[0]; }
 function roleFor(code: Role) { return ROLE_OPTIONS.find((role) => role.code === code) ?? ROLE_OPTIONS[0]; }
 function squadRoleLabel(role: CareerOffer["squadRole"]) { return role === "star" ? "Stella" : role === "starter" ? "Titolare" : role === "rotation" ? "Rotazione" : "Prospetto"; }
-function squadRoleCompactLabel(role: CareerOffer["squadRole"]) { return role === "star" ? "Stella" : role === "starter" ? "Tit." : role === "rotation" ? "Rot." : "Prosp."; }
 function formatMoney(value: number) { if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`; if (value >= 1_000) return `€${Math.round(value / 1_000)}K`; return `€${value}`; }
