@@ -16,13 +16,14 @@ import { isImageAvatar } from "@/lib/avatar";
 const NAV_ITEMS = [
   { href: "/players",     label: "Mercato",    icon: TransferIcon,   color: "#fb923c" },
   { href: "/standings",   label: "Classifica", icon: StandingsIcon,  color: "#a78bfa" },
-  { href: "/carriera",    label: "Carriera",   icon: CareerIcon,     color: "#22d3ee" },
+  { href: "/carriera",    label: "Carriera",   icon: CareerIcon,     color: "#b7f34a" },
   { href: "/pronostici",  label: "Pronostici", icon: DiceIcon,       color: "#fbbf24" },
   { href: "/bacheca",     label: "Bacheca",    icon: MegaphoneIcon,  color: "#2dd4a7" },
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const shellTheme = pathname.startsWith("/carriera") ? "sec-career-shell" : "";
   const scrollRef = useRef<HTMLDivElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState<TeamProfile | null>(null);
@@ -50,7 +51,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <DialogProvider>
-    <div className="h-dvh flex flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
+    <div className={`h-dvh flex flex-col overflow-hidden ${shellTheme}`} style={{ background: "var(--bg)" }}>
       {/* Top bar — header app-style, piatto, mai scrollabile */}
       <header className="flex-none flex min-h-[64px] items-center gap-3 px-4 pb-2 safe-top">
         <div className="flex flex-col min-w-0 flex-1">
@@ -81,7 +82,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Bottom navigation */}
       <nav aria-label="Navigazione principale" className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
-           style={{ background: "rgba(7,11,20,0.9)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderTop: "1px solid var(--border)" }}>
+           style={{ background: "color-mix(in srgb, var(--bg) 90%, transparent)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderTop: "1px solid var(--border)" }}>
         <div
           className="mx-auto grid w-full max-w-xl"
           style={{ gridTemplateColumns: `repeat(${NAV_ITEMS.length}, minmax(0, 1fr))` }}

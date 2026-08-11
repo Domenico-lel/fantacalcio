@@ -45,8 +45,25 @@
               --accent-grad:linear-gradient(135deg,#0ec98f,#4ae8b8); --accent-glow:rgba(20,220,160,0.35); }
 .sec-bet    { --accent:#fbbf24; --accent-soft:#fde68a; --accent-ink:#2c1e02; --accent-bg:#382a0c;
               --accent-grad:linear-gradient(135deg,#f59e0b,#fcd34d); --accent-glow:rgba(251,191,36,0.35); }
-.sec-career { --accent:#22d3ee; --accent-soft:#a5f3fc; --accent-ink:#06242b; --accent-bg:#0b3038;
-              --accent-grad:linear-gradient(135deg,#06b6d4,#67e8f9); --accent-glow:rgba(34,211,238,0.34); }
+.sec-career,
+.sec-career-shell {
+  --bg: #0b0f07;
+  --bg-soft: #10170a;
+  --surface: #151e0d;
+  --surface-2: #1c2812;
+  --surface-3: #26361a;
+  --border: rgba(215, 255, 145, 0.14);
+  --border-2: rgba(215, 255, 145, 0.28);
+  --text: #f7fbea;
+  --text-dim: rgba(235, 246, 211, 0.74);
+  --text-faint: rgba(235, 246, 211, 0.54);
+  --accent: #b7f34a;
+  --accent-soft: #e7ffc0;
+  --accent-ink: #101904;
+  --accent-bg: #1b260b;
+  --accent-grad: linear-gradient(135deg, #79d313, #c8ff66);
+  --accent-glow: rgba(183, 243, 74, 0.3);
+}
 
 * {
   -webkit-tap-highlight-color: transparent;

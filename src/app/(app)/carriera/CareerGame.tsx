@@ -287,8 +287,8 @@ function ModePicker({ onPick }: { onPick: (mode: GameMode) => void }) {
   return (
     <main className="px-4 py-5">
       <div className="mb-5 rounded-3xl p-5 overflow-hidden relative"
-        style={{ background: "linear-gradient(145deg, #103548, #0b1d31 65%, #101827)", border: "1px solid rgba(103,232,249,.24)" }}>
-        <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full blur-3xl" style={{ background: "rgba(34,211,238,.18)" }} />
+        style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--accent) 16%, var(--surface-2)), var(--bg-soft) 65%, var(--bg))", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}>
+        <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full blur-3xl" style={{ background: "var(--accent-glow)" }} />
         <p className="eyebrow">Nuova modalità</p>
         <h2 className="font-display mt-2 text-3xl font-extrabold leading-tight text-white">Scrivi la tua<br />storia nel calcio</h2>
         <p className="mt-3 max-w-xs text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>
@@ -676,7 +676,7 @@ function DecisionOptionCard({ decisionId, option, selected, onSelect }: {
 }) {
   const detailId = `${decisionId}-${option.id}-details`;
   return (
-    <label className="card block min-h-12 cursor-pointer p-4 transition-colors focus-within:ring-2 focus-within:ring-cyan-300/70" style={{ background: selected ? "color-mix(in srgb, var(--accent) 9%, var(--surface-2))" : undefined, borderColor: selected ? "var(--accent)" : undefined }}>
+    <label className="card block min-h-12 cursor-pointer p-4 transition-colors focus-within:ring-2 focus-within:ring-[var(--accent)]" style={{ background: selected ? "color-mix(in srgb, var(--accent) 9%, var(--surface-2))" : undefined, borderColor: selected ? "var(--accent)" : undefined }}>
       <input
         type="radio"
         className="sr-only"
@@ -964,7 +964,7 @@ function ClubCrest({ club, clubName, size = 48 }: { club?: ClubDefinition | null
   const crestUrl = resolvedClub?.crestUrl;
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const showImage = !!crestUrl && failedUrl !== crestUrl;
-  const colors = resolvedClub?.colors ?? ["#172033", "#22d3ee"] as const;
+  const colors = resolvedClub?.colors ?? ["#1b260b", "#b7f34a"] as const;
 
   return (
     <span
@@ -1026,7 +1026,7 @@ function seasonLabel(year: number) {
 
 function decisionOutcomeColor(outcome: CareerDecisionProbability["outcome"]) {
   if (outcome === "greatSuccess") return "#34d399";
-  if (outcome === "success") return "#22d3ee";
+  if (outcome === "success") return "var(--accent)";
   if (outcome === "neutral") return "#94a3b8";
   return "#fb7185";
 }
