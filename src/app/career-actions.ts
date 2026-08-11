@@ -27,7 +27,7 @@ import {
   type StartMode,
   type TrainingChoice,
 } from "@/lib/career-engine";
-import type { Json } from "@/lib/database.types";
+import type { Database, Json } from "@/lib/database.types";
 
 export interface CreateCareerRequest {
   firstName: string;
@@ -46,8 +46,10 @@ export interface CareerRecord {
   id: string;
   ownerName: string;
   ownerLogo: string;
+  status: "active" | "retired" | "archived";
   dbVersion: number;
   state: CareerState;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -55,6 +57,7 @@ export interface CareerHub {
   viewer: Viewer | null;
   career: CareerRecord | null;
   seasons: CareerSeason[];
+  archivedCareers: CareerRecord[];
   error: string | null;
 }
 
@@ -67,8 +70,12 @@ export interface CareerMutationResult {
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 type CareerRow = Awaited<ReturnType<typeof getOwnCareerRow>>;
+type CareerTableRow = Database["public"]["Tables"]["fanta_careers"]["Row"];
 
 function schemaMessage(message: string): string {
+  if (/duplicate key|fanta_careers_one_active_per_user_idx/i.test(message)) {
+    return "Hai già una carriera attiva. Ricarica per vedere i progressi più recenti.";
+  }
   if (/fanta_careers|fanta_career_seasons|schema cache|permission denied|relation .* does not exist/i.test(message)) {
     return "La modalità Carriera non è ancora attiva nel database. Applica la migrazione della carriera e riprova.";
   }
@@ -94,40 +101,84 @@ async function getOwnCareerRow(db: AdminClient, userId: string) {
     .from("fanta_careers")
     .select("*")
     .eq("user_id", userId)
+    .in("status", ["active", "retired"])
+    // "active" viene prima di "retired": in assenza di un'attiva teniamo
+    // visibile l'ultima conclusa finche l'utente non la archivia.
+    .order("status", { ascending: true })
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   return { data, error };
 }
 
+function careerRecord(row: CareerTableRow): CareerRecord | null {
+  const state = parseState(row.state);
+  if (!state) return null;
+  return {
+    id: row.id,
+    ownerName: row.owner_name,
+    ownerLogo: row.owner_logo,
+    status: row.status,
+    dbVersion: row.version,
+    state,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 async function readHub(viewer: Viewer): Promise<CareerHub> {
   const db = createAdminClient();
-  const own = await getOwnCareerRow(db, viewer.userId);
-  if (own.error) return { viewer, career: null, seasons: [], error: schemaMessage(own.error.message) };
-  if (!own.data) return { viewer, career: null, seasons: [], error: null };
-
-  const state = parseState(own.data.state);
-  if (!state) {
-    return { viewer, career: null, seasons: [], error: "Il salvataggio della carriera non è leggibile." };
+  const { data, error } = await db
+    .from("fanta_careers")
+    .select("*")
+    .eq("user_id", viewer.userId)
+    .order("updated_at", { ascending: false });
+  if (error) {
+    return {
+      viewer,
+      career: null,
+      seasons: [],
+      archivedCareers: [],
+      error: schemaMessage(error.message),
+    };
   }
+
+  const rows = data ?? [];
+  const currentRow = rows.find((row) => row.status === "active")
+    ?? rows.find((row) => row.status === "retired")
+    ?? null;
+  const career = currentRow ? careerRecord(currentRow) : null;
+  if (currentRow && !career) {
+    return {
+      viewer,
+      career: null,
+      seasons: [],
+      archivedCareers: rows
+        .filter((row) => row.status === "archived")
+        .map(careerRecord)
+        .filter((record): record is CareerRecord => record !== null),
+      error: "Il salvataggio della carriera non è leggibile.",
+    };
+  }
+
+  const archivedCareers = rows
+    .filter((row) => row.status === "archived" || (row.status === "retired" && row.id !== currentRow?.id))
+    .map(careerRecord)
+    .filter((record): record is CareerRecord => record !== null);
 
   return {
     viewer,
-    career: {
-      id: own.data.id,
-      ownerName: own.data.owner_name,
-      ownerLogo: own.data.owner_logo,
-      dbVersion: own.data.version,
-      state,
-      updatedAt: own.data.updated_at,
-    },
+    career,
     // Lo stato versionato e la fonte autorevole: contiene anche le stagioni
     // convertite dal vecchio catalogo fittizio ai club reali.
-    seasons: [...state.seasons].reverse(),
+    seasons: career ? [...career.state.seasons].reverse() : [],
+    archivedCareers,
     error: null,
   };
 }
 
 async function emptyHub(error: string): Promise<CareerHub> {
-  return { viewer: null, career: null, seasons: [], error };
+  return { viewer: null, career: null, seasons: [], archivedCareers: [], error };
 }
 
 export async function fetchCareerHub(): Promise<CareerHub> {
@@ -156,7 +207,7 @@ export async function createCareer(input: CreateCareerRequest): Promise<CareerMu
   const existing = await getOwnCareerRow(db, viewer.userId);
   if (existing.error) {
     const error = schemaMessage(existing.error.message);
-    return { hub: { viewer, career: null, seasons: [], error }, error };
+    return { hub: { viewer, career: null, seasons: [], archivedCareers: [], error }, error };
   }
   if (existing.data) return { hub: await readHub(viewer), error: "Hai già una carriera salvata." };
 
@@ -183,7 +234,7 @@ export async function createCareer(input: CreateCareerRequest): Promise<CareerMu
 
   if (insertError) {
     const error = schemaMessage(insertError.message);
-    return { hub: { viewer, career: null, seasons: [], error }, error };
+    return { hub: { viewer, career: null, seasons: [], archivedCareers: [], error }, error };
   }
 
   revalidatePath("/carriera");
@@ -520,12 +571,43 @@ export async function declineCareerTransfers(expectedVersion: number): Promise<C
   return { hub: await readHub(viewer), error };
 }
 
-export async function restartCareer(): Promise<CareerMutationResult> {
+export async function restartCareer(expectedVersion: number): Promise<CareerMutationResult> {
   const viewer = await getCurrentViewer();
   if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
   const db = createAdminClient();
-  const { error: deleteError } = await db.from("fanta_careers").delete().eq("user_id", viewer.userId);
-  const error = deleteError ? schemaMessage(deleteError.message) : null;
+  const own = await getOwnCareerRow(db, viewer.userId);
+  if (own.error) {
+    const error = schemaMessage(own.error.message);
+    return { hub: await readHub(viewer), error };
+  }
+  if (!own.data) return { hub: await readHub(viewer), error: null };
+  if (own.data.version !== expectedVersion) {
+    return {
+      hub: await readHub(viewer),
+      error: "La carriera è cambiata su un altro dispositivo. Ho ricaricato i progressi: controllali prima di archiviarla.",
+    };
+  }
+
+  // "Ricomincia" non distrugge piu la cronologia: la carriera e le relative
+  // stagioni restano consultabili nell'archivio e una nuova riga potra essere
+  // creata con createCareer.
+  const { data, error: archiveError } = await db
+    .from("fanta_careers")
+    .update({
+      status: "archived",
+      version: expectedVersion + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", own.data.id)
+    .eq("user_id", viewer.userId)
+    .eq("version", expectedVersion)
+    .select("id")
+    .maybeSingle();
+  const error = archiveError
+    ? schemaMessage(archiveError.message)
+    : data
+      ? null
+      : "La carriera è stata aggiornata su un altro dispositivo. Ricarica e riprova.";
   revalidatePath("/carriera");
   return { hub: await readHub(viewer), error };
 }

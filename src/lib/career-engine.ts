@@ -39,6 +39,18 @@ export type EventTone = "positive" | "neutral" | "negative" | "special";
 export type SquadRole = "prospect" | "rotation" | "starter" | "star";
 export type CareerDecisionPhase = "preSeason" | "postSeason";
 export type CareerDecisionOutcome = "greatSuccess" | "success" | "neutral" | "failure";
+export type NationalRankingTrend = "up" | "down" | "stable";
+export type RetirementPlan = "undecided" | "retireAt40" | "continueTo42";
+export type CareerArcType =
+  | "breakthrough"
+  | "comeback"
+  | "wonderkid"
+  | "lateBloomer"
+  | "clubIcon"
+  | "nationalHero"
+  | "journeyman"
+  | "crisis";
+export type CareerArcStatus = "active" | "completed" | "failed";
 
 export interface LeagueMetadata {
   name: string;
@@ -151,6 +163,18 @@ export const COUNTRY_OPTIONS: readonly CountryOption[] = [
   },
 ] as const;
 
+/** Metadati separati dal paese: necessari per una piramide italiana credibile. */
+export const LEAGUE_METADATA_BY_NAME: Readonly<Record<string, LeagueMetadata>> = {
+  "Serie A": { name: "Serie A", shortName: "Serie A", strength: 88, clubs: 20, leagueMatches: 38, style: "Tattica e tecnica" },
+  "Serie B": { name: "Serie B", shortName: "Serie B", strength: 69, clubs: 20, leagueMatches: 38, style: "Equilibrio e intensita" },
+  "Serie C": { name: "Serie C", shortName: "Serie C", strength: 56, clubs: 20, leagueMatches: 38, style: "Duelli, giovani e trasferte difficili" },
+  "Serie D": { name: "Serie D", shortName: "Serie D", strength: 45, clubs: 18, leagueMatches: 34, style: "Territorio, fisicita e campi caldi" },
+} as const;
+
+export function getLeagueMetadata(country: CountryCode, leagueName?: string): LeagueMetadata {
+  return (leagueName ? LEAGUE_METADATA_BY_NAME[leagueName] : undefined) ?? findCountry(country).league;
+}
+
 export const ROLE_OPTIONS: readonly RoleOption[] = [
   { code: "GK", label: "Portiere", shortLabel: "POR", department: "Porta" },
   { code: "RB", label: "Terzino destro", shortLabel: "TD", department: "Difesa" },
@@ -214,16 +238,49 @@ function makeClubs(
 }
 
 export const CLUBS_BY_COUNTRY: Record<CountryCode, readonly ClubDefinition[]> = {
-  IT: makeClubs("IT", "Serie A", "football-data", [
-    [108, "Inter", "Torri Milano", 88, 87, 94, "#111827", "#38bdf8"],
-    [109, "Juventus", "Reale Torino", 84, 84, 88, "#111827", "#f8fafc"],
-    [100, "Roma", "Lupi Capitolini", 83, 82, 87, "#991b1b", "#f59e0b"],
-    [113, "Napoli", "Partenope Azzurra", 82, 85, 85, "#0369a1", "#e0f2fe"],
-    [99, "Fiorentina", "Giglio Firenze", 78, 81, 76, "#581c87", "#f5d0fe"],
-    [107, "Genoa", "Grifoni Genova", 73, 77, 67, "#1e3a8a", "#dc2626"],
-    [103, "Bologna", "Emilia Calcio", 69, 79, 58, "#be123c", "#1e3a8a"],
-    [5890, "Lecce", "Salento United", 65, 74, 50, "#facc15", "#dc2626"],
-  ]),
+  IT: [
+    ...makeClubs("IT", "Serie A", "football-data", [
+      [108, "Inter", "Torri Milano", 88, 87, 94, "#111827", "#38bdf8"],
+      [109, "Juventus", "Reale Torino", 84, 84, 88, "#111827", "#f8fafc"],
+      [100, "Roma", "Lupi Capitolini", 83, 82, 87, "#991b1b", "#f59e0b"],
+      [113, "Napoli", "Partenope Azzurra", 82, 85, 85, "#0369a1", "#e0f2fe"],
+      [99, "Fiorentina", "Giglio Firenze", 78, 81, 76, "#581c87", "#f5d0fe"],
+      [107, "Genoa", "Grifoni Genova", 73, 77, 67, "#1e3a8a", "#dc2626"],
+      [103, "Bologna", "Emilia Calcio", 69, 79, 58, "#be123c", "#1e3a8a"],
+      [5890, "Lecce", "Salento United", 65, 74, 50, "#facc15", "#dc2626"],
+    ]),
+    // Una selezione trasversale dei tre gironi: club reali, valori da vivaio e
+    // calendario da Serie C. Gli id sono soltanto chiavi interne stabili; URL
+    // vuoto forza il fallback grafico ed evita di mostrare stemmi non verificati.
+    ...makeClubs("IT", "Serie C", "espn", [
+      [12001, "Vicenza", "Vicenza", 59, 72, 55, "#ef4444", "#f8fafc", ""],
+      [12002, "Cittadella", "Cittadella", 55, 70, 47, "#b91c1c", "#facc15", ""],
+      [12003, "Triestina", "Triestina", 53, 69, 48, "#dc2626", "#f8fafc", ""],
+      [12004, "Pro Vercelli", "Pro Vercelli", 52, 70, 46, "#f8fafc", "#111827", ""],
+      [12005, "Arezzo", "Arezzo", 56, 72, 50, "#facc15", "#b91c1c", ""],
+      [12006, "Ascoli", "Ascoli", 57, 71, 54, "#111827", "#f8fafc", ""],
+      [12007, "Perugia", "Perugia", 56, 73, 55, "#dc2626", "#f8fafc", ""],
+      [12008, "Ternana", "Ternana", 58, 72, 57, "#dc2626", "#16a34a", ""],
+      [12009, "Benevento", "Benevento", 59, 74, 58, "#facc15", "#dc2626", ""],
+      [12010, "Catania", "Catania", 58, 75, 60, "#2563eb", "#dc2626", ""],
+      [12011, "Crotone", "Crotone", 55, 72, 52, "#1d4ed8", "#dc2626", ""],
+      [12012, "Foggia", "Foggia", 54, 71, 55, "#dc2626", "#111827", ""],
+    ]),
+    ...makeClubs("IT", "Serie D", "espn", [
+      [12101, "Piacenza", "Piacenza", 48, 68, 45, "#dc2626", "#f8fafc", ""],
+      [12102, "Pistoiese", "Pistoiese", 45, 66, 40, "#f97316", "#2563eb", ""],
+      [12103, "Prato", "Prato", 44, 67, 39, "#2563eb", "#f8fafc", ""],
+      [12104, "Siena", "Siena", 49, 69, 48, "#111827", "#f8fafc", ""],
+      [12105, "Grosseto", "Grosseto", 46, 67, 41, "#dc2626", "#f8fafc", ""],
+      [12106, "Ancona", "Ancona", 47, 68, 44, "#dc2626", "#f8fafc", ""],
+      [12107, "Chieti", "Chieti", 44, 65, 38, "#111827", "#16a34a", ""],
+      [12108, "Nocerina", "Nocerina", 46, 67, 43, "#111827", "#dc2626", ""],
+      [12109, "Reggina", "Reggina", 49, 70, 52, "#7c3aed", "#f8fafc", ""],
+      [12110, "Varese", "Varese", 45, 68, 43, "#dc2626", "#f8fafc", ""],
+      [12111, "Martina", "Martina", 43, 66, 36, "#38bdf8", "#f8fafc", ""],
+      [12112, "Vigor Senigallia", "Vigor Senigallia", 42, 65, 34, "#dc2626", "#2563eb", ""],
+    ]),
+  ],
   ES: makeClubs("ES", "LaLiga", "football-data", [
     [86, "Real Madrid", "Real Castiglia", 90, 90, 97, "#f8fafc", "#f59e0b"],
     [81, "FC Barcelona", "Catalunya Blau", 89, 93, 96, "#1d4ed8", "#be123c"],
@@ -353,6 +410,7 @@ export interface CareerEvent {
     | "transfer"
     | "contract"
     | "decision"
+    | "turningPoint"
     | "retirement";
   title: string;
   description: string;
@@ -428,6 +486,8 @@ export interface CareerDecision {
   description: string;
   context: string;
   options: CareerDecisionOption[];
+  /** Le decisioni ritiro usano lo stesso flusso persistente delle altre scelte. */
+  kind?: "standard" | "retirement";
 }
 
 export interface CareerDecisionResult {
@@ -491,6 +551,68 @@ export interface NationalTeamCareer {
   cleanSheets: number;
   trophies: number;
   firstCallUpSeason: number | null;
+  /** Campi opzionali: i salvataggi creati prima del mondo nazionali restano validi. */
+  currentRanking?: number;
+  bestRanking?: number;
+  captaincyCaps?: number;
+  tournamentAppearances?: number;
+}
+
+export interface NationalRankingEntry {
+  country: CountryCode;
+  name: string;
+  flag: string;
+  rank: number;
+  previousRank: number;
+  points: number;
+  trend: NationalRankingTrend;
+  /** Ultimi cinque risultati: 1 vittoria, 0 pareggio, -1 sconfitta. */
+  form: number[];
+  trophies: number;
+}
+
+export interface NationalRankingSnapshot {
+  seasonYear: number;
+  entries: NationalRankingEntry[];
+}
+
+export interface CareerArcImpact {
+  overall: number;
+  reputation: number;
+  form: number;
+}
+
+export interface CareerArc {
+  id: string;
+  type: CareerArcType;
+  title: string;
+  description: string;
+  startedSeason: number;
+  lastUpdatedSeason: number;
+  status: CareerArcStatus;
+  progress: number;
+  target: number;
+  impact: CareerArcImpact;
+}
+
+export interface CareerArchiveSummary {
+  id: string;
+  playerName: string;
+  nationality: CountryCode;
+  role: Role;
+  startedSeason: number;
+  lastSeason: number;
+  retiredAtAge: number | null;
+  seasons: number;
+  clubs: string[];
+  overallPeak: number;
+  goatScore: number;
+  appearances: number;
+  goals: number;
+  assists: number;
+  trophies: number;
+  nationalCaps: number;
+  archivedAt: string;
 }
 
 export interface CareerSeason {
@@ -532,6 +654,11 @@ export interface CareerSeason {
   nationalGoals: number;
   nationalAssists: number;
   nationalCleanSheets: number;
+  nationalTeamRank?: number;
+  nationalTeamRankChange?: number;
+  nationalCompetition?: string | null;
+  nationalResult?: string | null;
+  careerArcId?: string | null;
   events: CareerEvent[];
   goatPointsEarned: number;
   retiredAfterSeason: boolean;
@@ -574,6 +701,12 @@ export interface CareerState {
   pendingSeasonReportId?: string | null;
   /** Offerte generate a fine stagione ma nascoste finche la POST non termina. */
   queuedOffers?: CareerOffer[];
+  /** Stato vivo del calcio internazionale, aggiunto senza cambiare la versione v1. */
+  nationalRanking?: NationalRankingEntry[];
+  nationalRankingHistory?: NationalRankingSnapshot[];
+  activeCareerArc?: CareerArc | null;
+  careerArcHistory?: CareerArc[];
+  retirementPlan?: RetirementPlan;
 }
 
 interface RoleProfile {
@@ -713,6 +846,133 @@ function findCountry(code: CountryCode): CountryOption {
   return country;
 }
 
+const INITIAL_NATIONAL_POINTS: Readonly<Record<CountryCode, number>> = {
+  AR: 1875,
+  ES: 1870,
+  FR: 1860,
+  GB: 1815,
+  BR: 1800,
+  PT: 1775,
+  NL: 1755,
+  DE: 1745,
+  IT: 1725,
+};
+
+/** Crea la graduatoria base. Da qui in poi ogni stagione muove tutte le nazionali. */
+export function createInitialNationalRanking(): NationalRankingEntry[] {
+  return COUNTRY_OPTIONS
+    .map((country) => ({
+      country: country.code,
+      name: country.name,
+      flag: country.flag,
+      rank: 0,
+      previousRank: 0,
+      points: INITIAL_NATIONAL_POINTS[country.code],
+      trend: "stable" as const,
+      form: [] as number[],
+      trophies: 0,
+    }))
+    .sort((left, right) => right.points - left.points)
+    .map((entry, index) => ({ ...entry, rank: index + 1, previousRank: index + 1 }));
+}
+
+function normalizeNationalRanking(entries?: readonly NationalRankingEntry[]): NationalRankingEntry[] {
+  if (!entries || entries.length === 0) return createInitialNationalRanking();
+  const byCountry = new Map(entries.map((entry) => [entry.country, entry]));
+  return COUNTRY_OPTIONS
+    .map((country) => {
+      const saved = byCountry.get(country.code);
+      return {
+        country: country.code,
+        name: country.name,
+        flag: country.flag,
+        rank: saved?.rank ?? 99,
+        previousRank: saved?.previousRank ?? saved?.rank ?? 99,
+        points: Math.round(saved?.points ?? INITIAL_NATIONAL_POINTS[country.code]),
+        trend: saved?.trend ?? "stable",
+        form: (saved?.form ?? []).slice(-5).map((result) => clamp(Math.trunc(result), -1, 1)),
+        trophies: Math.max(0, Math.trunc(saved?.trophies ?? 0)),
+      } satisfies NationalRankingEntry;
+    })
+    .sort((left, right) => right.points - left.points)
+    .map((entry, index) => ({
+      ...entry,
+      rank: index + 1,
+      previousRank: clamp(entry.previousRank, 1, COUNTRY_OPTIONS.length),
+      trend: entry.previousRank > index + 1 ? "up" as const : entry.previousRank < index + 1 ? "down" as const : "stable" as const,
+    }));
+}
+
+function evolveNationalRanking(
+  state: CareerState,
+  rng: SeededRandom,
+  playerCaps: number,
+  playerCompetition: string | null,
+  playerResult: string | null,
+): { ranking: NationalRankingEntry[]; rank: number; rankChange: number } {
+  const previous = normalizeNationalRanking(state.nationalRanking);
+  const tournamentSeason = playerCompetition !== null && playerCompetition !== "Qualificazioni internazionali";
+  const evolved = previous.map((entry) => {
+    const strength = clamp((entry.points - 1660) / 250, 0.18, 0.92);
+    const matches = tournamentSeason ? 7 : 5;
+    const results = Array.from({ length: matches }, () => {
+      const roll = rng.next();
+      const winChance = clamp(0.31 + strength * 0.42 + rng.between(-0.08, 0.08), 0.2, 0.82);
+      if (roll < winChance) return 1;
+      if (roll < winChance + 0.23) return 0;
+      return -1;
+    });
+    const wins = results.filter((result) => result === 1).length;
+    const losses = results.filter((result) => result === -1).length;
+    const playerBonus = entry.country === state.player.nationality
+      ? Math.min(9, playerCaps) + (playerResult === "Vincitore" ? 28 : playerResult === "Finale" ? 12 : 0)
+      : 0;
+    const worldShock = rng.chance(0.11) ? rng.int(-18, 19) : rng.int(-7, 8);
+    const pointsDelta = (wins - losses) * 6 + playerBonus + worldShock;
+    return {
+      ...entry,
+      previousRank: entry.rank,
+      points: clamp(Math.round(entry.points + pointsDelta), 1450, 2050),
+      form: [...entry.form, ...results].slice(-5),
+      trophies: entry.trophies,
+    };
+  });
+  const winners = new Set<CountryCode>();
+  if (tournamentSeason) {
+    if (playerResult === "Vincitore") winners.add(state.player.nationality);
+    const playerWasEliminated = playerResult !== null && playerResult !== "Non convocato" && playerResult !== "Vincitore";
+    const topCandidate = (entries: NationalRankingEntry[]): CountryCode => {
+      const eligible = playerWasEliminated
+        ? entries.filter((entry) => entry.country !== state.player.nationality)
+        : entries;
+      const pool = eligible.length > 0 ? eligible : entries;
+      return rng.pick([...pool].sort((left, right) => right.points - left.points).slice(0, Math.min(4, pool.length))).country;
+    };
+    if (playerCompetition === "Coppa del Mondo") {
+      if (winners.size === 0) winners.add(topCandidate(evolved));
+    } else {
+      const southAmerica = evolved.filter((entry) => entry.country === "BR" || entry.country === "AR");
+      const europe = evolved.filter((entry) => entry.country !== "BR" && entry.country !== "AR");
+      if (![...winners].some((country) => country === "BR" || country === "AR")) winners.add(topCandidate(southAmerica));
+      if (![...winners].some((country) => country !== "BR" && country !== "AR")) winners.add(topCandidate(europe));
+    }
+  }
+  const ranking = evolved
+    .map((entry) => ({ ...entry, trophies: entry.trophies + (winners.has(entry.country) ? 1 : 0) }))
+    .sort((left, right) => right.points - left.points || left.country.localeCompare(right.country))
+    .map((entry, index): NationalRankingEntry => ({
+      ...entry,
+      rank: index + 1,
+      trend: entry.previousRank > index + 1 ? "up" : entry.previousRank < index + 1 ? "down" : "stable",
+    }));
+  const playerEntry = ranking.find((entry) => entry.country === state.player.nationality) ?? ranking[ranking.length - 1];
+  return {
+    ranking,
+    rank: playerEntry.rank,
+    rankChange: playerEntry.previousRank - playerEntry.rank,
+  };
+}
+
 const ALL_CLUBS: readonly ClubDefinition[] = Object.values(CLUBS_BY_COUNTRY).flat();
 
 const LEGACY_LEAGUE_NAMES: Readonly<Record<string, string>> = {
@@ -789,6 +1049,13 @@ export function upgradeCareerCatalog(state: CareerState): CareerState {
           joinedSeason: state.currentClub.joinedSeason,
           contractUntil: state.currentClub.contractUntil,
           squadRole: state.currentClub.squadRole,
+          // Una promozione o retrocessione e parte del salvataggio e non deve
+          // essere annullata quando aggiorniamo stemma e metadati catalogo.
+          league: LEAGUE_METADATA_BY_NAME[state.currentClub.league]
+            ? state.currentClub.league
+            : currentClubDefinition.league,
+          rating: state.currentClub.rating ?? currentClubDefinition.rating,
+          prestige: state.currentClub.prestige ?? currentClubDefinition.prestige,
         }
       : {
           ...state.currentClub,
@@ -830,7 +1097,7 @@ export function upgradeCareerCatalog(state: CareerState): CareerState {
       ...season,
       clubName: club?.name ?? upgradeCatalogText(season.clubName),
       country: club?.country ?? season.country,
-      league: club?.league ?? currentLeague(season.country, season.league),
+      league: LEGACY_LEAGUE_NAMES[season.league] ?? season.league ?? club?.league ?? currentLeague(season.country, season.league),
       trophies: season.trophies.map(upgradeCatalogText),
       awards: season.awards.map(upgradeCatalogText),
       events: season.events.map(upgradeEvent),
@@ -865,7 +1132,7 @@ function squadRoleFor(overall: number, clubRating: number): SquadRole {
 
 function salaryFor(overall: number, role: SquadRole, prestige: number): number {
   const roleMultiplier: Record<SquadRole, number> = { prospect: 0.55, rotation: 0.85, starter: 1.15, star: 1.65 };
-  const raw = Math.max(90_000, (overall - 42) ** 2.25 * 2_500);
+  const raw = Math.max(90_000, Math.max(1, overall - 38) ** 2.25 * 2_500);
   return roundMoney(raw * roleMultiplier[role] * (0.75 + prestige / 180));
 }
 
@@ -967,6 +1234,11 @@ function sampleCount(rng: SeededRandom, expected: number, volatility = 0.3): num
   return Math.max(0, Math.round(expected + noise));
 }
 
+function tournamentSeasonCaps(tournament: boolean, firstCallUp: boolean, rng: SeededRandom): number {
+  if (tournament) return rng.int(firstCallUp ? 3 : 4, 9);
+  return rng.int(firstCallUp ? 2 : 1, 7);
+}
+
 function roleTrainingFit(role: Role, choice: TrainingChoice): number {
   if (choice === "balanced") return 1;
   if (choice === "recovery") return 0.76;
@@ -975,6 +1247,165 @@ function roleTrainingFit(role: Role, choice: TrainingChoice): number {
 
 function roleDepartment(role: Role): RoleOption["department"] {
   return ROLE_OPTIONS.find((option) => option.code === role)?.department ?? "Attacco";
+}
+
+interface CareerArcSeasonContext {
+  averageRating: number;
+  overallChange: number;
+  injured: boolean;
+  appearances: number;
+  trophies: number;
+}
+
+interface CareerArcEvolution {
+  active: CareerArc | null;
+  history: CareerArc[];
+  impact: CareerArcImpact;
+  event: CareerEvent | null;
+  arcId: string | null;
+}
+
+const EMPTY_ARC_IMPACT: CareerArcImpact = { overall: 0, reputation: 0, form: 0 };
+
+const ARC_COPY: Record<CareerArcType, Omit<CareerArc, "id" | "type" | "startedSeason" | "lastUpdatedSeason" | "status" | "progress">> = {
+  breakthrough: { title: "La svolta", description: "Due stagioni solide possono cambiare il livello della carriera.", target: 2, impact: { overall: 1, reputation: 4, form: 6 } },
+  comeback: { title: "La risalita", description: "Dopo il momento difficile, ogni buona prestazione pesa il doppio.", target: 2, impact: { overall: 1, reputation: 3, form: 9 } },
+  wonderkid: { title: "Predestinato", description: "Il talento attira aspettative: servono prestazioni, non solo promesse.", target: 3, impact: { overall: 1, reputation: 5, form: 5 } },
+  lateBloomer: { title: "Esplosione tardiva", description: "La maturita apre una finestra inattesa per salire di livello.", target: 2, impact: { overall: 2, reputation: 3, form: 4 } },
+  clubIcon: { title: "Bandiera del club", description: "Continuita e risultati possono trasformarti nel volto della squadra.", target: 3, impact: { overall: 0, reputation: 7, form: 5 } },
+  nationalHero: { title: "Sogno azzurro", description: "La nazionale puo diventare il capitolo piu importante della carriera.", target: 2, impact: { overall: 1, reputation: 7, form: 6 } },
+  journeyman: { title: "Globetrotter", description: "Ogni nuova maglia aggiunge esperienza, ma rende piu difficile lasciare un segno.", target: 3, impact: { overall: 1, reputation: 5, form: 4 } },
+  crisis: { title: "Bivio di carriera", description: "Forma, fiducia e posto in squadra sono in bilico.", target: 2, impact: { overall: 1, reputation: 2, form: 10 } },
+};
+
+function createCareerArc(state: CareerState, type: CareerArcType): CareerArc {
+  const copy = ARC_COPY[type];
+  return {
+    id: `arc-${hashString(`${state.id}|${state.seasonIndex}|${type}`).toString(36)}`,
+    type,
+    ...copy,
+    startedSeason: state.seasonIndex,
+    lastUpdatedSeason: state.seasonIndex,
+    status: "active",
+    progress: 0,
+  };
+}
+
+function chooseCareerArc(state: CareerState, context: CareerArcSeasonContext, rng: SeededRandom): CareerArcType | null {
+  const previousClubs = new Set(state.seasons.map((season) => season.clubName));
+  const distinctClubs = previousClubs.size + (state.currentClub && !previousClubs.has(state.currentClub.name) ? 1 : 0);
+  const clubSeasons = state.currentClub
+    ? state.seasons.filter((season) => season.clubName === state.currentClub?.name).length + 1
+    : 0;
+  if (context.averageRating < 6.2 || (context.injured && context.appearances < 15)) return "crisis";
+  if ((state.careerArcHistory ?? []).some((arc) => arc.type === "crisis" && arc.status === "failed")) return "comeback";
+  if (state.nationalTeam.caps > 0 && rng.chance(0.42)) return "nationalHero";
+  if (clubSeasons >= 4 && rng.chance(0.48)) return "clubIcon";
+  if (distinctClubs >= 3 && rng.chance(0.48)) return "journeyman";
+  if (state.age <= 20 && context.overallChange >= 2 && rng.chance(0.58)) return "wonderkid";
+  if (state.age >= 27 && context.averageRating >= 7.15 && rng.chance(0.5)) return "lateBloomer";
+  if (context.averageRating >= 7.25 && rng.chance(0.52)) return "breakthrough";
+  return rng.chance(0.16) ? (rng.chance(0.28) ? "crisis" : "breakthrough") : null;
+}
+
+function evolveCareerArc(
+  state: CareerState,
+  context: CareerArcSeasonContext,
+  rng: SeededRandom,
+  eventIndex: number,
+): CareerArcEvolution {
+  const history = [...(state.careerArcHistory ?? [])];
+  const current = state.activeCareerArc ?? null;
+  if (!current) {
+    const type = chooseCareerArc(state, context, rng);
+    if (!type) return { active: null, history, impact: EMPTY_ARC_IMPACT, event: null, arcId: null };
+    const active = createCareerArc(state, type);
+    const negative = type === "crisis";
+    return {
+      active,
+      history,
+      impact: EMPTY_ARC_IMPACT,
+      arcId: active.id,
+      event: makeEvent(
+        state,
+        eventIndex,
+        "turningPoint",
+        active.title,
+        active.description,
+        negative ? "negative" : "special",
+        negative ? -6 : 5,
+      ),
+    };
+  }
+
+  const positiveStep = current.type === "crisis"
+    ? context.averageRating >= 6.75 && !context.injured
+    : context.averageRating >= 6.95 || context.trophies > 0 || context.overallChange >= 2;
+  const hardSetback = context.averageRating < 6.15 || (context.injured && context.appearances < 12);
+  if (hardSetback && rng.chance(current.type === "crisis" ? 0.58 : 0.36)) {
+    const failed: CareerArc = {
+      ...current,
+      lastUpdatedSeason: state.seasonIndex,
+      status: "failed",
+      impact: { overall: -1, reputation: -2, form: -8 },
+    };
+    return {
+      active: null,
+      history: [...history, failed].slice(-20),
+      impact: failed.impact,
+      arcId: failed.id,
+      event: makeEvent(state, eventIndex, "turningPoint", "Una porta si chiude", `${current.title}: la svolta non arriva e serve ripartire.`, "negative", -8),
+    };
+  }
+
+  const progress = clamp(current.progress + (positiveStep ? 1 : 0), 0, current.target);
+  if (progress >= current.target) {
+    const completed: CareerArc = {
+      ...current,
+      lastUpdatedSeason: state.seasonIndex,
+      status: "completed",
+      progress,
+    };
+    return {
+      active: null,
+      history: [...history, completed].slice(-20),
+      impact: completed.impact,
+      arcId: completed.id,
+      event: makeEvent(state, eventIndex, "turningPoint", `${current.title}: compiuta`, "Il percorso cambia davvero la traiettoria della carriera.", "special", 10),
+    };
+  }
+
+  const active: CareerArc = { ...current, progress, lastUpdatedSeason: state.seasonIndex };
+  return {
+    active,
+    history,
+    impact: EMPTY_ARC_IMPACT,
+    arcId: active.id,
+    event: positiveStep
+      ? makeEvent(state, eventIndex, "turningPoint", `${current.title}: un passo avanti`, `${progress}/${current.target} tappe completate.`, "positive", 4)
+      : makeEvent(state, eventIndex, "turningPoint", `${current.title}: tutto fermo`, "La stagione non basta per avanzare in questo capitolo.", "neutral", 0),
+  };
+}
+
+interface SeasonTwist {
+  impact: CareerArcImpact;
+  event: CareerEvent | null;
+}
+
+function rollSeasonTwist(state: CareerState, rng: SeededRandom, eventIndex: number): SeasonTwist {
+  if (!rng.chance(0.24)) return { impact: EMPTY_ARC_IMPACT, event: null };
+  const twists = [
+    { title: "Un mentore inatteso", description: "Un veterano ti prende sotto la sua ala e accelera la crescita.", tone: "positive" as const, impact: { overall: 1, reputation: 1, form: 5 } },
+    { title: "Cambio in panchina", description: "Il nuovo allenatore azzera le gerarchie e ti costringe a riconquistare fiducia.", tone: "negative" as const, impact: { overall: 0, reputation: -1, form: -8 } },
+    { title: "Occasione all'ultimo minuto", description: "Un'assenza apre spazio: sfrutti una chance che sembrava impossibile.", tone: "special" as const, impact: { overall: 0, reputation: 3, form: 7 } },
+    { title: "Pressione fuori campo", description: "Una vicenda esterna rompe il ritmo nel momento peggiore.", tone: "negative" as const, impact: { overall: -1, reputation: -2, form: -6 } },
+    { title: "Nuovo ruolo", description: "Lo staff scopre una posizione che valorizza qualita rimaste nascoste.", tone: "positive" as const, impact: { overall: 1, reputation: 2, form: 3 } },
+  ];
+  const chosen = rng.pick(twists);
+  return {
+    impact: chosen.impact,
+    event: makeEvent(state, eventIndex, "turningPoint", chosen.title, chosen.description, chosen.tone, chosen.impact.overall * 4 + chosen.impact.reputation + Math.round(chosen.impact.form / 3)),
+  };
 }
 
 const EMPTY_DECISION_EFFECTS: CareerDecisionEffects = {
@@ -1059,6 +1490,14 @@ function validateDecisionOptions(options: readonly CareerDecisionOption[]): void
 function shiftSquadRole(role: SquadRole, steps: number): SquadRole {
   const index = SQUAD_ROLE_ORDER.indexOf(role);
   return SQUAD_ROLE_ORDER[clamp(index + Math.trunc(steps), 0, SQUAD_ROLE_ORDER.length - 1)] as SquadRole;
+}
+
+export function getProjectedSquadRole(
+  state: Pick<CareerState, "overall" | "currentClub">,
+  preparationSteps = 0,
+): SquadRole | null {
+  if (!state.currentClub) return null;
+  return shiftSquadRole(squadRoleFor(state.overall, state.currentClub.rating), preparationSteps);
 }
 
 function specialistTrainingFor(role: Role): TrainingChoice {
@@ -1213,6 +1652,49 @@ function createPostSeasonDecision(state: CareerState, season: CareerSeason): Car
     description: "Scegli come usare l'estate. Percentuali ed effetti sono dichiarati prima del tiro.",
     context: `${season.clubName} · voto ${season.averageRating.toFixed(2)} · ${season.appearances} presenze`,
     options,
+    kind: "standard",
+  };
+}
+
+function createRetirementDecision(state: CareerState, season: CareerSeason): CareerDecision {
+  const id = `decision-retirement-${hashString(`${state.id}|${season.id}|40`).toString(36)}`;
+  const options: CareerDecisionOption[] = [
+    {
+      id: `${id}-ritirati`,
+      label: "Chiudi a 40 anni",
+      description: "Saluta ora il calcio giocato e consegna questa carriera all'archivio.",
+      hint: "Scelta definitiva: la carriera termina adesso.",
+      probabilities: [
+        probabilityBranch("greatSuccess", 0, "", "", decisionEffects()),
+        probabilityBranch("success", 100, "L'ultima partita", "Hai scelto il momento giusto per salutare.", decisionEffects({ reputation: 2 })),
+        probabilityBranch("neutral", 0, "", "", decisionEffects()),
+        probabilityBranch("failure", 0, "", "", decisionEffects()),
+      ],
+    },
+    {
+      id: `${id}-continua`,
+      label: "Continua fino a 42",
+      description: "Accetta altre due stagioni: il ritiro arrivera obbligatoriamente a 42 anni.",
+      hint: "Nessun ritiro casuale: giocherai al massimo altre due stagioni.",
+      probabilities: [
+        probabilityBranch("greatSuccess", 0, "", "", decisionEffects()),
+        probabilityBranch("success", 100, "La storia continua", "Hai ancora due stagioni per lasciare il segno.", decisionEffects({ form: 5 })),
+        probabilityBranch("neutral", 0, "", "", decisionEffects()),
+        probabilityBranch("failure", 0, "", "", decisionEffects()),
+      ],
+    },
+  ];
+  validateDecisionOptions(options);
+  return {
+    id,
+    phase: "postSeason",
+    kind: "retirement",
+    seasonIndex: season.index,
+    seasonYear: season.year,
+    title: "Il momento della scelta",
+    description: "A 40 anni decidi tu: chiudere ora oppure continuare fino a 42.",
+    context: `${state.player.displayName} · ${state.seasons.length} stagioni`,
+    options,
   };
 }
 
@@ -1221,8 +1703,21 @@ function createPostSeasonDecision(state: CareerState, season: CareerSeason): Car
  * La funzione e pura e idempotente: non risolve scelte e non consuma casualita.
  */
 export function normalizeCareerDecisionState(state: CareerState): CareerState {
+  const nationalRanking = normalizeNationalRanking(state.nationalRanking);
+  const playerNation = nationalRanking.find((entry) => entry.country === state.player.nationality);
+  const retirementPlan: RetirementPlan = state.retirementPlan
+    ?? (state.stage === "retired"
+      ? (state.retiredAtAge !== null && state.retiredAtAge > 40 ? "continueTo42" : "retireAt40")
+      : "undecided");
   const normalized: CareerState = {
     ...state,
+    nationalTeam: {
+      ...state.nationalTeam,
+      currentRanking: state.nationalTeam.currentRanking ?? playerNation?.rank ?? COUNTRY_OPTIONS.length,
+      bestRanking: state.nationalTeam.bestRanking ?? playerNation?.rank ?? COUNTRY_OPTIONS.length,
+      captaincyCaps: state.nationalTeam.captaincyCaps ?? 0,
+      tournamentAppearances: state.nationalTeam.tournamentAppearances ?? 0,
+    },
     pendingDecision: state.pendingDecision ?? null,
     queuedDecision: state.queuedDecision ?? null,
     lastDecisionResult: state.lastDecisionResult ?? null,
@@ -1230,7 +1725,27 @@ export function normalizeCareerDecisionState(state: CareerState): CareerState {
     seasonPreparation: state.seasonPreparation ?? null,
     pendingSeasonReportId: state.pendingSeasonReportId ?? null,
     queuedOffers: state.queuedOffers ?? [],
+    nationalRanking,
+    nationalRankingHistory: (state.nationalRankingHistory ?? []).slice(-20),
+    activeCareerArc: state.activeCareerArc ?? null,
+    careerArcHistory: (state.careerArcHistory ?? []).slice(-20),
+    retirementPlan,
   };
+
+  if (
+    normalized.stage === "active" &&
+    normalized.age === 40 &&
+    normalized.retirementPlan === "undecided" &&
+    !normalized.pendingDecision &&
+    !normalized.queuedDecision &&
+    !normalized.lastDecisionResult &&
+    !normalized.pendingSeasonReportId &&
+    normalized.pendingOffers.length === 0 &&
+    normalized.seasons.length > 0
+  ) {
+    const lastSeason = normalized.seasons[normalized.seasons.length - 1];
+    if (lastSeason) return { ...normalized, pendingDecision: createRetirementDecision(normalized, lastSeason) };
+  }
 
   if (
     normalized.stage === "active" &&
@@ -1249,8 +1764,8 @@ export function normalizeCareerDecisionState(state: CareerState): CareerState {
 }
 
 function applyImmediateDecisionEffects(state: CareerState, effects: CareerDecisionEffects): CareerState {
-  const overall = clamp(state.overall + effects.overall, 45, 99);
-  const potential = clamp(state.potential + effects.potential, overall, 97);
+  const overall = clamp(state.overall + effects.overall, 35, 99);
+  const potential = clamp(state.potential + effects.potential, overall, 99);
   const reputation = clamp(state.reputation + effects.reputation, 0, 100);
   const form = clamp(state.form + effects.form, 0, 100);
   const clubRating = state.currentClub?.rating ?? 66;
@@ -1281,7 +1796,7 @@ function makeDecisionMarketOffers(state: CareerState, decisionId: string, count:
   return ALL_CLUBS
     .filter((club) => club.name !== state.currentClub?.name)
     .filter((club) => !alreadyOffered.has(club.name.toLocaleLowerCase("it")))
-    .filter((club) => club.rating >= Math.max(62, state.overall - 5) && club.rating <= Math.min(92, state.overall + 10))
+    .filter((club) => club.rating >= Math.max(40, state.overall - 5) && club.rating <= Math.min(92, state.overall + 10))
     .map((club) => ({ club, score: Math.abs(club.rating - (state.overall + 3)) + rng.between(0, 12) }))
     .sort((left, right) => left.score - right.score)
     .slice(0, count)
@@ -1366,7 +1881,27 @@ export function resolveCareerDecision(
   };
 
   let next = applyImmediateDecisionEffects(state, branch.effects);
-  if (decision.phase === "preSeason") {
+  if (decision.kind === "retirement") {
+    const retiresNow = option.id.endsWith("-ritirati");
+    next = retiresNow
+      ? {
+          ...next,
+          stage: "retired",
+          retirementPlan: "retireAt40",
+          retiredAtAge: state.age,
+          marketValue: 0,
+          seasons: state.seasons.map((season) => season.index === decision.seasonIndex
+            ? { ...season, retiredAfterSeason: true }
+            : season),
+          pendingOffers: [],
+          queuedOffers: [],
+          queuedDecision: null,
+        }
+      : {
+          ...next,
+          retirementPlan: "continueTo42",
+        };
+  } else if (decision.phase === "preSeason") {
     next = {
       ...next,
       seasonPreparation: {
@@ -1392,7 +1927,7 @@ export function resolveCareerDecision(
       age: decision.phase === "postSeason" ? Math.max(14, state.age - 1) : state.age,
     },
     state.feed.length + (state.decisionHistory?.length ?? 0) + 1,
-    "decision",
+    decision.kind === "retirement" && option.id.endsWith("-ritirati") ? "retirement" : "decision",
     result.title,
     `${result.description} ${result.effectSummary}.`,
     branch.tone,
@@ -1482,9 +2017,10 @@ export function createInitialCareer(input: CreateCareerInput, seed: string | num
   const age = input.startingAge ?? defaultAge;
   if (!Number.isInteger(age) || age < 14 || age > 22) throw new Error("L'eta iniziale deve essere compresa tra 14 e 22 anni.");
 
-  const startBase = input.startMode === "academy" ? 56 : 62;
-  const overall = clamp(startBase + rng.int(-3, 4) + (input.gameMode === "legend" ? 2 : 0), 50, 69);
-  const potentialBonus = input.gameMode === "legend" ? rng.int(24, 31) : rng.int(18, 28);
+  // Tutte le storie partono dallo stesso livello: la differenza la fanno
+  // potenziale, scelte e svolte successive, non un tiro nascosto iniziale.
+  const overall = 40;
+  const potentialBonus = input.gameMode === "legend" ? rng.int(47, 56) : rng.int(38, 52);
   const potential = clamp(overall + potentialBonus, 72, 96);
   const reputation = input.startMode === "academy" ? rng.int(2, 6) : rng.int(5, 10);
   const id = `career-${hashString(`${normalizedSeed}|${firstName}|${lastName}|${input.nationality}|${input.role}`).toString(36)}`;
@@ -1525,6 +2061,10 @@ export function createInitialCareer(input: CreateCareerInput, seed: string | num
       cleanSheets: 0,
       trophies: 0,
       firstCallUpSeason: null,
+      currentRanking: createInitialNationalRanking().find((entry) => entry.country === input.nationality)?.rank ?? COUNTRY_OPTIONS.length,
+      bestRanking: createInitialNationalRanking().find((entry) => entry.country === input.nationality)?.rank ?? COUNTRY_OPTIONS.length,
+      captaincyCaps: 0,
+      tournamentAppearances: 0,
     },
     trophyCabinet: [],
     awardCabinet: [],
@@ -1539,6 +2079,11 @@ export function createInitialCareer(input: CreateCareerInput, seed: string | num
     seasonPreparation: null,
     pendingSeasonReportId: null,
     queuedOffers: [],
+    nationalRanking: createInitialNationalRanking(),
+    nationalRankingHistory: [],
+    activeCareerArc: null,
+    careerArcHistory: [],
+    retirementPlan: "undecided",
   };
 
   if (input.startMode === "freeAgent" && input.startingClubName) {
@@ -1559,17 +2104,17 @@ export function createInitialCareer(input: CreateCareerInput, seed: string | num
 export function generateStartingOffers(state: CareerState): CareerOffer[] {
   if (state.stage === "retired") return [];
   const rng = new SeededRandom(`${state.seed}|starting-offers|${state.player.nationality}|${state.overall}`);
+  const homeTargetRating = state.player.nationality === "IT" ? 47 : Math.max(58, state.overall + 20);
   const homeClubs = CLUBS_BY_COUNTRY[state.player.nationality]
-    .filter((club) => club.rating <= state.overall + (state.startMode === "academy" ? 18 : 13))
-    .map((club) => ({ club, score: Math.abs(club.rating - (state.overall + 7)) + rng.between(0, 7) }))
+    .map((club) => ({ club, score: Math.abs(club.rating - homeTargetRating) + rng.between(0, 7) }))
     .sort((a, b) => a.score - b.score)
     .map(({ club }) => club);
 
   const foreignCountries = rng.shuffled(COUNTRY_OPTIONS.filter((country) => country.code !== state.player.nationality));
   const foreignClubs = foreignCountries
     .flatMap((country) => CLUBS_BY_COUNTRY[country.code])
-    .filter((club) => club.rating <= state.overall + 11 && club.rating >= state.overall - 1)
-    .map((club) => ({ club, score: Math.abs(club.rating - (state.overall + 5)) + rng.between(0, 10) }))
+    .filter((club) => club.rating <= state.overall + 34)
+    .map((club) => ({ club, score: Math.abs(club.rating - (state.overall + 22)) + rng.between(0, 10) }))
     .sort((a, b) => a.score - b.score)
     .map(({ club }) => club);
 
@@ -1633,22 +2178,32 @@ function seasonTrophies(
   rng: SeededRandom,
 ): { trophies: string[]; cupResult: string; continentalResult: string | null } {
   const country = findCountry(club.country);
+  const league = getLeagueMetadata(club.country, club.league);
   const trophies: string[] = [];
-  if (leaguePosition === 1) trophies.push(country.league.name);
+  if (leaguePosition === 1) trophies.push(league.name);
 
-  const cupChance = clamp(0.04 + (club.rating - 65) / 110 + (averageRating - 6.5) * 0.05, 0.03, 0.38);
+  const cupChance = clamp(0.06 + (club.rating - league.strength) / 85 + (averageRating - 6.5) * 0.05, 0.03, 0.38);
   const cupRoll = rng.next();
   let cupResult = "Sedicesimi";
   if (cupRoll < cupChance) {
     cupResult = "Vincitore";
-    trophies.push(`Coppa ${country.name}`);
+    trophies.push(
+      club.league === "Serie C"
+        ? "Coppa Italia Serie C"
+        : club.league === "Serie D"
+          ? "Coppa Italia Serie D"
+          : club.country === "IT"
+            ? "Coppa Italia"
+            : `Coppa ${country.name}`,
+    );
   } else if (cupRoll < cupChance + 0.13) cupResult = "Finale";
   else if (cupRoll < cupChance + 0.31) cupResult = "Semifinale";
   else if (cupRoll < cupChance + 0.58) cupResult = "Quarti";
   else if (cupRoll < cupChance + 0.82) cupResult = "Ottavi";
 
   let continentalResult: string | null = null;
-  if (club.prestige >= 72 || state.reputation >= 55) {
+  const topDivision = club.country !== "IT" || club.league === "Serie A";
+  if (topDivision && (club.prestige >= 72 || state.reputation >= 55)) {
     const continentalChance = clamp((club.rating - 73) / 105 + (averageRating - 7) * 0.035, 0.015, 0.26);
     const roll = rng.next();
     if (roll < continentalChance) {
@@ -1693,7 +2248,7 @@ function makeTransferOffers(state: CareerState, season: CareerSeason): CareerOff
   );
   if (!rng.chance(demand)) return [];
 
-  const targetMin = Math.max(62, state.overall - 5);
+  const targetMin = Math.max(40, state.overall - 5);
   const targetMax = Math.min(92, state.overall + 9 + Math.floor(state.reputation / 28));
   const allCandidates = Object.values(CLUBS_BY_COUNTRY)
     .flat()
@@ -1709,6 +2264,33 @@ function makeTransferOffers(state: CareerState, season: CareerSeason): CareerOff
 
   const count = clamp(1 + (rng.chance(demand * 0.65) ? 1 : 0) + (rng.chance(demand * 0.3) ? 1 : 0), 1, 3);
   return allCandidates.slice(0, count).map(({ club }, index) => offerFromClub(state, club, index, false));
+}
+
+function italianLeagueMovement(
+  club: CareerClub,
+  leaguePosition: number,
+  leagueClubs: number,
+  rng: SeededRandom,
+): { club: CareerClub; event: "promotion" | "relegation" | null } {
+  if (club.country !== "IT") return { club, event: null };
+  const promotion: Readonly<Record<string, string>> = { "Serie D": "Serie C", "Serie C": "Serie B", "Serie B": "Serie A" };
+  const relegation: Readonly<Record<string, string>> = { "Serie A": "Serie B", "Serie B": "Serie C", "Serie C": "Serie D" };
+  const automaticPromotion = leaguePosition === 1 || (club.league === "Serie B" && leaguePosition <= 2);
+  const playoffPromotion = leaguePosition <= (club.league === "Serie D" ? 2 : 5) && rng.chance(club.league === "Serie D" ? 0.38 : 0.24);
+  const relegated = leaguePosition > leagueClubs - (club.league === "Serie A" ? 3 : 4);
+  if (promotion[club.league] && (automaticPromotion || playoffPromotion)) {
+    return {
+      club: { ...club, league: promotion[club.league] as string, rating: clamp(club.rating + 3, 40, 92), prestige: clamp(club.prestige + 3, 20, 97) },
+      event: "promotion",
+    };
+  }
+  if (relegation[club.league] && relegated) {
+    return {
+      club: { ...club, league: relegation[club.league] as string, rating: clamp(club.rating - 2, 40, 92), prestige: clamp(club.prestige - 2, 20, 97) },
+      event: "relegation",
+    };
+  }
+  return { club, event: null };
 }
 
 export function simulateNextSeason(
@@ -1734,6 +2316,7 @@ export function simulateNextSeason(
 
   const club = state.currentClub;
   const country = findCountry(club.country);
+  const league = getLeagueMetadata(club.country, club.league);
   const profile = ROLE_PROFILES[state.player.role];
   const mode = MODE_CONFIG[state.gameMode];
   const rng = new SeededRandom(`${state.seed}|season|${state.seasonIndex}|${club.name}|${trainingChoice}`);
@@ -1741,8 +2324,23 @@ export function simulateNextSeason(
   let eventIndex = 0;
 
   const roleNow = shiftSquadRole(squadRoleFor(state.overall, club.rating), preparation.squadRoleSteps);
+  if (roleNow !== club.squadRole) {
+    const improved = SQUAD_ROLE_ORDER.indexOf(roleNow) > SQUAD_ROLE_ORDER.indexOf(club.squadRole);
+    const labels: Record<SquadRole, string> = { prospect: "prospetto", rotation: "riserva", starter: "titolare", star: "stella" };
+    events.push(
+      makeEvent(
+        state,
+        eventIndex++,
+        "milestone",
+        improved ? "Gerarchie scalate" : "Posto da riconquistare",
+        `Lo staff ti considera ora ${labels[roleNow]}: da qui derivano presenze e partenze dal primo minuto.`,
+        improved ? "positive" : "negative",
+        improved ? 4 : -4,
+      ),
+    );
+  }
   const roleMinutes: Record<SquadRole, number> = { prospect: 0.38, rotation: 0.62, starter: 0.82, star: 0.93 };
-  const baseMatches = country.league.leagueMatches + rng.int(4, 11);
+  const baseMatches = league.leagueMatches + rng.int(3, club.league === "Serie D" ? 7 : 11);
   const recoveryFactor = trainingChoice === "recovery" ? 0.38 : trainingChoice === "athleticism" ? 1.12 : 1;
   const preparationInjuryFactor = Math.max(0.2, 1 + preparation.injuryRiskPercent / 100);
   const injuryProbability = clamp((0.115 + Math.max(0, state.age - 30) * 0.012) * mode.injury * recoveryFactor * preparationInjuryFactor, 0.015, 0.5);
@@ -1768,14 +2366,16 @@ export function simulateNextSeason(
 
   const availability = Math.max(3, baseMatches - gamesLost);
   const competitionBoost = clamp((state.overall - club.rating + 9) / 34, -0.18, 0.22);
-  const appearanceRate = clamp(roleMinutes[roleNow] + competitionBoost + rng.between(-0.06, 0.06), 0.2, 0.98);
+  const hierarchyShock = rng.chance(0.14) ? rng.between(-0.14, 0.14) : 0;
+  const appearanceRate = clamp(roleMinutes[roleNow] + competitionBoost + rng.between(-0.09, 0.09) + hierarchyShock, 0.16, 0.98);
   const appearances = clamp(Math.round(availability * appearanceRate), 2, availability);
   const startRate: Record<SquadRole, number> = { prospect: 0.24, rotation: 0.5, starter: 0.78, star: 0.91 };
-  const starts = clamp(Math.round(appearances * (startRate[roleNow] + rng.between(-0.06, 0.06))), 0, appearances);
+  const starts = clamp(Math.round(appearances * (startRate[roleNow] + rng.between(-0.1, 0.1))), 0, appearances);
   const minutes = Math.round(starts * rng.between(74, 87) + (appearances - starts) * rng.between(18, 34));
 
   const trainingFit = roleTrainingFit(state.player.role, trainingChoice);
-  const formNoise = (rng.next() + rng.next() + rng.next() - 1.5) * 0.75;
+  const rareFormShock = rng.chance(0.13) ? rng.between(-1.05, 1.05) : 0;
+  const formNoise = (rng.next() + rng.next() + rng.next() - 1.5) * 0.85 + rareFormShock;
   const qualityDelta = (state.overall - club.rating) / 24;
   const baseRating = 6.55 + qualityDelta + (state.form - 50) / 85 + (trainingFit - 1) * 0.32 + preparation.performance + formNoise;
   const averageRating = round(clamp(baseRating * mode.performance + (mode.performance - 1) * 2.2, 5.45, 9.42), 2);
@@ -1784,7 +2384,7 @@ export function simulateNextSeason(
   const trainingAssistBoost = trainingChoice === "playmaking" ? 1.18 : 1;
   const goals = sampleCount(rng, appearances * profile.goalRate * attackQuality * trainingGoalBoost, 0.5);
   const assists = sampleCount(rng, appearances * profile.assistRate * attackQuality * trainingAssistBoost, 0.48);
-  const teamCleanSheetRate = clamp(0.16 + (club.rating - 62) / 115, 0.14, 0.44);
+  const teamCleanSheetRate = clamp(0.2 + (club.rating - league.strength) / 95, 0.12, 0.46);
   const cleanSheets = sampleCount(rng, appearances * teamCleanSheetRate * profile.cleanSheetWeight, 0.32);
   const saves = state.player.role === "GK" ? sampleCount(rng, appearances * rng.between(2.35, 3.8), 0.16) : 0;
   const tackles = sampleCount(rng, appearances * profile.tackleRate * (0.88 + attackQuality * 0.16), 0.14);
@@ -1795,13 +2395,14 @@ export function simulateNextSeason(
   const yellowCards = sampleCount(rng, appearances * disciplineBase, 0.35);
   const redCards = rng.chance(clamp(appearances * 0.009, 0.01, 0.28)) ? 1 : 0;
 
-  const leagueStrengthPosition = 1 + ((92 - club.rating) / 31) * (country.league.clubs - 1);
+  const leagueRatingSpan = Math.max(14, league.strength - 57);
+  const leagueStrengthPosition = 1 + ((league.strength + 4 - club.rating) / leagueRatingSpan) * (league.clubs - 1);
   const playerPositionBoost = clamp(contribution / 28 + (averageRating - 6.7) * 1.5, -2.2, 4.8);
-  const leaguePosition = clamp(Math.round(leagueStrengthPosition - playerPositionBoost + rng.between(-2.4, 2.4)), 1, country.league.clubs);
+  const leaguePosition = clamp(Math.round(leagueStrengthPosition - playerPositionBoost + rng.between(-3.2, 3.2)), 1, league.clubs);
   const leaguePoints = clamp(
-    Math.round((country.league.clubs - leaguePosition) * 2.15 + country.league.leagueMatches * 0.95 + rng.between(-5, 6)),
+    Math.round((league.clubs - leaguePosition) * 2.15 + league.leagueMatches * 0.95 + rng.between(-7, 8)),
     22,
-    country.league.leagueMatches * 3,
+    league.leagueMatches * 3,
   );
   const teamHonours = seasonTrophies(state, club, leaguePosition, averageRating, rng);
   const awards = seasonAwards(state, appearances, goals, assists, cleanSheets, averageRating, rng);
@@ -1811,12 +2412,12 @@ export function simulateNextSeason(
   const potentialPull = state.age <= 25 ? Math.max(0, state.potential - state.overall) * 0.075 : 0;
   const injuryPenalty = injured ? gamesLost / 10 : 0;
   const rawGrowth = (ageGrowth + performanceGrowth + potentialPull) * trainingFit * mode.growth + preparation.growth - injuryPenalty;
-  const overallChange = clamp(Math.round(rawGrowth + rng.between(-0.75, 0.75)), state.age >= 33 ? -4 : -2, state.age <= 23 ? 6 : 4);
-  const overallEnd = clamp(state.overall + overallChange, 45, 99);
-  const potentialEnd = clamp(
+  let overallChange = clamp(Math.round(rawGrowth + rng.between(-1.35, 1.35)), state.age >= 33 ? -5 : -3, state.age <= 23 ? 7 : 5);
+  let overallEnd = clamp(state.overall + overallChange, 35, 99);
+  let potentialEnd = clamp(
     state.potential + (state.age <= 21 && averageRating >= 7.5 && rng.chance(0.35) ? 1 : 0) - (state.age >= 31 ? 1 : 0),
     overallEnd,
-    97,
+    99,
   );
   const reputationGain = Math.round(
     clamp(
@@ -1825,9 +2426,35 @@ export function simulateNextSeason(
       18,
     ),
   );
-  const reputationEnd = clamp(state.reputation + reputationGain, 0, 100);
+  let reputationEnd = clamp(state.reputation + reputationGain, 0, 100);
+  let formEnd = Math.round(clamp(46 + (averageRating - 6.5) * 15 + rng.between(-10, 10), 12, 95));
+
+  const twist = rollSeasonTwist(state, rng, eventIndex);
+  if (twist.event) {
+    events.push(twist.event);
+    eventIndex += 1;
+  }
+  const arcEvolution = evolveCareerArc(
+    state,
+    { averageRating, overallChange, injured, appearances, trophies: teamHonours.trophies.length },
+    rng,
+    eventIndex,
+  );
+  if (arcEvolution.event) {
+    events.push(arcEvolution.event);
+    eventIndex += 1;
+  }
+  const storyImpact: CareerArcImpact = {
+    overall: twist.impact.overall + arcEvolution.impact.overall,
+    reputation: twist.impact.reputation + arcEvolution.impact.reputation,
+    form: twist.impact.form + arcEvolution.impact.form,
+  };
+  overallEnd = clamp(overallEnd + storyImpact.overall, 35, 99);
+  overallChange = overallEnd - state.overall;
+  potentialEnd = clamp(potentialEnd, overallEnd, 99);
+  reputationEnd = clamp(reputationEnd + storyImpact.reputation, 0, 100);
+  formEnd = clamp(formEnd + storyImpact.form, 0, 100);
   const marketValueEnd = calculateMarketValue(overallEnd, state.age + 1, reputationEnd, club.rating);
-  const formEnd = Math.round(clamp(46 + (averageRating - 6.5) * 15 + rng.between(-7, 7), 18, 92));
 
   if (trainingFit >= 1.18 && overallChange > 0) {
     events.push(
@@ -1875,20 +2502,49 @@ export function simulateNextSeason(
     events.push(makeEvent(state, eventIndex++, "award", award, "Il rendimento stagionale vale un riconoscimento individuale.", "special", 8));
   }
 
-  const nationalScore = overallEnd + reputationEnd * 0.08 + (averageRating - 6.5) * 2;
-  const calledUp = nationalScore >= NATIONAL_THRESHOLDS[state.player.nationality] && appearances >= 12;
+  const currentNationalEntry = normalizeNationalRanking(state.nationalRanking)
+    .find((entry) => entry.country === state.player.nationality);
+  const currentNationalRank = currentNationalEntry?.rank ?? COUNTRY_OPTIONS.length;
+  const selectionThreshold = NATIONAL_THRESHOLDS[state.player.nationality] + Math.round((COUNTRY_OPTIONS.length - currentNationalRank) * 0.42);
+  const nationalScore = overallEnd + reputationEnd * 0.08 + (averageRating - 6.5) * 2.4;
+  const callUpChance = clamp(0.12 + (nationalScore - selectionThreshold) * 0.13 + (averageRating - 6.8) * 0.08, 0.02, 0.98);
+  const calledUp = appearances >= 10 && (nationalScore >= selectionThreshold + 5 || rng.chance(callUpChance));
+  const endingYear = state.seasonYear + 1;
+  const worldCupYear = (endingYear - 2026) % 4 === 0;
+  const continentalYear = !worldCupYear && (endingYear - 2026) % 2 === 0;
+  const isSouthAmerican = state.player.nationality === "BR" || state.player.nationality === "AR";
+  const nationalCompetition = worldCupYear
+    ? "Coppa del Mondo"
+    : continentalYear
+      ? (isSouthAmerican ? "Copa America" : "Campionato Europeo")
+      : "Qualificazioni internazionali";
   let nationalCaps = 0;
   let nationalGoals = 0;
   let nationalAssists = 0;
   let nationalCleanSheets = 0;
   let nationalTrophies = 0;
+  let nationalResult: string | null = calledUp ? "Convocato" : "Non convocato";
+  let captaincyCaps = 0;
   if (calledUp) {
-    nationalCaps = rng.int(state.nationalTeam.caps === 0 ? 3 : 2, 11);
+    nationalCaps = tournamentSeasonCaps(worldCupYear || continentalYear, state.nationalTeam.caps === 0, rng);
     nationalGoals = sampleCount(rng, nationalCaps * profile.nationalGoalRate * attackQuality, 0.55);
     nationalAssists = sampleCount(rng, nationalCaps * profile.assistRate * 0.68 * attackQuality, 0.52);
     nationalCleanSheets = state.player.role === "GK" ? sampleCount(rng, nationalCaps * 0.35, 0.4) : 0;
-    const tournamentYear = (state.seasonYear - CAREER_START_YEAR + 1) % 4 === 0;
-    if (tournamentYear && nationalCaps >= 5 && rng.chance(clamp(0.035 + nationalScore / 650, 0.04, 0.2))) nationalTrophies = 1;
+    if (worldCupYear || continentalYear) {
+      const tournamentPower = clamp(0.18 + (10 - currentNationalRank) * 0.035 + (nationalScore - 72) / 180, 0.12, 0.68);
+      const roll = rng.next();
+      if (roll < tournamentPower * 0.08) {
+        nationalResult = "Vincitore";
+        nationalTrophies = 1;
+      } else if (roll < tournamentPower * 0.18) nationalResult = "Finale";
+      else if (roll < tournamentPower * 0.38) nationalResult = "Semifinale";
+      else if (roll < tournamentPower * 0.64) nationalResult = "Quarti";
+      else nationalResult = worldCupYear ? "Ottavi" : "Fase a gironi";
+    } else {
+      nationalResult = rng.chance(clamp(0.45 + (10 - currentNationalRank) * 0.045, 0.42, 0.88)) ? "Qualificata" : "Spareggi";
+    }
+    const captain = state.nationalTeam.caps >= 24 && reputationEnd >= 62 && rng.chance(clamp(0.16 + reputationEnd / 250, 0.16, 0.56));
+    captaincyCaps = captain ? rng.int(1, Math.max(1, nationalCaps)) : 0;
     if (state.nationalTeam.caps === 0) {
       events.push(
         makeEvent(
@@ -1902,14 +2558,32 @@ export function simulateNextSeason(
         ),
       );
     }
+    if (captaincyCaps > 0 && (state.nationalTeam.captaincyCaps ?? 0) === 0) {
+      events.push(makeEvent(state, eventIndex++, "captaincy", "Fascia della nazionale", "Per la prima volta guidi la nazionale da capitano.", "special", 9));
+    }
     if (nationalTrophies > 0) {
       events.push(makeEvent(state, eventIndex++, "trophy", "Trionfo con la nazionale", "Un'estate indimenticabile si chiude con un trofeo internazionale.", "special", 14));
     }
   }
 
+  const nationalWorld = evolveNationalRanking(state, rng, nationalCaps, nationalCompetition, nationalResult);
+  if (Math.abs(nationalWorld.rankChange) >= 2) {
+    events.push(
+      makeEvent(
+        state,
+        eventIndex++,
+        "nationalTeam",
+        nationalWorld.rankChange > 0 ? "Nazionale in ascesa" : "Nazionale in calo",
+        `${findCountry(state.player.nationality).name}: ${nationalWorld.rank}° nel ranking (${nationalWorld.rankChange > 0 ? "+" : ""}${nationalWorld.rankChange}).`,
+        nationalWorld.rankChange > 0 ? "positive" : "negative",
+        nationalWorld.rankChange,
+      ),
+    );
+  }
+
   const nextAge = state.age + 1;
-  const retirementChance = nextAge === 36 ? 0.08 : nextAge === 37 ? 0.22 : nextAge === 38 ? 0.52 : nextAge >= 39 ? 1 : 0;
-  const retiredAfterSeason = nextAge >= 36 && rng.chance(retirementChance);
+  // Nessun ritiro casuale: a 40 anni arriva la scelta, a 42 il ritiro e definitivo.
+  const retiredAfterSeason = nextAge >= 42;
   if (retiredAfterSeason) {
     events.push(
       makeEvent(
@@ -1980,17 +2654,50 @@ export function simulateNextSeason(
     nationalGoals,
     nationalAssists,
     nationalCleanSheets,
+    nationalTeamRank: nationalWorld.rank,
+    nationalTeamRankChange: nationalWorld.rankChange,
+    nationalCompetition,
+    nationalResult,
+    careerArcId: arcEvolution.arcId,
     events,
     goatPointsEarned: seasonGoatPoints,
     retiredAfterSeason,
   };
 
   const renewed = state.seasonYear + 1 >= club.contractUntil;
+  const movement = italianLeagueMovement(
+    {
+      ...club,
+      squadRole: roleNow,
+      contractUntil: renewed ? state.seasonYear + 3 : club.contractUntil,
+    },
+    leaguePosition,
+    league.clubs,
+    rng,
+  );
   const nextClub: CareerClub = {
+    ...movement.club,
     ...club,
     squadRole: roleNow,
     contractUntil: renewed ? state.seasonYear + 3 : club.contractUntil,
+    league: movement.club.league,
+    rating: movement.club.rating,
+    prestige: movement.club.prestige,
   };
+  if (movement.event) {
+    const promoted = movement.event === "promotion";
+    events.push(
+      makeEvent(
+        state,
+        eventIndex++,
+        "milestone",
+        promoted ? "Promozione conquistata" : "Retrocessione amara",
+        `${club.name} ${promoted ? "sale" : "scende"} in ${nextClub.league}.`,
+        promoted ? "special" : "negative",
+        promoted ? 10 : -8,
+      ),
+    );
+  }
   if (renewed && !retiredAfterSeason) {
     events.push(
       makeEvent(
@@ -2012,6 +2719,10 @@ export function simulateNextSeason(
     assists: state.nationalTeam.assists + nationalAssists,
     cleanSheets: state.nationalTeam.cleanSheets + nationalCleanSheets,
     trophies: state.nationalTeam.trophies + nationalTrophies,
+    currentRanking: nationalWorld.rank,
+    bestRanking: Math.min(state.nationalTeam.bestRanking ?? currentNationalRank, nationalWorld.rank),
+    captaincyCaps: (state.nationalTeam.captaincyCaps ?? 0) + captaincyCaps,
+    tournamentAppearances: (state.nationalTeam.tournamentAppearances ?? 0) + ((calledUp && (worldCupYear || continentalYear)) ? 1 : 0),
     firstCallUpSeason:
       state.nationalTeam.firstCallUpSeason ?? (nationalCaps > 0 ? state.seasonYear : null),
   };
@@ -2041,6 +2752,13 @@ export function simulateNextSeason(
     seasonPreparation: null,
     pendingSeasonReportId: season.id,
     queuedOffers: [],
+    nationalRanking: nationalWorld.ranking,
+    nationalRankingHistory: [
+      ...(state.nationalRankingHistory ?? []),
+      { seasonYear: endingYear, entries: nationalWorld.ranking },
+    ].slice(-20),
+    activeCareerArc: arcEvolution.active,
+    careerArcHistory: arcEvolution.history,
     feed: [...events].reverse().concat(state.feed).slice(0, 40),
     retiredAtAge: retiredAfterSeason ? nextAge : null,
   };
@@ -2049,7 +2767,11 @@ export function simulateNextSeason(
   nextState = {
     ...nextState,
     queuedOffers,
-    queuedDecision: retiredAfterSeason ? null : createPostSeasonDecision(nextState, season),
+    queuedDecision: retiredAfterSeason
+      ? null
+      : nextAge === 40 && nextState.retirementPlan === "undecided"
+        ? createRetirementDecision(nextState, season)
+        : createPostSeasonDecision(nextState, season),
   };
   return { state: nextState, season };
 }
@@ -2090,4 +2812,33 @@ export function acceptTransfer(rawState: CareerState, clubName: string): CareerS
     pendingOffers: [],
     feed: [transferEvent, ...state.feed].slice(0, 40),
   });
+}
+
+/** Snapshot leggero pensato per conservare piu carriere senza duplicare tutto lo stato. */
+export function createCareerArchiveSummary(
+  rawState: CareerState,
+  archivedAt = new Date().toISOString(),
+): CareerArchiveSummary {
+  const state = normalizeCareerDecisionState(rawState);
+  const clubs = [...new Set(state.seasons.map((season) => season.clubName))];
+  if (state.currentClub && !clubs.includes(state.currentClub.name)) clubs.push(state.currentClub.name);
+  return {
+    id: state.id,
+    playerName: state.player.displayName,
+    nationality: state.player.nationality,
+    role: state.player.role,
+    startedSeason: CAREER_START_YEAR,
+    lastSeason: state.seasons.at(-1)?.year ?? state.seasonYear,
+    retiredAtAge: state.retiredAtAge,
+    seasons: state.seasons.length,
+    clubs,
+    overallPeak: Math.max(state.overall, 40, ...state.seasons.map((season) => season.overallEnd)),
+    goatScore: state.goatScore,
+    appearances: state.totals.appearances,
+    goals: state.totals.goals,
+    assists: state.totals.assists,
+    trophies: state.trophyCabinet.reduce((sum, honour) => sum + honour.count, 0) + state.nationalTeam.trophies,
+    nationalCaps: state.nationalTeam.caps,
+    archivedAt,
+  };
 }

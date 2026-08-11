@@ -416,7 +416,7 @@ export interface Database {
           user_id: string;
           owner_name: string;
           owner_logo: string;
-          status: "active" | "retired";
+          status: "active" | "retired" | "archived";
           state: Json;
           current_season: number;
           goat_points: number;
@@ -429,7 +429,7 @@ export interface Database {
           user_id: string;
           owner_name: string;
           owner_logo?: string;
-          status?: "active" | "retired";
+          status?: "active" | "retired" | "archived";
           state?: Json;
           current_season?: number;
           goat_points?: number;
@@ -441,7 +441,7 @@ export interface Database {
           user_id?: string;
           owner_name?: string;
           owner_logo?: string;
-          status?: "active" | "retired";
+          status?: "active" | "retired" | "archived";
           state?: Json;
           current_season?: number;
           goat_points?: number;

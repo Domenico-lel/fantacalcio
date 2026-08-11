@@ -20,6 +20,7 @@ import {
   restartCareer,
   type CareerHub,
   type CareerMutationResult,
+  type CareerRecord,
   type CreateCareerRequest,
 } from "@/app/career-actions";
 import {
@@ -28,6 +29,7 @@ import {
   ROLE_OPTIONS,
   TRAINING_OPTIONS,
   getClubByName,
+  getProjectedSquadRole,
   type CareerDecision,
   type CareerDecisionEffects,
   type CareerDecisionOption,
@@ -38,9 +40,12 @@ import {
   type CareerSeason,
   type CareerSeasonPreparation,
   type CareerState,
+  type CareerArc,
   type ClubDefinition,
   type CountryCode,
   type GameMode,
+  type NationalRankingEntry,
+  type NationalRankingTrend,
   type PreferredFoot,
   type Role,
   type StartMode,
@@ -200,22 +205,27 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
   }
 
   async function reset() {
+    const expectedVersion = hub.career?.dbVersion;
+    if (!expectedVersion) {
+      toast("Ricarica la carriera prima di archiviarla.", "error");
+      return;
+    }
     const ok = await confirm({
-      title: "Ricominciare la carriera?",
-      message: "Il giocatore, le stagioni e tutti i trofei di questa carriera verranno cancellati.",
-      confirmLabel: "Ricomincia",
-      danger: true,
+      title: "Archiviare e ricominciare?",
+      message: "Questa carriera resterà nell'archivio. Potrai creare subito un nuovo giocatore.",
+      confirmLabel: "Archivia e ricomincia",
     });
     if (!ok) return;
-    const result = await mutate(restartCareer);
+    const result = await mutate(() => restartCareer(expectedVersion));
     if (result && !result.error) {
       setSetupStep(null);
       setTab("career");
-      toast("Puoi creare un nuovo giocatore.", "success");
+      toast("Carriera archiviata. Puoi creare un nuovo giocatore.", "success");
     }
   }
 
   if (!hub.career) {
+    const archivedCareers = hub.archivedCareers;
     return (
       <div className="screen sec-career">
         <PageHeader eyebrow="Il tuo viaggio" title="Carriera" />
@@ -223,6 +233,7 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
         {setupStep === null
           ? <ModePicker onPick={(mode) => { setDraft({ ...DEFAULT_DRAFT, gameMode: mode }); setSetupStep(1); }} />
           : <SetupWizard step={setupStep} setStep={setSetupStep} draft={draft} setDraft={setDraft} busy={busy} onSubmit={submitCareer} onCancel={() => setSetupStep(null)} />}
+        {setupStep === null && archivedCareers.length > 0 ? <ArchivedCareerShelf records={archivedCareers} /> : null}
         <ClubDataCredit />
       </div>
     );
@@ -275,7 +286,7 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
         ) : tab === "stats" ? (
           <StatsTab state={state} onReset={reset} />
         ) : (
-          <ArchiveTab seasons={hub.seasons} />
+          <ArchiveTab hub={hub} state={state} />
         )}
       </TabPanel>
       <ClubDataCredit />
@@ -295,7 +306,7 @@ function ModePicker({ onPick }: { onPick: (mode: GameMode) => void }) {
           Parti dal vivaio, cresci stagione dopo stagione e prova a diventare una leggenda.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
-          {["14–39 anni", "12 ruoli", "9 nazioni", "Salvataggio automatico"].map((label) => <span key={label} className="chip">{label}</span>)}
+          {["14–42 anni", "OVR iniziale 40", "9 nazioni", "Salvataggio automatico"].map((label) => <span key={label} className="chip">{label}</span>)}
         </div>
       </div>
 
@@ -512,6 +523,7 @@ function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDe
   onDeclineTransfers: () => void;
   onReset: () => void;
 }) {
+  const viewState = state;
   const pendingReport = state.pendingSeasonReportId
     ? state.seasons.find((season) => season.id === state.pendingSeasonReportId)
     : undefined;
@@ -571,6 +583,7 @@ function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDe
   return (
     <main className="px-4 py-4 pb-8 space-y-4">
       <PlayerHero state={state} />
+      {viewState.activeCareerArc ? <CareerArcCard arc={viewState.activeCareerArc} /> : null}
       {state.stage === "retired" ? (
         <RetiredCard state={state} onReset={onReset} />
       ) : state.pendingOffers.length > 0 ? (
@@ -586,6 +599,7 @@ function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDe
 }
 
 function PlayerHero({ state }: { state: CareerState }) {
+  const viewState = state;
   const club = state.currentClub;
   const catalogClub = club ? getClubByName(club.name) : undefined;
   const displayClub = catalogClub ?? club;
@@ -603,10 +617,37 @@ function PlayerHero({ state }: { state: CareerState }) {
         <h2 className="font-display mt-1 truncate text-xl font-extrabold text-white">{state.player.displayName}</h2>
         <p className="mt-1 truncate text-sm font-semibold" style={{ color: "var(--accent-soft)" }}>{displayClub?.name ?? "Svincolato"}</p>
         <p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{displayClub?.league}</p>
+        {club ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="chip" aria-label={`Ruolo in squadra: ${squadRoleLabel(club.squadRole)}`}>{squadRoleLabel(club.squadRole)}</span>
+            <span className="chip">{squadRoleStartRate(club.squadRole)}% dal 1′</span>
+            {viewState.retirementPlan === "continueTo42" ? <span className="chip">Fino a 42 anni</span> : null}
+          </div>
+        ) : null}
       </div>
     </div>
     <div className="relative mt-5 grid grid-cols-4 gap-2"><HeroStat label="Età" value={String(state.age)} /><HeroStat label="Valore" value={formatMoney(state.marketValue)} /><HeroStat label="Forma" value={String(state.form)} /><HeroStat label="GOAT" value={String(state.goatScore)} /></div>
   </section>;
+}
+
+function CareerArcCard({ arc }: { arc: CareerArc }) {
+  const progress = Math.max(0, Math.min(arc.progress, arc.target));
+  const percentage = arc.target > 0 ? Math.round((progress / arc.target) * 100) : 0;
+  return (
+    <section className="card p-4" aria-label={`Svolta di carriera: ${arc.title}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="eyebrow">Svolta in corso</p>
+          <h3 className="font-display mt-1 truncate text-base font-bold text-white">{arc.title}</h3>
+        </div>
+        <strong className="flex-none text-sm" style={{ color: "var(--accent)" }}>{progress}/{arc.target}</strong>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{arc.description}</p>
+      <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,.07)" }} role="progressbar" aria-label={`Avanzamento ${arc.title}`} aria-valuemin={0} aria-valuemax={arc.target} aria-valuenow={progress}>
+        <div className="h-full rounded-full" style={{ width: `${percentage}%`, background: "var(--accent-grad)" }} />
+      </div>
+    </section>
+  );
 }
 
 function DecisionPanel({ decision, busy, onConfirm }: {
@@ -615,6 +656,7 @@ function DecisionPanel({ decision, busy, onConfirm }: {
   onConfirm: (decisionId: string, optionId: string) => void;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const isRetirementChoice = decision.kind === "retirement";
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -624,10 +666,11 @@ function DecisionPanel({ decision, busy, onConfirm }: {
     <section className="space-y-3" aria-labelledby={`${decision.id}-title`} aria-busy={busy}>
       <div className="px-1 pb-1">
         <div className="flex items-center justify-between gap-3">
-          <p className="eyebrow">{decision.phase === "preSeason" ? "Inizio stagione" : "Fine stagione"}</p>
+          <p className="eyebrow">{isRetirementChoice ? "Il momento della scelta" : decision.phase === "preSeason" ? "Inizio stagione" : "Fine stagione"}</p>
           <span className="chip">{seasonLabel(decision.seasonYear)}</span>
         </div>
         <h2 id={`${decision.id}-title`} ref={titleRef} tabIndex={-1} className="font-display mt-2 text-xl font-extrabold leading-tight text-white outline-none">{decision.title}</h2>
+        {isRetirementChoice ? <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>A 40 anni decidi tu: chiudi qui oppure gioca fino a 42.</p> : null}
       </div>
 
       <fieldset disabled={busy}>
@@ -653,13 +696,16 @@ function DecisionOptionCard({ option, busy, onSelect }: {
   busy: boolean;
   onSelect: () => void;
 }) {
-  const hasRisk = option.probabilities.filter((item) => item.percentage > 0).length > 1;
+  const possibleOutcomes = option.probabilities.filter((item) => item.percentage > 0);
+  const hasRisk = possibleOutcomes.length > 1;
+  const certainEffect = possibleOutcomes.length === 1 ? primaryDecisionEffect(possibleOutcomes[0].effects) : null;
   return (
     <button type="button" disabled={busy} onClick={onSelect} className="card block min-h-12 w-full p-3.5 text-left transition-transform active:scale-[.99]">
       <span className="flex items-start gap-3">
         <span className="min-w-0 flex-1">
           <strong className="block text-base text-white">{option.label}</strong>
           <span className="mt-1 block text-xs leading-snug" style={{ color: "var(--text-dim)" }}>{option.description}</span>
+          {!hasRisk && certainEffect && certainEffect !== "Nessun cambio" ? <span className="mt-2 inline-flex text-xs font-bold" style={{ color: "var(--accent-soft)" }}>{certainEffect}</span> : null}
         </span>
         <span className="mt-1 text-lg" style={{ color: "var(--accent)" }} aria-hidden="true">›</span>
       </span>
@@ -691,7 +737,7 @@ function ProbabilityBreakdown({ probabilities }: { probabilities: CareerDecision
 function primaryDecisionEffect(effects: CareerDecisionEffects): string {
   if (effects.overall) return `${formatSigned(effects.overall)} OVR`;
   if (effects.potential) return `${formatSigned(effects.potential)} POT`;
-  if (effects.squadRoleSteps) return effects.squadRoleSteps > 0 ? "Ruolo ↑" : "Ruolo ↓";
+  if (effects.squadRoleSteps) return effects.squadRoleSteps > 0 ? "Più titolare" : "Meno titolare";
   if (effects.offerInterest) return effects.offerInterest > 0 ? "Mercato ↑" : "Mercato ↓";
   if (effects.contractYears) return `${formatSigned(effects.contractYears)} anno contratto`;
   if (effects.form) return `${formatSigned(effects.form)} forma`;
@@ -710,6 +756,12 @@ function DecisionResultPanel({ result, busy, onContinue }: {
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const outcomeColor = decisionOutcomeColor(result.outcome);
+  const isRetirementResult = result.optionId.endsWith("-ritirati") || result.optionId.endsWith("-continua");
+  const continueLabel = result.optionId.endsWith("-ritirati")
+    ? "Concludi la carriera"
+    : result.optionId.endsWith("-continua")
+      ? "Continua fino a 42 anni"
+      : result.phase === "preSeason" ? "Prepara la stagione" : "Continua l'estate";
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -719,7 +771,7 @@ function DecisionResultPanel({ result, busy, onContinue }: {
     <section className="card-accent slide-up overflow-hidden" aria-labelledby={`${result.id}-title`} aria-busy={busy}>
       <div className="p-4" style={{ background: `linear-gradient(145deg, color-mix(in srgb, ${outcomeColor} 15%, transparent), transparent)` }}>
         <div className="flex items-center justify-between gap-3">
-          <p className="eyebrow">{result.phase === "preSeason" ? "Esito pre-stagione" : "Esito fine stagione"}</p>
+          <p className="eyebrow">{isRetirementResult ? "Scelta di ritiro" : result.phase === "preSeason" ? "Esito pre-stagione" : "Esito fine stagione"}</p>
           <span className="chip">{seasonLabel(result.seasonYear)}</span>
         </div>
         <div className="mt-4 flex h-14 w-14 items-center justify-center rounded-2xl text-2xl" style={{ background: `color-mix(in srgb, ${outcomeColor} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${outcomeColor} 42%, transparent)` }} aria-hidden="true">
@@ -731,7 +783,7 @@ function DecisionResultPanel({ result, busy, onContinue }: {
         <DecisionEffectChips effects={result.effects} />
 
         <button type="button" disabled={busy} onClick={() => onContinue(result.decisionId)} className="btn-primary mt-4 min-h-12 w-full px-4 py-3 text-sm">
-          {busy ? "Salvataggio…" : result.phase === "preSeason" ? "Prepara la stagione" : "Continua l'estate"}
+          {busy ? "Salvataggio…" : continueLabel}
         </button>
       </div>
     </section>
@@ -759,6 +811,7 @@ function SeasonReadyPanel({ state, preparation, busy, onSimulate }: {
   onSimulate: (choice: TrainingChoice) => void;
 }) {
   const training = TRAINING_OPTIONS.find((item) => item.code === preparation.trainingChoice);
+  const projectedRole = getProjectedSquadRole(state, preparation.squadRoleSteps);
   return (
     <section className="card-accent p-4" aria-labelledby="season-ready-title" aria-busy={busy}>
       <div className="flex items-center justify-between gap-3">
@@ -767,8 +820,11 @@ function SeasonReadyPanel({ state, preparation, busy, onSimulate }: {
       </div>
       <h3 id="season-ready-title" className="font-display mt-2 text-xl font-extrabold text-white">È il momento di scendere in campo</h3>
       <div className="card-flat mt-3 flex items-center justify-between gap-3 p-3">
-        <span className="text-xs" style={{ color: "var(--text-dim)" }}>Piano scelto</span>
-        <strong className="text-sm text-white">{training?.label ?? preparation.trainingChoice}</strong>
+        <div className="min-w-0 flex-1">
+          <span className="block text-xs" style={{ color: "var(--text-dim)" }}>Piano scelto</span>
+          <strong className="mt-0.5 block truncate text-sm text-white">{training?.label ?? preparation.trainingChoice}</strong>
+        </div>
+        {projectedRole ? <div className="flex-none text-right"><span className="block text-xs" style={{ color: "var(--text-dim)" }}>Titolarità prevista</span><strong className="mt-0.5 block text-sm text-white">{squadRoleLabel(projectedRole)} · {squadRoleStartRate(projectedRole)}%</strong></div> : null}
       </div>
       <button type="button" disabled={busy} onClick={() => onSimulate(preparation.trainingChoice)} className="btn-primary mt-3 min-h-12 w-full px-4 py-3 text-sm">
         {busy ? "Simulazione della stagione…" : "Simula la stagione"}
@@ -811,9 +867,9 @@ function SeasonReport({ season, immersive, busy, onClose }: { season: CareerSeas
 
   return <section className="card-accent slide-up overflow-hidden" aria-labelledby={`${season.id}-report-title`} aria-busy={busy}><div className="p-4" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent)" }}><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><ClubCrest club={club} clubName={season.clubName} size={48} /><div className="min-w-0"><p className="eyebrow">Report stagione</p><h3 id={`${season.id}-report-title`} ref={titleRef} tabIndex={-1} className="font-display mt-1 truncate text-lg font-extrabold text-white outline-none">{season.label} · {club?.name ?? season.clubName}</h3></div></div><div className="flex-none rounded-2xl px-3 py-2 text-center" style={{ background: "rgba(0,0,0,.24)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>Media</span><strong className="font-display text-xl text-white">{season.averageRating.toFixed(2)}</strong></div></div>
       <p className="sr-only" role="status" aria-live="polite">Passaggio {Math.min(step, maxStep) + 1} di {maxStep + 1} del report.</p>
-      {(step === 0 || !immersive) && <div className="mt-4 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="GOAT" value={`+${season.goatPointsEarned}`} /></div>}
+      {(step === 0 || !immersive) && <div className="mt-4 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Titolare" value={String(season.starts)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Media" value={season.averageRating.toFixed(2)} /></div>}
       {(step >= 1 || !immersive) && <div className="mt-4 card-flat p-3"><div className="grid grid-cols-3 gap-2 text-center"><SmallInfo label="Campionato" value={`${season.leaguePosition}°`} /><SmallInfo label="Coppa" value={season.cupResult} /><SmallInfo label="OVR" value={`${season.overallStart}→${season.overallEnd}`} /></div></div>}
-      {(step >= 2 || !immersive) && <div className="mt-4 space-y-2">{[...season.trophies, ...season.awards].length > 0 ? <div className="flex flex-wrap gap-2">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div> : <p className="text-xs" style={{ color: "var(--text-dim)" }}>Nessun trofeo, ma ogni stagione costruisce la carriera.</p>}{season.events.map((event) => <p key={event.id} className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}><strong className="text-white">{event.title}.</strong> {event.description}</p>)}</div>}
+      {(step >= 2 || !immersive) && <div className="mt-4 space-y-2">{season.nationalCompetition ? <div className="card-flat flex items-center justify-between gap-3 px-3 py-2.5"><span className="text-xs" style={{ color: "var(--text-dim)" }}>{season.nationalCompetition}</span><strong className="text-xs text-white">{season.nationalResult ?? "Convocato"}</strong></div> : null}{[...season.trophies, ...season.awards].length > 0 ? <div className="flex flex-wrap gap-2">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div> : <p className="text-xs" style={{ color: "var(--text-dim)" }}>Nessun trofeo, ma ogni stagione costruisce la carriera.</p>}{season.events.map((event) => <p key={event.id} className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}><strong className="text-white">{event.title}.</strong> {event.description}</p>)}</div>}
       <button type="button" disabled={busy} onClick={step < maxStep ? () => setStep((value) => value + 1) : onClose} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">{busy ? "Salvataggio…" : step < maxStep ? "Continua" : season.retiredAfterSeason ? "Guarda la carriera" : "Scelte di fine stagione"}</button>
     </div></section>;
 }
@@ -825,40 +881,133 @@ function TransferPanel({ offers, busy, onAccept, onDecline }: { offers: CareerOf
 function OfferCard({ offer, busy, label, onClick }: { offer: CareerOffer; busy: boolean; label: string; onClick: () => void }) {
   const country = countryFor(offer.country);
   const club = getClubByName(offer.clubName);
-  return <article className="card p-4"><div className="flex items-start gap-3"><ClubCrest club={club} clubName={offer.clubName} size={48} /><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{club?.name ?? offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{country.flag} {offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)}</span><span className="chip">{offer.contractYears} anni</span><span className="chip">Interesse {offer.interest}%</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
+  return <article className="card p-4"><div className="flex items-start gap-3"><ClubCrest club={club} clubName={offer.clubName} size={48} /><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{club?.name ?? offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{country.flag} {offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)} · {squadRoleStartRate(offer.squadRole)}% dal 1′</span><span className="chip">{offer.contractYears} anni</span><span className="chip">Interesse {offer.interest}%</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
 }
 
 function StatsTab({ state, onReset }: { state: CareerState; onReset: () => void }) {
+  const viewState = state;
   const isKeeper = state.player.role === "GK";
+  const ownRanking = viewState.nationalRanking?.find((entry) => entry.country === state.player.nationality);
   return <main className="px-4 py-4 pb-8 space-y-4"><section className="card p-4"><div className="flex items-center justify-between"><div><p className="eyebrow">Numeri totali</p><h2 className="font-display mt-1 text-lg font-bold text-white">{state.player.displayName}</h2></div><div className="font-display text-2xl font-extrabold" style={{ color: "var(--accent)" }}>{state.goatScore}</div></div><div className="mt-4 grid grid-cols-3 gap-2"><BigStat label="Presenze" value={state.totals.appearances} /><BigStat label={isKeeper ? "Parate" : "Gol"} value={isKeeper ? state.totals.saves : state.totals.goals} /><BigStat label={isKeeper ? "Clean sheet" : "Assist"} value={isKeeper ? state.totals.cleanSheets : state.totals.assists} /><BigStat label="Da titolare" value={state.totals.starts} /><BigStat label={isKeeper ? "Porte inviolate" : "Passaggi chiave"} value={isKeeper ? state.totals.cleanSheets : state.totals.keyPasses} /><BigStat label="MVP" value={state.totals.playerOfTheMatch} /></div></section>
     <section className="card p-4"><p className="eyebrow">Livello attuale</p><div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="OVR" value={String(state.overall)} /><HeroStat label="Potenziale" value={String(state.potential)} /><HeroStat label="Reputaz." value={String(state.reputation)} /><HeroStat label="Forma" value={String(state.form)} /></div></section>
-    <section className="card p-4"><p className="eyebrow">Nazionale {countryFor(state.player.nationality).flag}</p><div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="Presenze" value={String(state.nationalTeam.caps)} /><HeroStat label="Gol" value={String(state.nationalTeam.goals)} /><HeroStat label="Assist" value={String(state.nationalTeam.assists)} /><HeroStat label="Trofei" value={String(state.nationalTeam.trophies)} /></div></section>
+    <section className="card p-4"><div className="flex items-center justify-between gap-3"><p className="eyebrow">Nazionale {countryFor(state.player.nationality).flag}</p>{ownRanking ? <span className="chip">#{ownRanking.rank} al mondo</span> : null}</div><div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="Presenze" value={String(state.nationalTeam.caps)} /><HeroStat label="Gol" value={String(state.nationalTeam.goals)} /><HeroStat label="Assist" value={String(state.nationalTeam.assists)} /><HeroStat label="Trofei" value={String(state.nationalTeam.trophies)} /></div></section>
+    {viewState.nationalRanking?.length ? <NationalRankingCard ranking={viewState.nationalRanking} playerCountry={state.player.nationality} /> : null}
     <Cabinet title="Trofei di squadra" empty="Nessun trofeo ancora." items={state.trophyCabinet.map((item) => ({ name: item.name, count: item.count }))} />
     <Cabinet title="Premi individuali" empty="Nessun premio ancora." items={state.awardCabinet.map((item) => ({ name: item.name, count: item.count }))} />
-    <button type="button" onClick={onReset} className="btn-danger-soft min-h-12 w-full px-4 py-3 text-sm">Ricomincia da zero</button>
+    <button type="button" onClick={onReset} className="btn-danger-soft min-h-12 w-full px-4 py-3 text-sm">Archivia e ricomincia</button>
   </main>;
 }
 
-function ArchiveTab({ seasons }: { seasons: CareerSeason[] }) {
-  return <main className="px-4 py-4 pb-8">
-    <p className="mb-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>Ogni stagione resta salvata con rendimento, crescita e traguardi.</p>
-    {seasons.length === 0
-      ? <EmptyState icon="📚" title="Archivio vuoto" body="Completa la prima stagione per iniziare a scrivere la tua storia." />
-      : <div className="space-y-3">{seasons.map((season) => {
-        const club = getClubByName(season.clubName);
-        return <article key={season.id} className="card p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <ClubCrest club={club} clubName={season.clubName} size={44} />
-              <div className="min-w-0"><p className="eyebrow">{season.label} · Età {season.age}</p><h3 className="font-display mt-1 truncate text-base font-bold text-white">{club?.name ?? season.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{season.leaguePosition}° in campionato · Coppa: {season.cupResult}</p></div>
+function NationalRankingCard({ ranking, playerCountry }: { ranking: NationalRankingEntry[]; playerCountry: CountryCode }) {
+  const sorted = [...ranking].sort((a, b) => a.rank - b.rank);
+  const own = sorted.find((entry) => entry.country === playerCountry);
+  const visible = sorted.slice(0, 5);
+  if (own && !visible.some((entry) => entry.country === own.country)) visible.push(own);
+  const hidden = sorted.filter((entry) => !visible.some((item) => item.country === entry.country));
+
+  return (
+    <section className="card overflow-hidden" aria-labelledby="national-ranking-title">
+      <div className="flex items-center justify-between gap-3 p-4 pb-2">
+        <div><p className="eyebrow">Mondo nazionali</p><h3 id="national-ranking-title" className="font-display mt-1 text-lg font-bold text-white">Ranking live</h3></div>
+        <span className="chip">{sorted.length} nazionali</span>
+      </div>
+      <ol className="px-2 pb-2">{visible.map((entry) => <NationalRankingRow key={entry.country} entry={entry} own={entry.country === playerCountry} />)}</ol>
+      {hidden.length > 0 ? (
+        <details style={{ borderTop: "1px solid var(--border)" }}>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center px-4 text-xs font-bold" style={{ color: "var(--accent-soft)" }}>Classifica completa</summary>
+          <ol className="px-2 pb-2">{hidden.map((entry) => <NationalRankingRow key={entry.country} entry={entry} own={false} />)}</ol>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
+function NationalRankingRow({ entry, own }: { entry: NationalRankingEntry; own: boolean }) {
+  const trendLabel = entry.trend === "up" ? `sale dal ${entry.previousRank}° posto` : entry.trend === "down" ? `scende dal ${entry.previousRank}° posto` : "posizione stabile";
+  return (
+    <li className="flex min-h-11 items-center gap-2 rounded-xl px-2.5 py-2" aria-current={own ? "true" : undefined} style={{ background: own ? "color-mix(in srgb, var(--accent) 12%, transparent)" : undefined }}>
+      <strong className="w-6 flex-none text-center text-sm text-white">{entry.rank}</strong>
+      <span className="text-lg" aria-hidden="true">{entry.flag}</span>
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{entry.name}</span>
+      <span className="flex flex-none gap-1" aria-label={`Forma: ${entry.form.map(nationalFormLabel).join(", ") || "nessun dato"}`}>{entry.form.slice(-3).map((result, index) => <span key={`${result}-${index}`} className="h-2 w-2 rounded-full" style={{ background: nationalFormColor(result) }} aria-hidden="true" />)}</span>
+      <span className="w-11 flex-none text-right"><strong className="block text-xs text-white">{Math.round(entry.points)}</strong><span className="block text-[10px]" style={{ color: nationalTrendColor(entry.trend) }} aria-label={trendLabel}>{nationalTrendIcon(entry.trend)}</span></span>
+    </li>
+  );
+}
+
+function ArchiveTab({ hub, state }: { hub: CareerHub; state: CareerState }) {
+  const viewState = state;
+  const completedCareers = [...hub.archivedCareers];
+  if (state.stage === "retired" && hub.career && !completedCareers.some((record) => record.id === hub.career?.id)) completedCareers.unshift(hub.career);
+  const arcs = (viewState.careerArcHistory ?? []).filter((arc) => arc.status !== "active");
+  const rankedSeasons = hub.seasons.filter((season) => typeof season.nationalTeamRank === "number").slice(0, 6);
+
+  return <main className="space-y-5 px-4 py-4 pb-8">
+    <ArchivedCareerShelf records={completedCareers} empty />
+
+    {arcs.length > 0 ? <CareerArcHistory arcs={arcs} /> : null}
+    {rankedSeasons.length > 0 ? <NationalRankingHistory seasons={rankedSeasons} /> : null}
+
+    <section aria-labelledby="season-archive-title">
+      <div className="mb-3 px-1"><p className="eyebrow">Carriera attuale</p><h2 id="season-archive-title" className="font-display mt-1 text-lg font-bold text-white">Stagioni</h2></div>
+      {hub.seasons.length === 0
+        ? <EmptyState icon="📚" title="Nessuna stagione" body="Completa la prima stagione per iniziare a scrivere la tua storia." />
+        : <div className="space-y-3">{hub.seasons.map((season) => {
+          const viewSeason = season;
+          const club = getClubByName(season.clubName);
+          return <article key={season.id} className="card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <ClubCrest club={club} clubName={season.clubName} size={44} />
+                <div className="min-w-0"><p className="eyebrow">{season.label} · Età {season.age}</p><h3 className="font-display mt-1 truncate text-base font-bold text-white">{club?.name ?? season.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{squadRoleLabel(season.squadRole)} · {season.starts}/{season.appearances} dal 1′</p></div>
+              </div>
+              <div className="flex-none rounded-xl px-2.5 py-2 text-center" style={{ background: "rgba(255,255,255,.055)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>OVR</span><strong className="text-white">{season.overallEnd}</strong></div>
             </div>
-            <div className="flex-none rounded-xl px-2.5 py-2 text-center" style={{ background: "rgba(255,255,255,.055)" }}><span className="block text-[11px]" style={{ color: "var(--text-dim)" }}>OVR</span><strong className="text-white">{season.overallEnd}</strong></div>
-          </div>
-          <div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="Media" value={season.averageRating.toFixed(2)} /></div>
-          {[...season.trophies, ...season.awards].length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div>}
-        </article>;
-      })}</div>}
+            <div className="mt-3 grid grid-cols-4 gap-2"><HeroStat label="Pres." value={String(season.appearances)} /><HeroStat label="Gol" value={String(season.goals)} /><HeroStat label="Assist" value={String(season.assists)} /><HeroStat label="Media" value={season.averageRating.toFixed(2)} /></div>
+            {(viewSeason.nationalTeamRank || viewSeason.nationalCompetition || [...season.trophies, ...season.awards].length > 0) ? <div className="mt-3 flex flex-wrap gap-1.5">{viewSeason.nationalTeamRank ? <span className="chip">🌍 Nazionale #{viewSeason.nationalTeamRank}</span> : null}{viewSeason.nationalCompetition ? <span className="chip">{viewSeason.nationalCompetition} · {viewSeason.nationalResult ?? "Convocato"}</span> : null}{season.trophies.map((item) => <span key={item} className="chip">🏆 {item}</span>)}{season.awards.map((item) => <span key={item} className="chip">⭐ {item}</span>)}</div> : null}
+          </article>;
+        })}</div>}
+    </section>
   </main>;
+}
+
+function ArchivedCareerShelf({ records, empty = false }: { records: CareerRecord[]; empty?: boolean }) {
+  return <section className={empty ? undefined : "px-4 pb-6"} aria-labelledby="career-archive-title"><div className="mb-3 flex items-end justify-between gap-3 px-1"><div><p className="eyebrow">Le tue storie</p><h2 id="career-archive-title" className="font-display mt-1 text-lg font-bold text-white">Carriere archiviate</h2></div><span className="chip">{records.length}</span></div>{records.length > 0 ? <div className="space-y-2">{records.map((record) => <ArchivedCareerCard key={record.id} record={record} />)}</div> : <div className="card-flat p-4"><p className="text-sm font-semibold text-white">Ancora nessuna</p><p className="mt-1 text-xs" style={{ color: "var(--text-dim)" }}>Quando ricominci, la carriera attuale resterà qui.</p></div>}</section>;
+}
+
+function ArchivedCareerCard({ record }: { record: CareerRecord }) {
+  const state = record.state;
+  const club = state.currentClub ? getClubByName(state.currentClub.name) : undefined;
+  const trophies = state.trophyCabinet.reduce((sum, item) => sum + item.count, 0) + state.nationalTeam.trophies;
+  const completed = state.stage === "retired";
+  const clubs = [...new Set([
+    ...state.seasons.map((season) => season.clubName),
+    ...(state.currentClub ? [state.currentClub.name] : []),
+  ])];
+  const peakOverall = Math.max(state.overall, ...state.seasons.map((season) => season.overallEnd));
+  return <details className="card overflow-hidden">
+    <summary className="flex min-h-[88px] cursor-pointer list-none items-center gap-3 p-3.5">
+      <ClubCrest club={club} clubName={state.currentClub?.name} size={48} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2"><h3 className="font-display truncate text-base font-bold text-white">{state.player.displayName}</h3><span className="chip">{completed ? "Conclusa" : "Interrotta"}</span></div>
+        <p className="mt-1 truncate text-xs" style={{ color: "var(--text-dim)" }}>{state.seasons.length} stagioni · {completed ? "ritiro" : "stop"} a {state.retiredAtAge ?? state.age} anni</p>
+        <p className="mt-1 text-xs font-semibold" style={{ color: "var(--accent-soft)" }}>{state.goatScore} GOAT · {trophies} trofei</p>
+      </div>
+      <span className="text-lg" style={{ color: "var(--accent)" }} aria-hidden="true">⌄</span>
+    </summary>
+    <div className="border-t p-3" style={{ borderColor: "var(--border)" }}>
+      <div className="grid grid-cols-4 gap-2"><HeroStat label="OVR max" value={String(peakOverall)} /><HeroStat label="Pres." value={String(state.totals.appearances)} /><HeroStat label="Gol" value={String(state.totals.goals)} /><HeroStat label="Nazionale" value={String(state.nationalTeam.caps)} /></div>
+      <p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}><strong className="text-white">Percorso:</strong> {clubs.length > 0 ? clubs.join(" → ") : state.currentClub?.name ?? "Nessun club"}</p>
+    </div>
+  </details>;
+}
+
+function CareerArcHistory({ arcs }: { arcs: CareerArc[] }) {
+  return <section aria-labelledby="career-arcs-title"><div className="mb-3 px-1"><p className="eyebrow">Momenti chiave</p><h2 id="career-arcs-title" className="font-display mt-1 text-lg font-bold text-white">Svolte di carriera</h2></div><div className="card overflow-hidden">{arcs.map((arc, index) => <article key={arc.id} className="flex min-h-14 items-center gap-3 p-3" style={{ borderTop: index ? "1px solid var(--border)" : undefined }}><span className="flex h-8 w-8 flex-none items-center justify-center rounded-xl" style={{ background: arc.status === "completed" ? "rgba(52,211,153,.12)" : "rgba(251,113,133,.12)" }} aria-hidden="true">{arc.status === "completed" ? "✓" : "↘"}</span><div className="min-w-0 flex-1"><h3 className="truncate text-sm font-bold text-white">{arc.title}</h3><p className="mt-0.5 text-xs" style={{ color: "var(--text-dim)" }}>{arc.status === "completed" ? "Completata" : "Conclusa"} · {arc.progress}/{arc.target}</p></div></article>)}</div></section>;
+}
+
+function NationalRankingHistory({ seasons }: { seasons: CareerSeason[] }) {
+  return <section aria-labelledby="ranking-history-title"><div className="mb-3 px-1"><p className="eyebrow">Nazionale</p><h2 id="ranking-history-title" className="font-display mt-1 text-lg font-bold text-white">Storico ranking</h2></div><div className="grid grid-cols-3 gap-2">{seasons.map((season) => <div key={season.id} className="card-flat p-3 text-center"><span className="block truncate text-[11px]" style={{ color: "var(--text-dim)" }}>{season.label}</span><strong className="font-display mt-1 block text-lg text-white">#{season.nationalTeamRank}</strong>{season.nationalTeamRankChange ? <span className="mt-0.5 block text-[10px]" style={{ color: season.nationalTeamRankChange > 0 ? "#34d399" : "#fb7185" }}>{season.nationalTeamRankChange > 0 ? "↑" : "↓"}{Math.abs(season.nationalTeamRankChange)}</span> : <span className="mt-0.5 block text-[10px]" style={{ color: "var(--text-faint)" }}>—</span>}</div>)}</div></section>;
 }
 
 function EventFeed({ events }: { events: CareerEvent[] }) {
@@ -867,7 +1016,8 @@ function EventFeed({ events }: { events: CareerEvent[] }) {
 }
 
 function RetiredCard({ state, onReset }: { state: CareerState; onReset: () => void }) {
-  return <section className="card-accent p-5 text-center"><span className="text-5xl" aria-hidden="true">🏟️</span><p className="eyebrow mt-4">Fine carriera</p><h3 className="font-display mt-1 text-2xl font-extrabold text-white">Una storia da {state.goatScore} punti</h3><p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{state.player.displayName} si ritira a {state.retiredAtAge ?? state.age} anni dopo {state.seasons.length} stagioni e {state.trophyCabinet.reduce((sum, item) => sum + item.count, 0)} trofei.</p><button type="button" onClick={onReset} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">Crea una nuova carriera</button></section>;
+  const trophies = state.trophyCabinet.reduce((sum, item) => sum + item.count, 0) + state.nationalTeam.trophies;
+  return <section className="card-accent p-5 text-center"><span className="text-5xl" aria-hidden="true">🏟️</span><p className="eyebrow mt-4">Fine carriera</p><h3 className="font-display mt-1 text-2xl font-extrabold text-white">Una storia da {state.goatScore} punti</h3><p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{state.player.displayName} si ritira a {state.retiredAtAge ?? state.age} anni dopo {state.seasons.length} stagioni e {trophies} trofei.</p><button type="button" onClick={onReset} className="btn-primary mt-5 min-h-12 w-full px-4 py-3 text-sm">Archivia e crea una nuova carriera</button></section>;
 }
 
 function Cabinet({ title, empty, items }: { title: string; empty: string; items: { name: string; count: number }[] }) {
@@ -981,7 +1131,7 @@ function decisionEffectItems(effects: CareerDecisionEffects): DecisionEffectItem
     { label: "Reputazione", value: effects.reputation, suffix: "", good: effects.reputation > 0 },
     { label: "Forma", value: effects.form, suffix: "", good: effects.form > 0 },
     { label: "Valore", value: effects.marketValuePercent, suffix: "%", good: effects.marketValuePercent > 0 },
-    { label: "Gerarchie", value: effects.squadRoleSteps, suffix: "", good: effects.squadRoleSteps > 0 },
+    { label: "Titolarità", value: effects.squadRoleSteps, suffix: "", good: effects.squadRoleSteps > 0 },
     { label: "Rendimento", value: effects.seasonPerformance * 100, suffix: "%", good: effects.seasonPerformance > 0 },
     { label: "Crescita", value: effects.seasonGrowth, suffix: "", good: effects.seasonGrowth > 0 },
     { label: "Rischio fisico", value: effects.injuryRiskPercent, suffix: "%", good: effects.injuryRiskPercent < 0 },
@@ -1018,4 +1168,13 @@ function onRadioKeyDown<T extends string>(
 function countryFor(code: CountryCode) { return COUNTRY_OPTIONS.find((country) => country.code === code) ?? COUNTRY_OPTIONS[0]; }
 function roleFor(code: Role) { return ROLE_OPTIONS.find((role) => role.code === code) ?? ROLE_OPTIONS[0]; }
 function squadRoleLabel(role: CareerOffer["squadRole"]) { return role === "star" ? "Stella" : role === "starter" ? "Titolare" : role === "rotation" ? "Rotazione" : "Prospetto"; }
+function squadRoleStartRate(role: CareerOffer["squadRole"]) { return role === "star" ? 91 : role === "starter" ? 78 : role === "rotation" ? 50 : 24; }
+function nationalTrendIcon(trend: NationalRankingTrend) { return trend === "up" ? "▲" : trend === "down" ? "▼" : "—"; }
+function nationalTrendColor(trend: NationalRankingTrend) { return trend === "up" ? "#34d399" : trend === "down" ? "#fb7185" : "var(--text-faint)"; }
+function nationalFormColor(result: number) {
+  if (result > 0) return "#34d399";
+  if (result < 0) return "#fb7185";
+  return "#94a3b8";
+}
+function nationalFormLabel(result: number) { return result > 0 ? "vittoria" : result < 0 ? "sconfitta" : "pareggio"; }
 function formatMoney(value: number) { if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`; if (value >= 1_000) return `€${Math.round(value / 1_000)}K`; return `€${value}`; }
