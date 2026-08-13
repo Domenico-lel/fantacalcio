@@ -9,6 +9,10 @@
    ──────────────────────────────────────────────────────────────────────────── */
 
 :root {
+  /* Stack locali: nessun download esterno bloccante durante build o avvio. */
+  --font-inter: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+
   /* Base */
   --bg: #070b14;
   --bg-soft: #0b111e;
