@@ -632,6 +632,11 @@ function GestioneTab() {
   async function sync() {
     setSyncing(true); setMsg("");
     try {
+      // Salva sempre l'ultimo link digitato prima di leggere la classifica.
+      // Così il pulsante funziona anche quando l'admin incolla un nuovo URL e
+      // tocca direttamente "Sincronizza ora".
+      const saved = await setLeagueUrlSetting(leagueUrl);
+      if (saved.error) { setMsg(saved.error); return; }
       const res = await syncTeams();
       if (res.error) { setMsg(res.error); return; }
       setMsg(`✓ Sincronizzate ${res.count} squadre dalla classifica`);

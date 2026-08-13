@@ -25,8 +25,52 @@ export function normalizeLeagueSlug(value: string): string | null {
   } catch { return null; }
 }
 
+/**
+ * Restituisce l'URL canonico della pagina inserita dall'admin.
+ * Mantiene anche percorsi come /view/competition/{id}/dashboard: la nuova
+ * interfaccia di Fantacalcio usa il percorso della competizione per decidere
+ * quale classifica mostrare.
+ */
+export function normalizeLeagueUrl(value: string): string | null {
+  const input = value.trim();
+  if (!input) return null;
+  const withProtocol = /^https?:\/\//i.test(input) ? input : `https://${input}`;
+  try {
+    const url = new URL(withProtocol);
+    if (url.protocol !== "https:" || url.hostname !== "leghe.fantacalcio.it") return null;
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (!parts[0] || !/^[a-z0-9][a-z0-9-]*$/i.test(decodeURIComponent(parts[0]))) return null;
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
 export function leagueUrlFromSlug(slug: string): string {
   return `https://leghe.fantacalcio.it/${encodeURIComponent(slug)}`;
+}
+
+/** URL salvato, con eventuale percorso della competizione preservato. */
+export async function getLeagueUrl(): Promise<string> {
+  const fromEnv = normalizeLeagueUrl(process.env.FANTACALCIO_LEAGUE_URL ?? "")
+    ?? (normalizeLeagueSlug(process.env.FANTACALCIO_LEAGUE_SLUG ?? "")
+      ? leagueUrlFromSlug(normalizeLeagueSlug(process.env.FANTACALCIO_LEAGUE_SLUG ?? "")!)
+      : "");
+  if (!isSupabaseConfigured()) return fromEnv;
+
+  try {
+    const db = createAdminClient();
+    const { data } = await db
+      .from("fanta_settings")
+      .select("value")
+      .eq("key", LEAGUE_SLUG_SETTING)
+      .maybeSingle();
+    return normalizeLeagueUrl(data?.value ?? "") ?? fromEnv;
+  } catch {
+    return fromEnv;
+  }
 }
 
 /** La configurazione salvata dall'admin prevale sulla variabile d'ambiente. */

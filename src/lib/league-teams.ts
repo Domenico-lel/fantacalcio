@@ -1,7 +1,7 @@
 // Recupera l'elenco delle squadre dalla pagina classifica della lega
 // (stessa fonte/HTML usata da /api/standings).
 
-import { getLeagueSlug, leagueUrlFromSlug } from "@/lib/league-config";
+import { getLeagueUrl } from "@/lib/league-config";
 
 const HEADERS = {
   "User-Agent":
@@ -55,12 +55,11 @@ function parseTeams(html: string): LeagueTeam[] {
 }
 
 export async function fetchLeagueTeams(): Promise<LeagueTeamsResult> {
-  const slug = await getLeagueSlug();
-  if (!slug) {
+  const url = await getLeagueUrl();
+  if (!url) {
     return { teams: [], error: "Link della lega non configurato: aggiungilo nella sezione Gestione." };
   }
 
-  const url = leagueUrlFromSlug(slug);
   try {
     const res = await fetch(url, {
       headers: HEADERS,

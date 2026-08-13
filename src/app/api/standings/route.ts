@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLeagueSlug, leagueUrlFromSlug } from "@/lib/league-config";
+import { getLeagueUrl } from "@/lib/league-config";
 
 export interface StandingEntry {
   position: number;
@@ -72,10 +72,10 @@ function parseStandingsFromHtml(html: string): StandingEntry[] {
 }
 
 async function fetchStandings(): Promise<{ items: StandingEntry[]; error: string | null }> {
-  const slug = await getLeagueSlug();
-  if (!slug) return { items: [], error: "Link della lega non configurato" };
+  const url = await getLeagueUrl();
+  if (!url) return { items: [], error: "Link della lega non configurato" };
   try {
-    const res = await fetch(leagueUrlFromSlug(slug), { headers: HEADERS, next: { revalidate: 600 } });
+    const res = await fetch(url, { headers: HEADERS, next: { revalidate: 600 } });
     if (!res.ok) return { items: [], error: `La pagina della lega risponde ${res.status}` };
     const html = await res.text();
     const items = parseStandingsFromHtml(html);
