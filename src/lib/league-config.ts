@@ -52,6 +52,24 @@ export function leagueUrlFromSlug(slug: string): string {
   return `https://leghe.fantacalcio.it/${encodeURIComponent(slug)}`;
 }
 
+/**
+ * Alcune rotte /view/competition/... funzionano solo nella sessione web
+ * dell'utente e dal server restituiscono 404. In quel caso proviamo anche la
+ * pagina pubblica della lega, che espone la classifica corrente.
+ */
+export function leagueUrlCandidates(url: string): string[] {
+  const normalized = normalizeLeagueUrl(url);
+  if (!normalized) return [];
+  try {
+    const parsed = new URL(normalized);
+    const slug = parsed.pathname.split("/").filter(Boolean)[0];
+    const base = slug ? leagueUrlFromSlug(decodeURIComponent(slug)) : normalized;
+    return [...new Set([normalized, base])];
+  } catch {
+    return [normalized];
+  }
+}
+
 /** URL salvato, con eventuale percorso della competizione preservato. */
 export async function getLeagueUrl(): Promise<string> {
   const fromEnv = normalizeLeagueUrl(process.env.FANTACALCIO_LEAGUE_URL ?? "")

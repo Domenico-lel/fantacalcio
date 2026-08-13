@@ -1,7 +1,7 @@
 // Recupera l'elenco delle squadre dalla pagina classifica della lega
 // (stessa fonte/HTML usata da /api/standings).
 
-import { getLeagueUrl } from "@/lib/league-config";
+import { getLeagueUrl, leagueUrlCandidates } from "@/lib/league-config";
 
 const HEADERS = {
   "User-Agent":
@@ -60,18 +60,21 @@ export async function fetchLeagueTeams(): Promise<LeagueTeamsResult> {
     return { teams: [], error: "Link della lega non configurato: aggiungilo nella sezione Gestione." };
   }
 
+  let lastStatus: number | null = null;
   try {
-    const res = await fetch(url, {
-      headers: HEADERS,
-      next: { revalidate: 600 },
-    });
-    if (!res.ok) {
-      return { teams: [], error: `La pagina della lega risponde ${res.status}. Controlla il link salvato in Gestione.` };
+    for (const candidate of leagueUrlCandidates(url)) {
+      const res = await fetch(candidate, { headers: HEADERS, next: { revalidate: 600 } });
+      lastStatus = res.status;
+      if (!res.ok) continue;
+      const teams = parseTeams(await res.text());
+      if (teams.length > 0) return { teams, error: null };
     }
-    const teams = parseTeams(await res.text());
-    return teams.length > 0
-      ? { teams, error: null }
-      : { teams: [], error: "La pagina è raggiungibile, ma non contiene una classifica leggibile." };
+    return {
+      teams: [],
+      error: lastStatus && lastStatus >= 400
+        ? `La pagina della lega risponde ${lastStatus}. Controlla il link salvato in Gestione.`
+        : "La pagina è raggiungibile, ma non contiene una classifica leggibile.",
+    };
   } catch {
     return { teams: [], error: "Impossibile raggiungere la pagina della lega. Riprova tra poco." };
   }

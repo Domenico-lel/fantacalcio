@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLeagueUrl } from "@/lib/league-config";
+import { getLeagueUrl, leagueUrlCandidates } from "@/lib/league-config";
 
 export interface StandingEntry {
   position: number;
@@ -74,14 +74,21 @@ function parseStandingsFromHtml(html: string): StandingEntry[] {
 async function fetchStandings(): Promise<{ items: StandingEntry[]; error: string | null }> {
   const url = await getLeagueUrl();
   if (!url) return { items: [], error: "Link della lega non configurato" };
+  let lastStatus: number | null = null;
   try {
-    const res = await fetch(url, { headers: HEADERS, next: { revalidate: 600 } });
-    if (!res.ok) return { items: [], error: `La pagina della lega risponde ${res.status}` };
-    const html = await res.text();
-    const items = parseStandingsFromHtml(html);
-    return items.length > 0
-      ? { items, error: null }
-      : { items: [], error: "La pagina della lega non contiene una classifica leggibile" };
+    for (const candidate of leagueUrlCandidates(url)) {
+      const res = await fetch(candidate, { headers: HEADERS, next: { revalidate: 600 } });
+      lastStatus = res.status;
+      if (!res.ok) continue;
+      const items = parseStandingsFromHtml(await res.text());
+      if (items.length > 0) return { items, error: null };
+    }
+    return {
+      items: [],
+      error: lastStatus && lastStatus >= 400
+        ? `La pagina della lega risponde ${lastStatus}`
+        : "La pagina della lega non contiene una classifica leggibile",
+    };
   } catch {
     return { items: [], error: "Impossibile raggiungere la pagina della lega" };
   }
