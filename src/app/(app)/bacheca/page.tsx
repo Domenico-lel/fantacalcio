@@ -639,7 +639,7 @@ function GestioneTab() {
       if (saved.error) { setMsg(saved.error); return; }
       const res = await syncTeams();
       if (res.error) { setMsg(res.error); return; }
-      setMsg(`✓ Sincronizzate ${res.count} squadre dalla classifica`);
+      setMsg(`✓ Sincronizzate ${res.count} squadre dalla classifica${res.merged ? ` · accorpati ${res.merged} doppioni` : ""}`);
       await load();
     } catch {
       setMsg("Sincronizzazione non riuscita. Controlla il link della lega e riprova.");

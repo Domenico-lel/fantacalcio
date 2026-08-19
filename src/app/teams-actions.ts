@@ -106,17 +106,114 @@ export async function fetchStandingsNameMap(): Promise<Record<string, StandingsT
   return map;
 }
 
-export async function syncTeams(): Promise<{ count: number; error: string | null }> {
+export async function syncTeams(): Promise<{ count: number; merged: number; error: string | null }> {
   const viewer = await getCurrentViewer();
-  if (!viewer?.isAdmin) return { count: 0, error: "Solo l'admin può sincronizzare le squadre" };
+  if (!viewer?.isAdmin) return { count: 0, merged: 0, error: "Solo l'admin può sincronizzare le squadre" };
 
   const { teams, error: fetchError } = await fetchLeagueTeams();
-  if (fetchError || teams.length === 0) return { count: 0, error: fetchError ?? "Nessuna squadra trovata nella classifica" };
+  if (fetchError || teams.length === 0) return { count: 0, merged: 0, error: fetchError ?? "Nessuna squadra trovata nella classifica" };
 
   const db = createAdminClient();
-  const rows = teams.map((t) => ({ name: t.name, team_id: t.teamId }));
-  const { error } = await db.from("fanta_teams").upsert(rows, { onConflict: "name" });
-  return { count: error ? 0 : teams.length, error: error?.message ?? null };
+  // La vecchia sincronizzazione usava il nome come chiave di conflitto. Se
+  // Fantacalcio cambiava una grafia, rimaneva la squadra vecchia e ne veniva
+  // creata una nuova. L'ID Fantacalcio è invece la chiave stabile.
+  const officialTeams = Array.from(
+    new Map(
+      teams.map((team) => [team.teamId ? `id:${team.teamId}` : `name:${team.name}`, team])
+    ).values()
+  );
+  const officialIds = new Set(officialTeams.flatMap((team) => team.teamId ? [team.teamId] : []));
+  const { data: savedTeams, error: readError } = await db
+    .from("fanta_teams")
+    .select("id, name, team_id, display_name, logo_url, max_managers, created_at")
+    .order("created_at", { ascending: true });
+  if (readError) return { count: 0, merged: 0, error: readError.message };
+
+  type SavedTeam = NonNullable<typeof savedTeams>[number];
+  type Match = { official: typeof officialTeams[number]; canonical: SavedTeam; duplicates: SavedTeam[] };
+  const saved = savedTeams ?? [];
+  const consumed = new Set<string>();
+  const matches: Match[] = [];
+
+  for (const official of officialTeams) {
+    const byId = official.teamId
+      ? saved.filter((team) => team.team_id === official.teamId && !consumed.has(team.id))
+      : [];
+    // Il nome è usato soltanto per recuperare i vecchi record senza team_id,
+    // oppure record non più presenti nella competizione. Non deve mai fondere
+    // due ID che sono entrambi ancora attivi nella lega.
+    const byName = saved.filter((team) =>
+      team.name === official.name
+      && !consumed.has(team.id)
+      && (!team.team_id || team.team_id === official.teamId || !officialIds.has(team.team_id))
+    );
+    const candidates = Array.from(new Map([...byId, ...byName].map((team) => [team.id, team])).values());
+
+    if (candidates.length === 0) {
+      const { error } = await db.from("fanta_teams").insert({ name: official.name, team_id: official.teamId });
+      if (error) return { count: 0, merged: 0, error: error.message };
+      continue;
+    }
+
+    // Preferiamo sempre l'ID ufficiale; a parità conserviamo il record più
+    // vecchio, così loghi, rose e manager rimangono ancorati allo stesso UUID.
+    const canonical = byId[0] ?? candidates[0];
+    const duplicates = candidates.filter((team) => team.id !== canonical.id);
+    candidates.forEach((team) => consumed.add(team.id));
+    matches.push({ official, canonical, duplicates });
+  }
+
+  // Prima liberiamo i nomi tecnici dei record che verranno rinominati: questo
+  // gestisce anche due nomi scambiati fra loro senza violare il vincolo UNIQUE.
+  const renames = matches.filter(({ official, canonical }) => canonical.name !== official.name);
+  for (const { canonical } of renames) {
+    const { error } = await db
+      .from("fanta_teams")
+      .update({ name: `__fantacalcio_sync_${crypto.randomUUID()}` })
+      .eq("id", canonical.id);
+    if (error) return { count: 0, merged: 0, error: error.message };
+  }
+
+  let merged = 0;
+  for (const { official, canonical, duplicates } of matches) {
+    let displayName = canonical.display_name;
+    let logoUrl = canonical.logo_url;
+    let maxManagers = canonical.max_managers;
+
+    for (const duplicate of duplicates) {
+      // Se il record storico contiene l'unico logo/nome personalizzato,
+      // lo riportiamo sul record canonico prima di eliminarlo.
+      displayName ||= duplicate.display_name;
+      logoUrl ||= duplicate.logo_url;
+      maxManagers = Math.max(maxManagers ?? 1, duplicate.max_managers ?? 1);
+
+      const [{ error: profilesError }, { error: rosterError }] = await Promise.all([
+        db.from("fanta_profiles").update({ team_ref: canonical.id } as never).eq("team_ref", duplicate.id),
+        db.from("fanta_roster").update({ team_ref: canonical.id } as never).eq("team_ref", duplicate.id),
+      ]);
+      if (profilesError || rosterError) {
+        return { count: 0, merged: 0, error: profilesError?.message ?? rosterError?.message ?? "Impossibile accorpare le squadre" };
+      }
+
+      const { error: deleteError } = await db.from("fanta_teams").delete().eq("id", duplicate.id);
+      if (deleteError) return { count: 0, merged: 0, error: deleteError.message };
+      merged += 1;
+    }
+
+    const { error: updateError } = await db
+      .from("fanta_teams")
+      .update({
+        name: official.name,
+        team_id: official.teamId,
+        display_name: displayName,
+        logo_url: logoUrl,
+        max_managers: maxManagers,
+      })
+      .eq("id", canonical.id);
+    if (updateError) return { count: 0, merged: 0, error: updateError.message };
+  }
+
+  return { count: officialTeams.length, merged, error: null };
 }
 
 export async function uploadTeamLogo(teamRef: string, formData: FormData): Promise<{ url: string | null; error: string | null }> {
