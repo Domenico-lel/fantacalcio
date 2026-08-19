@@ -325,6 +325,29 @@ export async function fetchFantacalcioStandings(): Promise<FantacalcioStandingsR
       })
       .filter((row): row is FantacalcioStanding => !!row);
     if (items.length) return { items: items.sort((a, b) => a.position - b.position), error: null };
+
+    // Prima della prima giornata calcolata Leghe Fantacalcio restituisce una
+    // classifica vuota, ma l'elenco delle squadre è già disponibile. Mostriamo
+    // quindi la classifica provvisoria a zero punti invece di un errore.
+    if (teams.size) {
+      return {
+        items: [...teams].map(([teamId, teamName], index) => ({
+          position: index + 1,
+          teamName,
+          teamId,
+          points: 0,
+          totalFp: 0,
+          played: 0,
+          won: 0,
+          drawn: 0,
+          lost: 0,
+          goalDiff: 0,
+          goalsFor: 0,
+          goalsAgainst: 0,
+        })),
+        error: null,
+      };
+    }
     if (standings.status === 401 || standings.status === 403) {
       return { items: [], error: "Fantacalcio ha rifiutato l'accesso: controlla l'account e le credenziali salvate nel deploy." };
     }
