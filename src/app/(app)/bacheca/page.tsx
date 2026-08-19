@@ -681,7 +681,7 @@ function GestioneTab() {
 
         <label htmlFor="league-url" className="sr-only">Link della lega Fantacalcio</label>
         <input id="league-url" value={leagueUrl} onChange={(e) => setLeagueUrl(e.target.value)}
-          placeholder="https://leghe.fantacalcio.it/nome-della-lega"
+          placeholder="https://leghe.fantacalcio.it/nome-lega/view/competition/123"
           className="input mt-4 w-full px-3.5 py-3 text-sm" inputMode="url" autoCapitalize="none" autoCorrect="off" />
 
         <div className="grid grid-cols-1 gap-2 mt-2 sm:grid-cols-2">

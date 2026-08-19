@@ -16,7 +16,7 @@ export async function setLeagueUrlSetting(value: string): Promise<{ error: strin
   const url = normalizeLeagueUrl(value);
   if (!url) {
     return {
-      error: "Incolla l'URL della lega nel formato https://leghe.fantacalcio.it/nome-della-lega",
+      error: "Incolla l'URL di Leghe Fantacalcio, ad esempio https://leghe.fantacalcio.it/nome-lega/view/competition/123",
       url: "",
     };
   }
