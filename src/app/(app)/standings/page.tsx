@@ -65,7 +65,6 @@ export default function StandingsPage() {
   const [myLogo, setMyLogo] = useState("⭐");
   const [standings, setStandings] = useState<StandingEntryWithLogo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [overrides, setOverrides] = useState<Record<string, StandingsTeamInfo>>({});
   const [sourceError, setSourceError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -87,10 +86,6 @@ export default function StandingsPage() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    fetchStandingsNameMap().then(setOverrides).catch(() => {});
-  }, []);
-
   function Logo({ url, fallback, size, radius = 50 }: { url: string | null; fallback: string; size: number; radius?: number }) {
     if (url) return <img src={url} alt="" className="object-cover flex-none" style={{ width: size, height: size, borderRadius: radius }} />;
     return (
@@ -103,7 +98,12 @@ export default function StandingsPage() {
 
   const loadStandings = useCallback(async () => {
     try {
-      const res = await fetch("/api/standings");
+      // Il refresh deve aggiornare anche logo e nome personalizzato: prima
+      // venivano letti soltanto al mount e in una PWA potevano restare vecchi.
+      const [res, overrides] = await Promise.all([
+        fetch("/api/standings"),
+        fetchStandingsNameMap().catch((): Record<string, StandingsTeamInfo> => ({})),
+      ]);
       if (!res.ok) throw new Error("Failed to fetch standings");
       const data = await res.json();
       setSourceError(data.error || "");
@@ -125,7 +125,7 @@ export default function StandingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [myTeamName, myLogo, overrides]);
+  }, [myTeamName, myLogo]);
 
   useEffect(() => { loadStandings(); }, [loadStandings]);
 
