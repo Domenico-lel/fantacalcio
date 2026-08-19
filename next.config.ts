@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.clerk.dev" },
       { protocol: "https", hostname: "crests.football-data.org" },
       { protocol: "https", hostname: "a.espncdn.com" },
+      { protocol: "https", hostname: "r2.thesportsdb.com" },
       { protocol: "https", hostname: "eredivisie.b-cdn.net" },
     ],
   },

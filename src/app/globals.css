@@ -313,6 +313,53 @@ select.input option { background: var(--surface-2); color: var(--text); }
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* Scelte della Carriera: feedback da simulatore, senza sacrificare il tap rapido. */
+.career-choice-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform .18s cubic-bezier(.22, 1, .36, 1), border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.career-choice-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(110deg, transparent 28%, color-mix(in srgb, var(--accent) 20%, transparent) 48%, transparent 68%);
+  transform: translateX(-105%);
+}
+.career-choice-card:active { transform: scale(.985); }
+.career-choice-card.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 78%, white);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent), 0 12px 24px -20px var(--accent-glow);
+  transform: translateY(-2px);
+}
+.career-choice-card.is-selected::after { opacity: 1; animation: careerChoiceShine .72s cubic-bezier(.22, 1, .36, 1); }
+@keyframes careerChoiceShine { to { transform: translateX(105%); } }
+.career-choice-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+.career-action { position: relative; overflow: hidden; }
+.career-action:not(:disabled)::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.34), transparent);
+  transform: translateX(-180%) skewX(-20deg);
+  animation: careerActionSheen 3.4s ease-in-out infinite;
+}
+@keyframes careerActionSheen { 22%, 100% { transform: translateX(420%) skewX(-20deg); } }
+
 /* Spinner (pull-to-refresh, caricamenti) */
 @keyframes spin { to { transform: rotate(360deg); } }
 

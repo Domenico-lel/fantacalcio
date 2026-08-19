@@ -611,3 +611,43 @@ export async function restartCareer(expectedVersion: number): Promise<CareerMuta
   revalidatePath("/carriera");
   return { hub: await readHub(viewer), error };
 }
+
+/** Elimina in modo definitivo la carriera attiva (e le relative stagioni in cascata). */
+export async function deleteCurrentCareer(expectedVersion: number): Promise<CareerMutationResult> {
+  const viewer = await getCurrentViewer();
+  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  if (!validExpectedVersion(expectedVersion)) {
+    return { hub: await readHub(viewer), error: "Versione della carriera non valida. Ricarica e riprova." };
+  }
+
+  const db = createAdminClient();
+  const own = await getOwnCareerRow(db, viewer.userId);
+  if (own.error || !own.data) {
+    const error = own.error ? schemaMessage(own.error.message) : null;
+    return { hub: await readHub(viewer), error };
+  }
+  if (own.data.version !== expectedVersion) {
+    return {
+      hub: await readHub(viewer),
+      error: "La carriera è cambiata su un altro dispositivo. Ho ricaricato i progressi prima dell'eliminazione.",
+    };
+  }
+
+  // La FK fanta_career_seasons.career_id usa ON DELETE CASCADE: un'unica
+  // cancellazione rimuove in modo atomico la carriera e tutto il suo storico.
+  const { data, error: deleteError } = await db
+    .from("fanta_careers")
+    .delete()
+    .eq("id", own.data.id)
+    .eq("user_id", viewer.userId)
+    .eq("version", expectedVersion)
+    .select("id")
+    .maybeSingle();
+  const error = deleteError
+    ? schemaMessage(deleteError.message)
+    : data
+      ? null
+      : "La carriera è cambiata su un altro dispositivo. Ricarica e riprova.";
+  revalidatePath("/carriera");
+  return { hub: await readHub(viewer), error };
+}

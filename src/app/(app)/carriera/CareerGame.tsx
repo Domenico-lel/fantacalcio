@@ -14,6 +14,7 @@ import {
   chooseCareerClub,
   continueCareerChoice,
   createCareer,
+  deleteCurrentCareer,
   declineCareerTransfers,
   fetchCareerHub,
   resolveCareerChoice,
@@ -224,6 +225,26 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
     }
   }
 
+  async function removeCareer() {
+    const expectedVersion = hub.career?.dbVersion;
+    if (!expectedVersion) {
+      toast("Ricarica la carriera prima di eliminarla.", "error");
+      return;
+    }
+    const ok = await confirm({
+      title: "Eliminare la carriera?",
+      message: "Verranno eliminati definitivamente giocatore, stagioni e statistiche. Questa azione non può essere annullata.",
+      confirmLabel: "Elimina definitivamente",
+    });
+    if (!ok) return;
+    const result = await mutate(() => deleteCurrentCareer(expectedVersion));
+    if (result && !result.error) {
+      setSetupStep(null);
+      setTab("career");
+      toast("Carriera eliminata definitivamente.", "success");
+    }
+  }
+
   if (!hub.career) {
     const archivedCareers = hub.archivedCareers;
     return (
@@ -282,9 +303,10 @@ export default function CareerGame({ initialHub }: { initialHub: CareerHub }) {
             onAcceptTransfer={acceptTransfer}
             onDeclineTransfers={declineTransfers}
             onReset={reset}
+            onDelete={removeCareer}
           />
         ) : tab === "stats" ? (
-          <StatsTab state={state} onReset={reset} />
+          <StatsTab state={state} onReset={reset} onDelete={removeCareer} />
         ) : (
           <ArchiveTab hub={hub} state={state} />
         )}
@@ -512,7 +534,7 @@ function StartingOffers({ state, busy, onChoose }: { state: CareerState; busy: b
   return <main className="px-4 py-5"><div className="card-accent p-4"><p className="eyebrow">Inizio carriera · {state.seasonYear}</p><h2 className="font-display mt-2 text-xl font-bold text-white">Tre club credono in te</h2><p className="mt-1.5 text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>A {state.age} anni arriva il primo bivio. Confronta livello, ruolo previsto e contratto.</p></div><div className="mt-4 space-y-3">{state.pendingOffers.map((offer) => <OfferCard key={offer.id} offer={offer} busy={busy} label="Firma" onClick={() => onChoose(offer.clubName)} />)}</div><PlayerStrip state={state} /></main>;
 }
 
-function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDecision, onSimulate, onAcceptTransfer, onDeclineTransfers, onReset }: {
+function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDecision, onSimulate, onAcceptTransfer, onDeclineTransfers, onReset, onDelete }: {
   state: CareerState;
   busy: boolean;
   onReportClose: (seasonId: string) => void;
@@ -522,6 +544,7 @@ function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDe
   onAcceptTransfer: (name: string) => void;
   onDeclineTransfers: () => void;
   onReset: () => void;
+  onDelete: () => void;
 }) {
   const viewState = state;
   const pendingReport = state.pendingSeasonReportId
@@ -594,6 +617,7 @@ function CareerTab({ state, busy, onReportClose, onResolveDecision, onContinueDe
         <FlowRecoveryCard />
       )}
       <EventFeed events={state.feed.slice(0, 6)} />
+      <button type="button" disabled={busy} onClick={onDelete} className="btn-danger-soft min-h-11 w-full px-4 py-2.5 text-xs">Elimina questa carriera</button>
     </main>
   );
 }
@@ -656,6 +680,7 @@ function DecisionPanel({ decision, busy, onConfirm }: {
   onConfirm: (decisionId: string, optionId: string) => void;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const isRetirementChoice = decision.kind === "retirement";
 
   useEffect(() => {
@@ -681,33 +706,43 @@ function DecisionPanel({ decision, busy, onConfirm }: {
               key={option.id}
               option={option}
               busy={busy}
-              onSelect={() => onConfirm(decision.id, option.id)}
+              selected={selectedOptionId === option.id}
+              onSelect={() => setSelectedOptionId(option.id)}
             />
           ))}
         </div>
       </fieldset>
+      {selectedOptionId ? (
+        <div className="career-choice-confirm pop-in">
+          <div><p className="text-xs font-bold text-white">Piano pronto</p><p className="mt-0.5 text-[11px]" style={{ color: "var(--text-dim)" }}>La scelta avrà conseguenze sulla tua carriera.</p></div>
+          <button type="button" disabled={busy} onClick={() => onConfirm(decision.id, selectedOptionId)} className="btn-primary career-action min-h-11 flex-none px-4 text-xs">
+            {busy ? "Invio…" : "Conferma"}
+          </button>
+        </div>
+      ) : null}
       {busy ? <p className="sr-only" role="status" aria-live="polite">La scelta viene salvata e l'esito viene calcolato.</p> : null}
     </section>
   );
 }
 
-function DecisionOptionCard({ option, busy, onSelect }: {
+function DecisionOptionCard({ option, busy, selected, onSelect }: {
   option: CareerDecisionOption;
   busy: boolean;
+  selected: boolean;
   onSelect: () => void;
 }) {
   const possibleOutcomes = option.probabilities.filter((item) => item.percentage > 0);
   const hasRisk = possibleOutcomes.length > 1;
   const certainEffect = possibleOutcomes.length === 1 ? primaryDecisionEffect(possibleOutcomes[0].effects) : null;
   return (
-    <button type="button" disabled={busy} onClick={onSelect} className="card block min-h-12 w-full p-3.5 text-left transition-transform active:scale-[.99]">
+    <button type="button" aria-pressed={selected} disabled={busy} onClick={onSelect} className={`card career-choice-card block min-h-12 w-full p-3.5 text-left ${selected ? "is-selected" : ""}`}>
       <span className="flex items-start gap-3">
         <span className="min-w-0 flex-1">
           <strong className="block text-base text-white">{option.label}</strong>
           <span className="mt-1 block text-xs leading-snug" style={{ color: "var(--text-dim)" }}>{option.description}</span>
           {!hasRisk && certainEffect && certainEffect !== "Nessun cambio" ? <span className="mt-2 inline-flex text-xs font-bold" style={{ color: "var(--accent-soft)" }}>{certainEffect}</span> : null}
         </span>
-        <span className="mt-1 text-lg" style={{ color: "var(--accent)" }} aria-hidden="true">›</span>
+        <span className="mt-1 text-lg" style={{ color: "var(--accent)" }} aria-hidden="true">{selected ? "✓" : "›"}</span>
       </span>
       {hasRisk ? <div className="mt-3"><ProbabilityBreakdown probabilities={option.probabilities} /></div> : null}
     </button>
@@ -826,7 +861,7 @@ function SeasonReadyPanel({ state, preparation, busy, onSimulate }: {
         </div>
         {projectedRole ? <div className="flex-none text-right"><span className="block text-xs" style={{ color: "var(--text-dim)" }}>Titolarità prevista</span><strong className="mt-0.5 block text-sm text-white">{squadRoleLabel(projectedRole)} · {squadRoleStartRate(projectedRole)}%</strong></div> : null}
       </div>
-      <button type="button" disabled={busy} onClick={() => onSimulate(preparation.trainingChoice)} className="btn-primary mt-3 min-h-12 w-full px-4 py-3 text-sm">
+      <button type="button" disabled={busy} onClick={() => onSimulate(preparation.trainingChoice)} className="btn-primary career-action mt-3 min-h-12 w-full px-4 py-3 text-sm">
         {busy ? "Simulazione della stagione…" : "Simula la stagione"}
       </button>
       {busy ? <p className="sr-only" role="status" aria-live="polite">Simulazione e salvataggio della stagione in corso.</p> : null}
@@ -881,10 +916,10 @@ function TransferPanel({ offers, busy, onAccept, onDecline }: { offers: CareerOf
 function OfferCard({ offer, busy, label, onClick }: { offer: CareerOffer; busy: boolean; label: string; onClick: () => void }) {
   const country = countryFor(offer.country);
   const club = getClubByName(offer.clubName);
-  return <article className="card p-4"><div className="flex items-start gap-3"><ClubCrest club={club} clubName={offer.clubName} size={48} /><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{club?.name ?? offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{country.flag} {offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)} · {squadRoleStartRate(offer.squadRole)}% dal 1′</span><span className="chip">{offer.contractYears} anni</span><span className="chip">Interesse {offer.interest}%</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
+  return <article className="card p-4"><div className="flex items-start gap-3"><ClubCrest club={club} clubName={offer.clubName} size={48} /><div className="min-w-0 flex-1"><h3 className="font-display truncate text-base font-bold text-white">{club?.name ?? offer.clubName}</h3><p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-dim)" }}>{country.flag} {offer.league} · OVR {offer.clubRating}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="chip">{squadRoleLabel(offer.squadRole)} · {squadRoleStartRate(offer.squadRole)}% dal 1′</span><span className="chip">{offer.contractYears} anni</span><span className="chip">Interesse {offer.interest}%</span></div></div></div><p className="mt-3 text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{offer.message}</p><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs" style={{ color: "var(--text-faint)" }}>Ingaggio {formatMoney(offer.annualSalary)}/anno</span><button type="button" disabled={busy} onClick={onClick} className="btn-primary career-action min-h-11 px-5 py-2.5 text-sm">{label}</button></div></article>;
 }
 
-function StatsTab({ state, onReset }: { state: CareerState; onReset: () => void }) {
+function StatsTab({ state, onReset, onDelete }: { state: CareerState; onReset: () => void; onDelete: () => void }) {
   const viewState = state;
   const isKeeper = state.player.role === "GK";
   const ownRanking = viewState.nationalRanking?.find((entry) => entry.country === state.player.nationality);
@@ -895,6 +930,7 @@ function StatsTab({ state, onReset }: { state: CareerState; onReset: () => void 
     <Cabinet title="Trofei di squadra" empty="Nessun trofeo ancora." items={state.trophyCabinet.map((item) => ({ name: item.name, count: item.count }))} />
     <Cabinet title="Premi individuali" empty="Nessun premio ancora." items={state.awardCabinet.map((item) => ({ name: item.name, count: item.count }))} />
     <button type="button" onClick={onReset} className="btn-danger-soft min-h-12 w-full px-4 py-3 text-sm">Archivia e ricomincia</button>
+    <button type="button" onClick={onDelete} className="btn-danger-soft min-h-12 w-full px-4 py-3 text-sm">Elimina carriera in corso</button>
   </main>;
 }
 
@@ -1079,7 +1115,7 @@ function ClubDataCredit() {
   return (
     <aside className="mx-4 mb-5 mt-1 text-center text-xs leading-relaxed" style={{ color: "var(--text-dim)" }} aria-label="Fonti dei dati dei club">
       Data provided by <a href="https://www.football-data.org/" target="_blank" rel="noreferrer" aria-label="football-data.org, apre una nuova scheda" className="underline underline-offset-2">football-data.org</a>
-      {" · "}Alcuni stemmi <a href="https://www.espn.com/soccer/" target="_blank" rel="noreferrer" aria-label="ESPN Calcio, apre una nuova scheda" className="underline underline-offset-2">ESPN</a>
+      {" · "}Stemmi da <a href="https://www.espn.com/soccer/" target="_blank" rel="noreferrer" aria-label="ESPN Calcio, apre una nuova scheda" className="underline underline-offset-2">ESPN</a> e <a href="https://www.thesportsdb.com/" target="_blank" rel="noreferrer" aria-label="TheSportsDB, apre una nuova scheda" className="underline underline-offset-2">TheSportsDB</a>
       {" · "}Nomi e marchi appartengono ai rispettivi club.
     </aside>
   );
