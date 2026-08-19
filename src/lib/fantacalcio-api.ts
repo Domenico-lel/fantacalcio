@@ -126,7 +126,7 @@ function findLeague(value: unknown, slug: string, depth = 0): JsonRecord | null 
     return null;
   }
   if (!isRecord(value)) return null;
-  const labels = ["slug", "url", "name", "nome", "leagueName", "league_name"];
+  const labels = ["alias", "slug", "url", "name", "nome", "leagueName", "league_name"];
   if (labels.some((key) => text(valueFor(value, [key])).toLowerCase().includes(slug.toLowerCase()))) return value;
   for (const key of ["leghe", "leagues", "items", "data", "results"]) {
     const found = findLeague(valueFor(value, [key]), slug, depth + 1);
@@ -192,11 +192,18 @@ async function loginAndGetToken(leagueUrl: string): Promise<{ token: string; err
   const login = await readJson(loginResponse);
   if (!isRecord(login)) return { token: "", error: "Fantacalcio ha restituito una risposta di login non valida." };
 
+  // L'API corrente avvolge la risposta di login in { data: { utente, leghe } }.
+  // Le versioni precedenti restituivano direttamente il payload, quindi
+  // supportiamo entrambe le forme senza cambiare la configurazione dell'admin.
+  const wrappedPayload = valueFor(login, ["data"]);
+  const payload = isRecord(wrappedPayload) ? wrappedPayload : login;
+
   const slug = new URL(leagueUrl).pathname.split("/").filter(Boolean)[0] ?? "";
-  const league = findLeague(login, slug);
+  const league = findLeague(payload, slug);
   const leagueId = text(league && valueFor(league, ["leagueId", "league_id", "id", "idLeague", "id_league"]));
-  const userId = findUserId(login);
-  const accountToken = tokenFrom(login);
+  const userId = findUserId(payload);
+  const accountToken = tokenFrom(payload)
+    || tokenFrom(valueFor(payload, ["utente", "user", "profile"]));
   let token = tokenFrom(league) || accountToken;
 
   // Il portale rinnova il token specifico della lega dopo il login. Se la
