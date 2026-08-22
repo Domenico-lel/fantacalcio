@@ -76,6 +76,8 @@ export interface StandingsTeamInfo {
   logoUrl: string | null; // logo del catalogo squadre
 }
 
+export type StandingsRosterMap = Record<string, RosterPlayer[]>;
+
 // Mappa per la Classifica: nome ufficiale (= fanta_teams.name, che coincide con il nome
 // scrapato da fantacalcio.it) → nome da mostrare + logo. L'override del nome viene dal
 // profilo del manager (team_name, modificato dall'admin in bacheca); così un rename in
@@ -104,6 +106,33 @@ export async function fetchStandingsNameMap(): Promise<Record<string, StandingsT
     map[t.name] = { displayName, logoUrl: t.logo_url };
   }
   return map;
+}
+
+// Rose indicizzate con il nome ufficiale della squadra: è la stessa chiave
+// che arriva dalla classifica di Fantacalcio, quindi il client può caricarle
+// al primo tap senza dipendere dai nomi personalizzati mostrati nell'app.
+export async function fetchStandingsRosterMap(): Promise<StandingsRosterMap> {
+  if (!isSupabaseConfigured()) return {};
+  const db = createAdminClient();
+  const [{ data: teams }, { data: players, error }] = await Promise.all([
+    db.from("fanta_teams").select("id, name"),
+    db.from("fanta_roster").select("id, team_ref, player_name, role, photo_url").order("role", { ascending: true }).order("player_name", { ascending: true }),
+  ]);
+  if (error) return {};
+
+  const officialNameById = new Map((teams ?? []).map((team) => [team.id, team.name]));
+  const rosters: StandingsRosterMap = {};
+  for (const player of players ?? []) {
+    const teamName = officialNameById.get(player.team_ref);
+    if (!teamName) continue;
+    (rosters[teamName] ??= []).push({
+      id: player.id,
+      playerName: player.player_name,
+      role: player.role,
+      photoUrl: player.photo_url,
+    });
+  }
+  return rosters;
 }
 
 export async function syncTeams(): Promise<{ count: number; merged: number; error: string | null }> {

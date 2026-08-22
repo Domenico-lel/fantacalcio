@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { loadViewerCache } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
-import { fetchStandingsNameMap, type StandingsTeamInfo } from "@/app/teams-actions";
+import { fetchStandingsNameMap, fetchStandingsRosterMap, type RosterPlayer, type StandingsTeamInfo } from "@/app/teams-actions";
 import { isImageAvatar } from "@/lib/avatar";
 import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
@@ -69,6 +69,10 @@ export default function StandingsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [expandedTeamName, setExpandedTeamName] = useState<string | null>(null);
+  const [rosters, setRosters] = useState<Record<string, RosterPlayer[]>>({});
+  const [rostersLoaded, setRostersLoaded] = useState(false);
+  const [loadingRosters, setLoadingRosters] = useState(false);
 
   useEffect(() => {
     // Identità autorevole dal server (stessa fonte dell'header), con paint immediato dalla cache.
@@ -133,6 +137,22 @@ export default function StandingsPage() {
     setRefreshing(true);
     await loadStandings();
     setRefreshing(false);
+  }
+
+  async function toggleTeam(teamName: string) {
+    if (expandedTeamName === teamName) {
+      setExpandedTeamName(null);
+      return;
+    }
+    setExpandedTeamName(teamName);
+    if (rostersLoaded || loadingRosters) return;
+    setLoadingRosters(true);
+    try {
+      setRosters(await fetchStandingsRosterMap());
+      setRostersLoaded(true);
+    } finally {
+      setLoadingRosters(false);
+    }
   }
 
   // Pull-to-refresh sulla classifica; sulla tab Trofei ci pensa TrofeiContent.
@@ -239,32 +259,73 @@ export default function StandingsPage() {
             {standings.map((entry, i) => {
               const isMe = entry.displayName === myTeamName;
               const pct = Math.max(6, Math.round((entry.points / maxPoints) * 100));
+              const isExpanded = expandedTeamName === entry.teamName;
+              const roster = rosters[entry.teamName] ?? [];
               return (
-                <div key={entry.position}
-                  className="flex items-center gap-3 px-3.5 py-3"
-                  style={{
-                    background: isMe ? "color-mix(in srgb, var(--accent) 11%, transparent)" : "transparent",
-                    borderTop: i === 0 ? "none" : "1px solid var(--border)",
-                  }}>
-                  <PositionBadge position={entry.position} />
-                  <Logo url={entry.logoUrl} fallback={entry.logoEmoji} size={32} radius={10} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-sm font-semibold truncate ${isMe ? "" : "text-white"}`} style={isMe ? { color: "var(--accent-soft)" } : undefined}>
-                        {entry.displayName}
-                      </span>
-                      <span className="font-display text-white font-bold text-sm flex-none">{entry.points}</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMe ? "var(--accent-grad)" : "rgba(255,255,255,0.28)" }} />
+                <Fragment key={entry.teamName}>
+                  <button type="button" onClick={() => toggleTeam(entry.teamName)} aria-expanded={isExpanded}
+                    aria-controls={`team-detail-${entry.position}`}
+                    className="w-full flex items-center gap-3 px-3.5 py-3 text-left tap"
+                    style={{
+                      background: isMe ? "color-mix(in srgb, var(--accent) 11%, transparent)" : "transparent",
+                      borderTop: i === 0 ? "none" : "1px solid var(--border)",
+                    }}>
+                    <PositionBadge position={entry.position} />
+                    <Logo url={entry.logoUrl} fallback={entry.logoEmoji} size={32} radius={10} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-sm font-semibold truncate ${isMe ? "" : "text-white"}`} style={isMe ? { color: "var(--accent-soft)" } : undefined}>
+                          {entry.displayName}
+                        </span>
+                        <span className="font-display text-white font-bold text-sm flex-none">{entry.points}</span>
                       </div>
-                      <span className="text-[11px] flex-none tabular-nums" style={{ color: "var(--text-dim)" }}>
-                        {entry.won}-{entry.drawn}-{entry.lost} · {entry.goalDiff > 0 ? `+${entry.goalDiff}` : entry.goalDiff}
-                      </span>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMe ? "var(--accent-grad)" : "rgba(255,255,255,0.28)" }} />
+                        </div>
+                        <span className="text-[11px] flex-none tabular-nums" style={{ color: "var(--text-dim)" }}>
+                          {entry.won}-{entry.drawn}-{entry.lost} · {entry.goalDiff > 0 ? `+${entry.goalDiff}` : entry.goalDiff}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                    <span className="text-xs flex-none" style={{ color: "var(--text-faint)" }} aria-hidden="true">{isExpanded ? "▲" : "▼"}</span>
+                  </button>
+
+                  {isExpanded && (
+                    <div id={`team-detail-${entry.position}`} className="px-3.5 pb-3.5" style={{ background: isMe ? "color-mix(in srgb, var(--accent) 7%, transparent)" : "rgba(255,255,255,0.018)", borderTop: "1px solid var(--border)" }}>
+                      <div className="mt-3 rounded-2xl p-3" style={{ background: "color-mix(in srgb, var(--accent) 10%, var(--surface))", border: "1px solid color-mix(in srgb, var(--accent) 22%, transparent)" }}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "var(--accent-soft)" }}>Giornata in corso</p>
+                            <p className="text-white text-sm font-semibold mt-0.5">Andamento live</p>
+                          </div>
+                          <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ color: "var(--text-dim)", background: "rgba(255,255,255,0.06)" }}>In attesa dati</span>
+                        </div>
+                        <p className="text-xs leading-relaxed mt-2" style={{ color: "var(--text-dim)" }}>Voti e fantapunteggio compariranno qui non appena saranno disponibili da Leghe Fantacalcio.</p>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <p className="eyebrow text-[10px]">Rosa · {loadingRosters ? "caricamento…" : `${roster.length} giocatori`}</p>
+                        {!loadingRosters && roster.length > 0 && <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>P · D · C · A</span>}
+                      </div>
+                      {loadingRosters && <p className="text-xs mt-2" style={{ color: "var(--text-dim)" }}>Carico la rosa…</p>}
+                      {!loadingRosters && roster.length === 0 && <p className="text-xs mt-2" style={{ color: "var(--text-dim)" }}>Rosa non ancora inserita dall&apos;admin.</p>}
+                      {!loadingRosters && roster.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
+                          {roster.map((player) => (
+                            <div key={player.id} className="flex items-center gap-2 rounded-xl px-2 py-1.5" style={{ background: "rgba(255,255,255,0.045)" }}>
+                              {player.photoUrl
+                                ? <img src={player.photoUrl} alt="" className="w-7 h-7 rounded-lg object-cover flex-none" />
+                                : <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs flex-none" style={{ background: "rgba(255,255,255,0.08)" }}>⚽</span>}
+                              <span className="w-4 text-center text-[10px] font-bold flex-none" style={{ color: "var(--accent-soft)" }}>{player.role ?? "—"}</span>
+                              <span className="text-sm text-white/90 truncate">{player.playerName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Fragment>
               );
             })}
           </div>
