@@ -1,4 +1,9 @@
 import { getLeagueUrl } from "@/lib/league-config";
+import {
+  parseFantacalcioNumber as numeric,
+  parseOptionalFantacalcioNumber as optionalNumeric,
+  valueForAliases as valueFor,
+} from "@/lib/fantacalcio-parser";
 
 const API_BASE = (process.env.FANTACALCIO_API_BASE ?? "https://apileague.fantacalcio.it").replace(/\/$/, "");
 const LEGACY_API_BASE = (process.env.FANTACALCIO_LEGACY_API_BASE ?? "https://leghe.fantacalcio.it/servizi").replace(/\/$/, "");
@@ -24,6 +29,30 @@ export interface FantacalcioStanding {
 export interface FantacalcioStandingsResult {
   items: FantacalcioStanding[];
   error: string | null;
+  currentMatchday: FantacalcioCurrentMatchday | null;
+}
+
+export interface FantacalcioMatchdayMatch {
+  homeTeamId: string;
+  awayTeamId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  homePoints: number | null;
+  awayPoints: number | null;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  homeFormation: string | null;
+  awayFormation: string | null;
+  homePlayersWithVote: number;
+  awayPlayersWithVote: number;
+  calculated: boolean;
+}
+
+export interface FantacalcioCurrentMatchday {
+  matchweek: number;
+  realMatchweek: number | null;
+  calculated: boolean;
+  matches: FantacalcioMatchdayMatch[];
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -36,27 +65,8 @@ function text(value: unknown): string {
   return typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
 }
 
-function numeric(value: unknown): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value !== "string") return 0;
-  const parsed = Number.parseFloat(value.replace(".", "").replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function normalizedKey(key: string): string {
-  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function valueFor(record: JsonRecord, keys: string[]): unknown {
-  const wanted = new Set(keys.map(normalizedKey));
-  for (const [key, value] of Object.entries(record)) {
-    if (wanted.has(normalizedKey(key))) return value;
-  }
-  return undefined;
-}
-
 function nestedName(record: JsonRecord): string {
-  const direct = text(valueFor(record, ["teamName", "team_name", "fantateam", "fantateam_name", "name", "nome", "squadra", "n"]));
+  const direct = text(valueFor(record, ["teamName", "team_name", "fantateam", "fantateam_name", "name", "nome", "squadra"]));
   if (direct) return direct;
   for (const key of ["team", "fantateam", "squadra"]) {
     const candidate = valueFor(record, [key]);
@@ -230,8 +240,9 @@ async function loginAndGetToken(leagueUrl: string): Promise<{ token: string; err
 function findLegacyStandingRows(value: unknown, depth = 0): JsonRecord[] {
   if (depth > 5 || !value) return [];
   if (Array.isArray(value)) {
-    if (value.some((row) => isRecord(row) && valueFor(row, ["id"]) !== undefined && valueFor(row, ["p", "s_p", "g"]) !== undefined)) {
-      return value.filter(isRecord);
+    const records = value.filter(isRecord);
+    if (records.some((row) => nestedTeamId(row) && valueFor(row, ["points", "punti", "pt", "rank-pt", "played", "games", "matches", "g", "rank-g", "s_p"]) !== undefined)) {
+      return records;
     }
     for (const item of value) {
       const rows = findLegacyStandingRows(item, depth + 1);
@@ -296,6 +307,196 @@ async function fetchLegacyStandings(leagueUrl: string, competitionId: string, to
   return { rows: response.ok ? findLegacyStandingRows(await readJson(response)) : [], status: response.status };
 }
 
+interface CalendarFixture {
+  matchweek: number;
+  realMatchweek: number | null;
+  homeTeamId: string;
+  awayTeamId: string;
+  calculated: boolean;
+  homePoints: number | null;
+  awayPoints: number | null;
+  homeGoals: number | null;
+  awayGoals: number | null;
+}
+
+function boolean(value: unknown): boolean {
+  return value === true || value === 1 || value === "1" || value === "true";
+}
+
+function arrayPayload(value: unknown, depth = 0): unknown[] {
+  if (depth > 4 || !value) return [];
+  if (Array.isArray(value)) return value;
+  if (!isRecord(value)) return [];
+  for (const key of ["data", "items", "results", "calendar", "fixtures"]) {
+    const found = arrayPayload(valueFor(value, [key]), depth + 1);
+    if (found.length) return found;
+  }
+  return [];
+}
+
+function teamIdFor(record: JsonRecord, side: "home" | "away"): string {
+  const direct = side === "home"
+    ? ["teamIdHome", "homeTeamId", "tIdH", "team_id_home", "idHome"]
+    : ["teamIdAway", "awayTeamId", "tIdA", "team_id_away", "idAway"];
+  const id = text(valueFor(record, direct));
+  if (id) return id;
+  const nested = valueFor(record, side === "home" ? ["home", "homeTeam"] : ["away", "awayTeam"]);
+  return isRecord(nested) ? text(valueFor(nested, ["id", "teamId", "team_id"])) : "";
+}
+
+function scorePair(value: unknown): [number | null, number | null] {
+  if (Array.isArray(value)) return [optionalNumeric(value[0]), optionalNumeric(value[1])];
+  if (isRecord(value)) {
+    return [
+      optionalNumeric(valueFor(value, ["home", "homeGoals", "goalsHome", "h"])),
+      optionalNumeric(valueFor(value, ["away", "awayGoals", "goalsAway", "a"])),
+    ];
+  }
+  if (typeof value === "string") {
+    const match = value.match(/(-?\d+(?:[.,]\d+)?)\D+(-?\d+(?:[.,]\d+)?)/);
+    if (match) return [optionalNumeric(match[1]), optionalNumeric(match[2])];
+  }
+  return [null, null];
+}
+
+function parseCalendar(value: unknown): CalendarFixture[] {
+  const fixtures: CalendarFixture[] = [];
+  for (const rawDay of arrayPayload(value)) {
+    if (!isRecord(rawDay)) continue;
+    const matchweek = numeric(valueFor(rawDay, ["matchDay", "matchweek", "match_day", "mday", "g"]));
+    if (!matchweek) continue;
+    const realMatchweek = optionalNumeric(valueFor(rawDay, ["championshipMatchDay", "realMatchweek", "real_matchweek", "cmday", "ga"]));
+    const matchesValue = valueFor(rawDay, ["matches", "partite"]);
+    const matches = Array.isArray(matchesValue) ? matchesValue : [rawDay];
+
+    for (const rawMatch of matches) {
+      if (!isRecord(rawMatch)) continue;
+      const homeTeamId = teamIdFor(rawMatch, "home") || teamIdFor(rawDay, "home");
+      const awayTeamId = teamIdFor(rawMatch, "away") || teamIdFor(rawDay, "away");
+      if (!homeTeamId || !awayTeamId || homeTeamId === "-1" || awayTeamId === "-1") continue;
+      const [homeGoals, awayGoals] = scorePair(valueFor(rawMatch, ["result", "res"]));
+      fixtures.push({
+        matchweek,
+        realMatchweek,
+        homeTeamId,
+        awayTeamId,
+        calculated: boolean(valueFor(rawMatch, ["calculated", "cal"]) ?? valueFor(rawDay, ["calculated", "cal"])),
+        homePoints: optionalNumeric(valueFor(rawMatch, ["ptH", "homePoints", "pointsHome", "fantapointsHome"])),
+        awayPoints: optionalNumeric(valueFor(rawMatch, ["ptA", "awayPoints", "pointsAway", "fantapointsAway"])),
+        homeGoals,
+        awayGoals,
+      });
+    }
+  }
+  return fixtures;
+}
+
+function selectCurrentFixtures(fixtures: CalendarFixture[]): CalendarFixture[] {
+  const matchweeks = [...new Set(fixtures.map((fixture) => fixture.matchweek))].sort((a, b) => a - b);
+  if (!matchweeks.length) return [];
+  const current = matchweeks.find((matchweek) => {
+    const round = fixtures.filter((fixture) => fixture.matchweek === matchweek);
+    return round.length > 0 && !round.every((fixture) => fixture.calculated);
+  }) ?? matchweeks[matchweeks.length - 1];
+  return fixtures.filter((fixture) => fixture.matchweek === current);
+}
+
+async function fetchCompetitionCalendar(competitionId: string, token: string): Promise<CalendarFixture[]> {
+  try {
+    const response = await fetch(`${API_BASE}/onboarding/v1/league/competition/calendar/${encodeURIComponent(competitionId)}`, {
+      headers: headers(token),
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    return parseCalendar(await readJson(response));
+  } catch {
+    // Il calendario arricchisce la scheda squadra, ma non deve impedire il
+    // caricamento della classifica quando il servizio secondario non risponde.
+    return [];
+  }
+}
+
+function recordPayload(value: unknown, depth = 0): JsonRecord | null {
+  if (depth > 4 || !value) return null;
+  if (!isRecord(value)) return null;
+  const data = valueFor(value, ["data"]);
+  return isRecord(data) ? recordPayload(data, depth + 1) : value;
+}
+
+function lineupSummary(value: unknown): { total: number | null; formation: string | null; playersWithVote: number } {
+  if (!isRecord(value)) return { total: null, formation: null, playersWithVote: 0 };
+  const startersValue = valueFor(value, ["starts", "starters"]);
+  const starters = Array.isArray(startersValue) ? startersValue : [];
+  const playersWithVote = starters.filter((player) => {
+    if (!isRecord(player)) return false;
+    return optionalNumeric(valueFor(player, ["cscr", "fantagrade", "scr", "grade"])) !== null;
+  }).length;
+  return {
+    total: optionalNumeric(valueFor(value, ["tot", "total", "fantapoints", "fantapunti"])),
+    formation: text(valueFor(value, ["mdl", "formation", "module"])) || null,
+    playersWithVote,
+  };
+}
+
+async function fetchMatchLineup(competitionId: string, fixture: CalendarFixture, token: string): Promise<{
+  home: ReturnType<typeof lineupSummary>;
+  away: ReturnType<typeof lineupSummary>;
+} | null> {
+  if (fixture.realMatchweek === null) return null;
+  const parts = [competitionId, fixture.matchweek, fixture.realMatchweek, fixture.homeTeamId, fixture.awayTeamId]
+    .map((part) => encodeURIComponent(String(part)))
+    .join("/");
+  try {
+    const response = await fetch(`${API_BASE}/gaming/v1/teamLineup/${parts}`, {
+      headers: headers(token),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const payload = recordPayload(await readJson(response));
+    if (!payload) return null;
+    return {
+      home: lineupSummary(valueFor(payload, ["home"])),
+      away: lineupSummary(valueFor(payload, ["away"])),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function buildCurrentMatchday(
+  competitionId: string,
+  token: string,
+  teams: Map<string, string>,
+  fixtures: CalendarFixture[],
+): Promise<FantacalcioCurrentMatchday | null> {
+  const current = selectCurrentFixtures(fixtures);
+  if (!current.length) return null;
+  const lineups = await Promise.all(current.map((fixture) => fetchMatchLineup(competitionId, fixture, token)));
+  return {
+    matchweek: current[0].matchweek,
+    realMatchweek: current[0].realMatchweek,
+    calculated: current.every((fixture) => fixture.calculated),
+    matches: current.map((fixture, index) => {
+      const lineup = lineups[index];
+      return {
+        homeTeamId: fixture.homeTeamId,
+        awayTeamId: fixture.awayTeamId,
+        homeTeamName: teams.get(fixture.homeTeamId) ?? "Squadra di casa",
+        awayTeamName: teams.get(fixture.awayTeamId) ?? "Squadra ospite",
+        homePoints: fixture.homePoints ?? lineup?.home.total ?? null,
+        awayPoints: fixture.awayPoints ?? lineup?.away.total ?? null,
+        homeGoals: fixture.homeGoals,
+        awayGoals: fixture.awayGoals,
+        homeFormation: lineup?.home.formation ?? null,
+        awayFormation: lineup?.away.formation ?? null,
+        homePlayersWithVote: lineup?.home.playersWithVote ?? 0,
+        awayPlayersWithVote: lineup?.away.playersWithVote ?? 0,
+        calculated: fixture.calculated,
+      };
+    }),
+  };
+}
+
 /**
  * Legge le stesse due risorse usate oggi da Leghe Fantacalcio: squadre della
  * competizione e classifica per giornate. L'HTML pubblico è ormai soltanto
@@ -303,28 +504,36 @@ async function fetchLegacyStandings(leagueUrl: string, competitionId: string, to
  */
 export async function fetchFantacalcioStandings(): Promise<FantacalcioStandingsResult> {
   const leagueUrl = await getLeagueUrl();
-  if (!leagueUrl) return { items: [], error: "Link della lega non configurato: aggiungilo nella sezione Gestione." };
+  if (!leagueUrl) return { items: [], error: "Link della lega non configurato: aggiungilo nella sezione Gestione.", currentMatchday: null };
   const competitionId = competitionIdFromUrl(leagueUrl);
   if (!competitionId) {
-    return { items: [], error: "Incolla il link completo della competizione Fantacalcio (quello che contiene /competition/...)." };
+    return { items: [], error: "Incolla il link completo della competizione Fantacalcio (quello che contiene /competition/...).", currentMatchday: null };
   }
 
   const auth = await loginAndGetToken(leagueUrl);
-  if (auth.error) return { items: [], error: auth.error };
+  if (auth.error) return { items: [], error: auth.error, currentMatchday: null };
 
   try {
-    const [teams, standings] = await Promise.all([
+    const [teams, standings, calendar] = await Promise.all([
       fetchCompetitionTeams(competitionId, auth.token),
       fetchLegacyStandings(leagueUrl, competitionId, auth.token),
+      fetchCompetitionCalendar(competitionId, auth.token),
     ]);
+    const teamIdByName = new Map([...teams].map(([id, name]) => [name.trim().toLocaleLowerCase("it-IT"), id]));
     const items = standings.rows
       .map((row, index) => {
-        const id = nestedTeamId(row);
-        const name = id ? teams.get(id) : null;
-        return name ? toStanding({ ...row, teamName: name }, index + 1) : null;
+        const sourceId = nestedTeamId(row);
+        const sourceName = nestedName(row);
+        const name = (sourceId ? teams.get(sourceId) : null) || sourceName;
+        if (!name) return null;
+        const teamId = (sourceId && teams.has(sourceId) ? sourceId : null)
+          ?? teamIdByName.get(name.trim().toLocaleLowerCase("it-IT"))
+          ?? sourceId;
+        return toStanding({ ...row, teamName: name, teamId }, index + 1);
       })
       .filter((row): row is FantacalcioStanding => !!row);
-    if (items.length) return { items: items.sort((a, b) => a.position - b.position), error: null };
+    const currentMatchday = await buildCurrentMatchday(competitionId, auth.token, teams, calendar);
+    if (items.length) return { items: items.sort((a, b) => a.position - b.position), error: null, currentMatchday };
 
     // Prima della prima giornata calcolata Leghe Fantacalcio restituisce una
     // classifica vuota, ma l'elenco delle squadre è già disponibile. Mostriamo
@@ -346,16 +555,17 @@ export async function fetchFantacalcioStandings(): Promise<FantacalcioStandingsR
           goalsAgainst: 0,
         })),
         error: null,
+        currentMatchday,
       };
     }
     if (standings.status === 401 || standings.status === 403) {
-      return { items: [], error: "Fantacalcio ha rifiutato l'accesso: controlla l'account e le credenziali salvate nel deploy." };
+      return { items: [], error: "Fantacalcio ha rifiutato l'accesso: controlla l'account e le credenziali salvate nel deploy.", currentMatchday: null };
     }
     if (standings.status === 404) {
-      return { items: [], error: "La competizione non è stata trovata. Apri la competizione su Leghe Fantacalcio e copia il link completo che contiene /competition/<id>." };
+      return { items: [], error: "La competizione non è stata trovata. Apri la competizione su Leghe Fantacalcio e copia il link completo che contiene /competition/<id>.", currentMatchday: null };
     }
   } catch {
-    return { items: [], error: "Non riesco a leggere squadre e classifica da Fantacalcio. Controlla il link della competizione e riprova." };
+    return { items: [], error: "Non riesco a leggere squadre e classifica da Fantacalcio. Controlla il link della competizione e riprova.", currentMatchday: null };
   }
-  return { items: [], error: "Fantacalcio non ha restituito una classifica leggibile. Verifica che la competizione abbia almeno una giornata calcolata." };
+  return { items: [], error: "Fantacalcio non ha restituito una classifica leggibile. Verifica che la competizione abbia almeno una giornata calcolata.", currentMatchday: null };
 }
