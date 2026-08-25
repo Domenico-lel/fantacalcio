@@ -1,5 +1,32 @@
 export type FantacalcioJsonRecord = Record<string, unknown>;
 
+export interface FantacalcioCalendarStandingFixture {
+  homeTeamId: string;
+  awayTeamId: string;
+  calculated: boolean;
+  homePoints: number | null;
+  awayPoints: number | null;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  homeStandingPoints: number | null;
+  awayStandingPoints: number | null;
+}
+
+export interface FantacalcioDerivedStanding {
+  position: number;
+  teamName: string;
+  teamId: string;
+  points: number;
+  totalFp: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalDiff: number;
+  goalsFor: number;
+  goalsAgainst: number;
+}
+
 function normalizedKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -18,6 +45,128 @@ export function valueForAliases(record: FantacalcioJsonRecord, keys: string[]): 
     if (values.has(normalized)) return values.get(normalized);
   }
   return undefined;
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+}
+
+/**
+ * Il payload dell'endpoint `competition/teams` usa la chiave compatta `n` per
+ * il nome. Nella classifica legacy la stessa chiave significa invece pareggi:
+ * questo parser deve quindi essere usato esclusivamente per l'elenco squadre.
+ */
+export function parseFantacalcioTeamName(record: FantacalcioJsonRecord): string {
+  const direct = text(valueForAliases(record, [
+    "teamName",
+    "team_name",
+    "fantateam",
+    "fantateam_name",
+    "name",
+    "nome",
+    "squadra",
+    "n",
+  ]));
+  if (direct) return direct;
+
+  for (const key of ["team", "fantateam", "squadra"]) {
+    const candidate = valueForAliases(record, [key]);
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const name = text(valueForAliases(candidate as FantacalcioJsonRecord, [
+      "name",
+      "nome",
+      "teamName",
+      "team_name",
+      "n",
+    ]));
+    if (name) return name;
+  }
+  return "";
+}
+
+function fallbackStandingPoints(
+  explicit: number | null,
+  ownGoals: number | null,
+  opponentGoals: number | null,
+): number {
+  if (explicit !== null) return explicit;
+  if (ownGoals === null || opponentGoals === null) return 0;
+  if (ownGoals > opponentGoals) return 3;
+  if (ownGoals === opponentGoals) return 1;
+  return 0;
+}
+
+/**
+ * Ricostruisce la classifica dal calendario moderno quando il servizio legacy
+ * non concede la sessione. Usa soltanto incontri marcati come calcolati.
+ */
+export function deriveFantacalcioStandingsFromCalendar(
+  teams: ReadonlyMap<string, string>,
+  fixtures: readonly FantacalcioCalendarStandingFixture[],
+): FantacalcioDerivedStanding[] {
+  const rows = new Map<string, FantacalcioDerivedStanding & { seed: number }>();
+  let seed = 0;
+  for (const [teamId, teamName] of teams) {
+    rows.set(teamId, {
+      position: 0,
+      teamName,
+      teamId,
+      points: 0,
+      totalFp: 0,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalDiff: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      seed: seed++,
+    });
+  }
+
+  let calculatedMatches = 0;
+  for (const fixture of fixtures) {
+    if (!fixture.calculated) continue;
+    const home = rows.get(fixture.homeTeamId);
+    const away = rows.get(fixture.awayTeamId);
+    if (!home || !away) continue;
+    calculatedMatches += 1;
+
+    home.played += 1;
+    away.played += 1;
+    home.totalFp += fixture.homePoints ?? 0;
+    away.totalFp += fixture.awayPoints ?? 0;
+    home.points += fallbackStandingPoints(fixture.homeStandingPoints, fixture.homeGoals, fixture.awayGoals);
+    away.points += fallbackStandingPoints(fixture.awayStandingPoints, fixture.awayGoals, fixture.homeGoals);
+
+    if (fixture.homeGoals === null || fixture.awayGoals === null) continue;
+    home.goalsFor += fixture.homeGoals;
+    home.goalsAgainst += fixture.awayGoals;
+    away.goalsFor += fixture.awayGoals;
+    away.goalsAgainst += fixture.homeGoals;
+    if (fixture.homeGoals > fixture.awayGoals) {
+      home.won += 1;
+      away.lost += 1;
+    } else if (fixture.homeGoals < fixture.awayGoals) {
+      away.won += 1;
+      home.lost += 1;
+    } else {
+      home.drawn += 1;
+      away.drawn += 1;
+    }
+  }
+
+  if (!calculatedMatches) return [];
+  return [...rows.values()]
+    .map((row) => ({ ...row, goalDiff: row.goalsFor - row.goalsAgainst }))
+    .sort((a, b) => (
+      b.points - a.points
+      || b.totalFp - a.totalFp
+      || b.goalDiff - a.goalDiff
+      || b.goalsFor - a.goalsFor
+      || a.seed - b.seed
+    ))
+    .map(({ seed: _seed, ...row }, index) => ({ ...row, position: index + 1 }));
 }
 
 function parsedNumber(value: unknown): number | null {
