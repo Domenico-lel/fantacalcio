@@ -173,16 +173,40 @@ function headers(token?: string): HeadersInit {
   };
 }
 
+function responseCookies(response: Response): string {
+  const responseHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
+  const setCookies = responseHeaders.getSetCookie?.()
+    ?? (response.headers.get("set-cookie")?.split(/,(?=\s*[^;,=\s]+=[^;,]+)/) ?? []);
+
+  return setCookies
+    .map((cookie) => cookie.split(";", 1)[0]?.trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+function mergeCookies(...cookieHeaders: string[]): string {
+  const cookies = new Map<string, string>();
+  for (const cookieHeader of cookieHeaders) {
+    for (const cookie of cookieHeader.split(";")) {
+      const normalized = cookie.trim();
+      const separator = normalized.indexOf("=");
+      if (separator <= 0) continue;
+      cookies.set(normalized.slice(0, separator), normalized);
+    }
+  }
+  return [...cookies.values()].join("; ");
+}
+
 async function readJson(response: Response): Promise<unknown> {
   const raw = await response.text();
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-async function loginAndGetToken(leagueUrl: string): Promise<{ token: string; error: string | null }> {
+async function loginAndGetToken(leagueUrl: string): Promise<{ token: string; cookie: string; error: string | null }> {
   const username = (process.env.FANTACALCIO_USERNAME ?? "").trim();
   const password = process.env.FANTACALCIO_PASSWORD ?? "";
   if (!username || !password) {
-    return { token: "", error: "Collegamento Fantacalcio non configurato: aggiungi username e password dell'account nelle variabili di ambiente del deploy." };
+    return { token: "", cookie: "", error: "Collegamento Fantacalcio non configurato: aggiungi username e password dell'account nelle variabili di ambiente del deploy." };
   }
 
   let loginResponse: Response;
@@ -191,16 +215,21 @@ async function loginAndGetToken(leagueUrl: string): Promise<{ token: string; err
       method: "POST",
       headers: headers(),
       body: JSON.stringify({ username, password }),
+      credentials: "include",
       cache: "no-store",
     });
   } catch {
-    return { token: "", error: "Non riesco a raggiungere il login di Fantacalcio. Riprova tra poco." };
+    return { token: "", cookie: "", error: "Non riesco a raggiungere il login di Fantacalcio. Riprova tra poco." };
   }
   if (!loginResponse.ok) {
-    return { token: "", error: "Login Fantacalcio rifiutato: controlla username e password nelle variabili di ambiente." };
+    return { token: "", cookie: "", error: "Login Fantacalcio rifiutato: controlla username e password nelle variabili di ambiente." };
+  }
+  let cookie = responseCookies(loginResponse);
+  if (!cookie) {
+    console.warn("[fantacalcio] Login riuscito senza cookie per le API legacy");
   }
   const login = await readJson(loginResponse);
-  if (!isRecord(login)) return { token: "", error: "Fantacalcio ha restituito una risposta di login non valida." };
+  if (!isRecord(login)) return { token: "", cookie: "", error: "Fantacalcio ha restituito una risposta di login non valida." };
 
   // L'API corrente avvolge la risposta di login in { data: { utente, leghe } }.
   // Le versioni precedenti restituivano direttamente il payload, quindi
@@ -223,18 +252,22 @@ async function loginAndGetToken(leagueUrl: string): Promise<{ token: string; err
     try {
       const refreshResponse = await fetch(`${API_BASE}/onboarding/v1/refresh`, {
         method: "POST",
-        headers: { ...headers(token || accountToken), "X-Retry": "true" },
+        headers: { ...headers(token || accountToken), ...(cookie ? { Cookie: cookie } : {}), "X-Retry": "true" },
         body: JSON.stringify({ LeagueId: leagueId, JWT: "", UserId: userId, TokenAuth: accountToken }),
+        credentials: "include",
         cache: "no-store",
       });
-      if (refreshResponse.ok) token = tokenFrom(await readJson(refreshResponse)) || token;
+      if (refreshResponse.ok) {
+        cookie = mergeCookies(cookie, responseCookies(refreshResponse));
+        token = tokenFrom(await readJson(refreshResponse)) || token;
+      }
     } catch {
       // Il token del login rimane il fallback previsto dal client web.
     }
   }
   return token
-    ? { token, error: null }
-    : { token: "", error: "Login Fantacalcio completato, ma non è stato ricevuto il token della lega. Controlla che l'account possa aprire questa competizione." };
+    ? { token, cookie, error: null }
+    : { token: "", cookie: "", error: "Login Fantacalcio completato, ma non è stato ricevuto il token della lega. Controlla che l'account possa aprire questa competizione." };
 }
 
 function findLegacyStandingRows(value: unknown, depth = 0): JsonRecord[] {
@@ -292,7 +325,7 @@ async function fetchCompetitionTeams(competitionId: string, token: string): Prom
   return teams;
 }
 
-async function fetchLegacyStandings(leagueUrl: string, competitionId: string, token: string): Promise<{ rows: JsonRecord[]; status: number }> {
+async function fetchLegacyStandings(leagueUrl: string, competitionId: string, token: string, cookie: string): Promise<{ rows: JsonRecord[]; status: number }> {
   const alias = new URL(leagueUrl).pathname.split("/").filter(Boolean)[0] ?? "";
   const params = new URLSearchParams({
     alias_lega: alias,
@@ -301,7 +334,8 @@ async function fetchLegacyStandings(leagueUrl: string, competitionId: string, to
     giornata_fine: "60",
   });
   const response = await fetch(`${LEGACY_API_BASE}/v1_legheCompetizione/classificagiornate?${params}`, {
-    headers: headers(token),
+    headers: { ...headers(token), ...(cookie ? { Cookie: cookie } : {}) },
+    credentials: "include",
     cache: "no-store",
   });
   return { rows: response.ok ? findLegacyStandingRows(await readJson(response)) : [], status: response.status };
@@ -516,7 +550,7 @@ export async function fetchFantacalcioStandings(): Promise<FantacalcioStandingsR
   try {
     const [teams, standings, calendar] = await Promise.all([
       fetchCompetitionTeams(competitionId, auth.token),
-      fetchLegacyStandings(leagueUrl, competitionId, auth.token),
+      fetchLegacyStandings(leagueUrl, competitionId, auth.token, auth.cookie),
       fetchCompetitionCalendar(competitionId, auth.token),
     ]);
     const teamIdByName = new Map([...teams].map(([id, name]) => [name.trim().toLocaleLowerCase("it-IT"), id]));
