@@ -310,18 +310,19 @@ export interface Database {
           id: string;
           day: number;
           title: string | null;
-          status: "open" | "closed" | "settled";
+          status: "draft" | "open" | "closed" | "settled";
           created_at: string;
         };
         Insert: {
+          id?: string;
           day: number;
           title?: string | null;
-          status?: "open" | "closed" | "settled";
+          status?: "draft" | "open" | "closed" | "settled";
         };
         Update: {
           day?: number;
           title?: string | null;
-          status?: "open" | "closed" | "settled";
+          status?: "draft" | "open" | "closed" | "settled";
         };
         Relationships: [];
       };
@@ -346,6 +347,7 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          id?: string;
           round_id: string;
           home_team?: string | null;
           away_team?: string | null;

@@ -17,9 +17,12 @@ create table if not exists fanta_bet_rounds (
   id         uuid primary key default gen_random_uuid(),
   day        integer not null,
   title      text,
-  status     text not null default 'open',   -- 'open' | 'closed' | 'settled'
+  status     text not null default 'draft',  -- 'draft' | 'open' | 'closed' | 'settled'
   created_at timestamptz not null default now()
 );
+
+-- Aggiorna anche i progetti che avevano eseguito una versione precedente.
+alter table fanta_bet_rounds alter column status set default 'draft';
 
 -- Scontri della giornata
 create table if not exists fanta_bet_matches (

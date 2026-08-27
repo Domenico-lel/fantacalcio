@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/sync-rosters",
       "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron/prepare-predictions",
+      "schedule": "30 3 * * *"
     }
   ]
 }

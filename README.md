@@ -11,7 +11,7 @@ App mobile PWA per gestire il fantacalcio creativo con amici. **Installabile com
 - **🔵 Notizie** (`/news`) — Feed RSS da Corriere dello Sport e Tuttosport, cache 5 min.
 - **🟠 Mercato** (`/players`) — Transfer rumors da Transfermarkt (top 5 leghe europee). Clicca card → scheda con dati trasferimento e link profilo TM.
 - **🟣 Classifica** (`/standings`) — Classifica reale, giornata corrente e rose ufficiali della lega; i giocatori vengono sincronizzati automaticamente ogni giorno.
-- **🟡 Pronostici** (`/pronostici`) — Sezione pronostici con sistema crediti (esclude admin dalla classifica).
+- **🟡 Pronostici** (`/pronostici`) — Bozza automatica per ogni giornata Fantacalcio, con accoppiamenti reali e quote basate sulla classifica; l'admin controlla e pubblica.
 - **🟢 Bacheca Social** (`/bacheca`) — Feed di post dove interagire, commentare, usare tag.
 
 **Profilo & Badge**:
@@ -122,6 +122,7 @@ Dual-layer strategy:
 - `GET /api/transfers` — scraping Transfermarkt top 5 leghe, cache 5 min (in-memory per dev).
 - `GET /api/standings` — scraping Leghe FC, cache 10 min.
 - `GET /api/cron/sync-rosters` — sincronizzazione giornaliera protetta di squadre, giocatori e scambi.
+- `GET /api/cron/prepare-predictions` — prepara ogni giorno la nuova bozza Pronostici senza pubblicarla.
 
 ## Configurazione Clerk (importante per utenti italiani)
 

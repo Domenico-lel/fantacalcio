@@ -5,6 +5,11 @@ import { getCurrentViewer, type Viewer } from "@/app/social-actions";
 import { STARTING_CREDITS, FOOTBALL_COMPETITIONS, type ExtMatch } from "@/lib/bet-constants";
 import { fetchCompetitionMatches, fetchMatchResult } from "@/lib/football-data";
 import { annotateWithOdds } from "@/lib/odds-api";
+import {
+  ensureCurrentPredictionDraft,
+  ensureCurrentPredictionDraftIfStale,
+  type PredictionDraftResult,
+} from "@/lib/prediction-drafts";
 
 type Pick = "1" | "X" | "2";
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -54,7 +59,7 @@ export interface BetRound {
   id: string;
   day: number;
   title: string | null;
-  status: "open" | "closed" | "settled";
+  status: "draft" | "open" | "closed" | "settled";
   createdAt: string;
   matches: BetMatch[];
 }
@@ -118,6 +123,14 @@ export async function fetchBetCenter(): Promise<BetCenter> {
 
   const viewer = await getCurrentViewer();
   if (!viewer) return empty;
+
+  // Il cron resta la fonte principale. Questo controllo rende però la bozza
+  // disponibile anche al primo accesso admin dopo una nuova giornata.
+  if (viewer.isAdmin) {
+    await ensureCurrentPredictionDraftIfStale().catch((error) => {
+      console.error("[prediction-draft] Controllo all'apertura fallito", error);
+    });
+  }
 
   const db = createAdminClient();
 
@@ -210,14 +223,16 @@ export async function fetchBetCenter(): Promise<BetCenter> {
     matchesByRound.set(m.round_id, list);
   }
 
-  const roundList: BetRound[] = (rounds ?? []).map((r) => ({
-    id: r.id,
-    day: r.day,
-    title: r.title,
-    status: r.status,
-    createdAt: r.created_at,
-    matches: matchesByRound.get(r.id) ?? [],
-  }));
+  const roundList: BetRound[] = (rounds ?? [])
+    .filter((round) => viewer.isAdmin || round.status !== "draft")
+    .map((r) => ({
+      id: r.id,
+      day: r.day,
+      title: r.title,
+      status: r.status,
+      createdAt: r.created_at,
+      matches: matchesByRound.get(r.id) ?? [],
+    }));
 
   // classifica crediti — una riga per squadra assegnata (l'admin non è in gara).
   // I comproprietari di una squadra condivisa (doppio) condividono la stessa
@@ -373,8 +388,24 @@ export async function createBetRound(day: number, title: string): Promise<{ erro
   if (!viewer?.isAdmin) return { error: "Solo l'admin" };
   if (!Number.isFinite(day) || day <= 0) return { error: "Giornata non valida" };
   const db = createAdminClient();
-  const { error } = await db.from("fanta_bet_rounds").insert({ day, title: title.trim() || null });
+  const { error } = await db.from("fanta_bet_rounds").insert({ day, title: title.trim() || null, status: "draft" });
   return { error: error?.message ?? null };
+}
+
+export async function preparePredictionDraftNow(): Promise<PredictionDraftResult> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) {
+    return {
+      day: null,
+      roundId: null,
+      matches: 0,
+      created: false,
+      skipped: false,
+      checkedAt: null,
+      error: "Solo l'admin può preparare la bozza",
+    };
+  }
+  return ensureCurrentPredictionDraft();
 }
 
 export async function setRoundStatus(roundId: string, status: "open" | "closed"): Promise<{ error: string | null }> {

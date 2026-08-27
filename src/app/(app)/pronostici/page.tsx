@@ -6,6 +6,7 @@ import {
   createBetRound, setRoundStatus, deleteBetRound, addBetMatch, deleteBetMatch, adjustCredits,
   updateMatchOdds, adminDeleteBet,
   fetchFootballMatches, addExternalBetMatch, syncRoundResults,
+  preparePredictionDraftNow,
   type BetCenter, type BetRound, type BetMatch, type CreditRow,
 } from "@/app/pronostici-actions";
 import { fetchTeams, type Team } from "@/app/teams-actions";
@@ -147,6 +148,7 @@ function BetTab({ data, loading, reload, clockOffset }: { data: BetCenter | null
 
 function RoundBadge({ status }: { status: BetRound["status"] }) {
   const map = {
+    draft: { label: "Bozza", color: "#94a3b8" },
     open: { label: "Aperta", color: "#34d399" },
     closed: { label: "Chiusa", color: "#f0a43a" },
     settled: { label: "Conclusa", color: "#857cf0" },
@@ -308,6 +310,8 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [preparing, setPreparing] = useState(false);
+  const [prepareMsg, setPrepareMsg] = useState("");
 
   useEffect(() => { fetchTeams().then(setTeams); }, []);
 
@@ -322,11 +326,42 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
     await reload();
   }
 
+  async function prepare() {
+    setPreparing(true); setPrepareMsg("");
+    const res = await preparePredictionDraftNow();
+    setPreparing(false);
+    if (res.error) { setPrepareMsg(res.error); return; }
+    if (res.skipped) {
+      setPrepareMsg(res.day ? `✓ La giornata ${res.day} è già pronta o pubblicata.` : "✓ Nessuna nuova giornata da preparare.");
+    } else {
+      setPrepareMsg(`✓ Giornata ${res.day}: ${res.matches} scontri precompilati con quote aggiornate.`);
+    }
+    await reload();
+  }
+
   return (
     <div className="px-4 py-4 flex flex-col gap-4">
-      {/* crea giornata */}
+      <div className="card p-4" style={{ borderColor: "color-mix(in srgb, var(--accent) 35%, var(--border))" }}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow mb-1">Bozza automatica</p>
+            <p className="text-sm leading-snug" style={{ color: "var(--text-dim)" }}>
+              Accoppiamenti dal calendario Fantacalcio e quote calcolate sulla classifica attuale. Controlla la bozza e premi “Pubblica”.
+            </p>
+          </div>
+          <span className="text-xl flex-none">✨</span>
+        </div>
+        <button type="button" onClick={prepare} disabled={preparing}
+          className="btn-primary w-full min-h-[44px] px-4 text-sm mt-3 disabled:opacity-50">
+          {preparing ? "Preparo…" : "Aggiorna bozza ora"}
+        </button>
+        {prepareMsg && <p role={prepareMsg.startsWith("✓") ? "status" : "alert"} className="text-xs mt-2" style={{ color: prepareMsg.startsWith("✓") ? "var(--success)" : "var(--text-dim)" }}>{prepareMsg}</p>}
+      </div>
+
+      {/* creazione di emergenza, se il calendario Fantacalcio non è disponibile */}
       <div className="card p-4">
-        <p className="eyebrow mb-3">Nuova giornata</p>
+        <p className="eyebrow mb-1">Creazione manuale</p>
+        <p className="text-white/40 text-xs mb-3">Fallback: crea una bozza vuota soltanto se il calendario automatico non è disponibile.</p>
         <div className="flex gap-2">
           <input type="number" value={day} onChange={(e) => setDay(e.target.value)} placeholder="Giornata"
             className="input w-24 px-3 py-2 text-sm" />
@@ -443,7 +478,11 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
               {syncing ? "…" : "↻ Risultati"}
             </button>
           )}
-          {round.status !== "settled" && (
+          {round.status === "draft" && (
+            <button onClick={async () => { await setRoundStatus(round.id, "open"); await reload(); }}
+              className="btn-primary px-3 py-1.5 text-[11px]">Pubblica</button>
+          )}
+          {round.status !== "draft" && round.status !== "settled" && (
             <button onClick={async () => { await setRoundStatus(round.id, round.status === "open" ? "closed" : "open"); await reload(); }}
               className="btn-soft px-2.5 py-1.5 text-[11px]">
               {round.status === "open" ? "Chiudi" : "Riapri"}
