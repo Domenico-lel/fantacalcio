@@ -1,6 +1,7 @@
 import { fetchFantacalcioStandings } from "@/lib/fantacalcio-api";
+import { FIXED_WIN_MULTIPLIER } from "@/lib/bet-constants";
 import { getLeagueUrl } from "@/lib/league-config";
-import { calculateStandingsOdds, stablePredictionUuid } from "@/lib/prediction-draft-utils";
+import { stablePredictionUuid } from "@/lib/prediction-draft-utils";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 
 const LAST_CHECK_KEY = "prediction_draft_last_checked_at";
@@ -69,21 +70,10 @@ async function preparePredictionDraft(): Promise<PredictionDraftResult> {
 
   const teamBySourceId = new Map((teams ?? []).flatMap((team) => team.team_id ? [[team.team_id, team] as const] : []));
   const teamByName = new Map((teams ?? []).map((team) => [normalizedName(team.name), team]));
-  const positionBySourceId = new Map(source.items.flatMap((team) => team.teamId ? [[team.teamId, team.position] as const] : []));
-  const positionByName = new Map(source.items.map((team) => [normalizedName(team.teamName), team.position]));
-  const teamCount = Math.max(source.items.length, teams?.length ?? 0, 2);
-
   const preparedMatches = matchday.matches.map((fixture) => {
     const home = teamBySourceId.get(fixture.homeTeamId) ?? teamByName.get(normalizedName(fixture.homeTeamName));
     const away = teamBySourceId.get(fixture.awayTeamId) ?? teamByName.get(normalizedName(fixture.awayTeamName));
     if (!home || !away) return null;
-    const homePosition = positionBySourceId.get(fixture.homeTeamId)
-      ?? positionByName.get(normalizedName(fixture.homeTeamName))
-      ?? teamCount;
-    const awayPosition = positionBySourceId.get(fixture.awayTeamId)
-      ?? positionByName.get(normalizedName(fixture.awayTeamName))
-      ?? teamCount;
-    const odds = calculateStandingsOdds(homePosition, awayPosition, teamCount);
     return {
       id: stablePredictionUuid(`fantacalcio-match:${roundId}:${fixture.homeTeamId}:${fixture.awayTeamId}`),
       round_id: roundId,
@@ -91,9 +81,9 @@ async function preparePredictionDraft(): Promise<PredictionDraftResult> {
       away_team: away.id,
       home_name: home.name,
       away_name: away.name,
-      odd_1: odds.odd1,
-      odd_x: odds.oddX,
-      odd_2: odds.odd2,
+      odd_1: FIXED_WIN_MULTIPLIER,
+      odd_x: FIXED_WIN_MULTIPLIER,
+      odd_2: FIXED_WIN_MULTIPLIER,
     };
   }).filter((match): match is NonNullable<typeof match> => !!match);
 

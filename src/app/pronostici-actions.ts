@@ -2,9 +2,13 @@
 
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import { getCurrentViewer, type Viewer } from "@/app/social-actions";
-import { STARTING_CREDITS, FOOTBALL_COMPETITIONS, type ExtMatch } from "@/lib/bet-constants";
+import {
+  STARTING_CREDITS,
+  FIXED_WIN_MULTIPLIER,
+  calculateFixedPayout,
+  type ExtMatch,
+} from "@/lib/bet-constants";
 import { fetchCompetitionMatches, fetchMatchResult } from "@/lib/football-data";
-import { annotateWithOdds } from "@/lib/odds-api";
 import {
   ensureAllPredictionDrafts,
   ensureAllPredictionDraftsIfStale,
@@ -19,7 +23,6 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 export interface MyBet {
   pick: Pick;
   stake: number;
-  odd: number;
   status: "pending" | "won" | "lost";
   payout: number;
 }
@@ -32,7 +35,6 @@ export interface AdminBet {
   logo: string;
   pick: Pick;
   stake: number;
-  odd: number;
   status: "pending" | "won" | "lost";
   payout: number;
 }
@@ -46,9 +48,6 @@ export interface BetMatch {
   competition: string | null; // valorizzato per le partite reali
   kickoff: string | null;     // data/ora ISO della partita reale
   external: boolean;          // true = partita reale (non squadre della lega)
-  odd1: number;
-  oddX: number;
-  odd2: number;
   result: Pick | null;
   myBet: MyBet | null;
   betCount: number;
@@ -111,10 +110,6 @@ async function addBalance(db: AdminClient, userId: string, delta: number): Promi
     .eq("user_id", key);
 }
 
-function oddFor(match: { odd_1: number; odd_x: number; odd_2: number }, pick: Pick): number {
-  return pick === "1" ? match.odd_1 : pick === "X" ? match.odd_x : match.odd_2;
-}
-
 // ─── Lettura: centro scommesse ───────────────────────────────────────────────
 
 export async function fetchBetCenter(): Promise<BetCenter> {
@@ -171,7 +166,7 @@ export async function fetchBetCenter(): Promise<BetCenter> {
   const allBets = matchIds.length
     ? (await db
         .from("fanta_bets")
-        .select("id, match_id, user_id, pick, stake, odd, status, payout")
+        .select("id, match_id, user_id, pick, stake, status, payout")
         .in("match_id", matchIds)).data
     : [];
 
@@ -181,7 +176,7 @@ export async function fetchBetCenter(): Promise<BetCenter> {
   for (const b of allBets ?? []) {
     countByMatch.set(b.match_id, (countByMatch.get(b.match_id) ?? 0) + 1);
     if (b.user_id === viewer.userId) {
-      myBetByMatch.set(b.match_id, { pick: b.pick, stake: b.stake, odd: Number(b.odd), status: b.status, payout: b.payout });
+      myBetByMatch.set(b.match_id, { pick: b.pick, stake: b.stake, status: b.status, payout: b.payout });
     }
     if (viewer.isAdmin) {
       const list = adminBetsByMatch.get(b.match_id) ?? [];
@@ -192,7 +187,6 @@ export async function fetchBetCenter(): Promise<BetCenter> {
         logo: logoByUser.get(b.user_id) ?? "⚽",
         pick: b.pick,
         stake: b.stake,
-        odd: Number(b.odd),
         status: b.status,
         payout: b.payout,
       });
@@ -212,9 +206,6 @@ export async function fetchBetCenter(): Promise<BetCenter> {
       competition: m.competition ?? null,
       kickoff: m.kickoff ?? null,
       external: !!(m.ext_event_id || m.competition),
-      odd1: Number(m.odd_1),
-      oddX: Number(m.odd_x),
-      odd2: Number(m.odd_2),
       result: m.result,
       myBet: myBetByMatch.get(m.id) ?? null,
       betCount: countByMatch.get(m.id) ?? 0,
@@ -301,9 +292,20 @@ export async function placeBet(matchId: string, pick: Pick, stake: number): Prom
   const balance = await getBalance(db, viewer.userId);
   if (balance < stake) return { error: `Crediti insufficienti (hai ${balance})` };
 
-  const odd = Number(oddFor(match, pick));
   await addBalance(db, viewer.userId, -stake); // scala dalla cassa condivisa della squadra
-  await db.from("fanta_bets").insert({ match_id: matchId, user_id: viewer.userId, pick, stake, odd });
+  const { error } = await db.from("fanta_bets").insert({
+    match_id: matchId,
+    user_id: viewer.userId,
+    pick,
+    stake,
+    odd: FIXED_WIN_MULTIPLIER,
+  });
+  if (error) {
+    console.error("[pronostici] Salvataggio giocata fallito", error);
+    // Se il salvataggio fallisce, ripristina subito la puntata scalata.
+    await addBalance(db, viewer.userId, stake);
+    return { error: "Non è stato possibile registrare la giocata. Riprova." };
+  }
 
   return { error: null, balance: balance - stake };
 }
@@ -332,7 +334,7 @@ async function settleMatch(db: AdminClient, matchId: string, result: Pick): Prom
   for (const b of bets ?? []) {
     if (b.status !== "pending" && b.status !== "won" && b.status !== "lost") continue;
     if (b.pick === result) {
-      const payout = Math.round(b.stake * Number(b.odd));
+      const payout = calculateFixedPayout(b.stake);
       await addBalance(db, b.user_id, payout);
       await db.from("fanta_bets").update({ status: "won", payout }).eq("id", b.id);
     } else {
@@ -402,7 +404,7 @@ export async function preparePredictionDraftNow(): Promise<AllPredictionDraftsRe
         skipped: true, checkedAt: null, error,
       },
       serieA: {
-        day: null, roundId: null, matches: 0, oddsSources: 0,
+        day: null, roundId: null, matches: 0,
         created: false, skipped: true, error,
       },
       checkedAt: null,
@@ -441,17 +443,10 @@ export async function addBetMatch(input: {
   roundId: string;
   homeTeamId: string;
   awayTeamId: string;
-  odd1: number;
-  oddX: number;
-  odd2: number;
 }): Promise<{ error: string | null }> {
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { error: "Solo l'admin" };
   if (input.homeTeamId === input.awayTeamId) return { error: "Scegli due squadre diverse" };
-  for (const o of [input.odd1, input.oddX, input.odd2]) {
-    if (!Number.isFinite(o) || o < 1) return { error: "Quote non valide (minimo 1.00)" };
-  }
-
   const db = createAdminClient();
   const { data: teams } = await db.from("fanta_teams").select("id, name").in("id", [input.homeTeamId, input.awayTeamId]);
   const nameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
@@ -465,9 +460,9 @@ export async function addBetMatch(input: {
     away_team: input.awayTeamId,
     home_name: homeName,
     away_name: awayName,
-    odd_1: input.odd1,
-    odd_x: input.oddX,
-    odd_2: input.odd2,
+    odd_1: FIXED_WIN_MULTIPLIER,
+    odd_x: FIXED_WIN_MULTIPLIER,
+    odd_2: FIXED_WIN_MULTIPLIER,
   });
   await refreshRoundStatus(db, input.roundId);
   return { error: error?.message ?? null };
@@ -483,11 +478,7 @@ export async function fetchFootballMatches(
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { matches: [], error: "Solo l'admin" };
   const res = await fetchCompetitionMatches(code, matchday);
-  if (res.error || res.matches.length === 0) return res;
-  // pre-compila le quote 1/X/2 dai bookmaker, quando disponibili
-  const oddsKey = FOOTBALL_COMPETITIONS.find((c) => c.code === code)?.oddsKey;
-  const matches = await annotateWithOdds(res.matches, oddsKey);
-  return { matches, error: null };
+  return res;
 }
 
 // Aggiunge alla giornata uno scontro su una partita reale (da provider o manuale).
@@ -500,19 +491,12 @@ export async function addExternalBetMatch(input: {
   competition?: string | null;
   eventId?: string | null;
   kickoff?: string | null;
-  odd1: number;
-  oddX: number;
-  odd2: number;
 }): Promise<{ error: string | null }> {
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { error: "Solo l'admin" };
   const home = input.homeName.trim();
   const away = input.awayName.trim();
   if (!home || !away) return { error: "Inserisci entrambe le squadre" };
-  for (const o of [input.odd1, input.oddX, input.odd2]) {
-    if (!Number.isFinite(o) || o < 1) return { error: "Quote non valide (minimo 1.00)" };
-  }
-
   const db = createAdminClient();
   const { error } = await db.from("fanta_bet_matches").insert({
     round_id: input.roundId,
@@ -523,9 +507,9 @@ export async function addExternalBetMatch(input: {
     competition: input.competition?.trim() || null,
     ext_event_id: input.eventId?.trim() || null,
     kickoff: input.kickoff || null,
-    odd_1: input.odd1,
-    odd_x: input.oddX,
-    odd_2: input.odd2,
+    odd_1: FIXED_WIN_MULTIPLIER,
+    odd_x: FIXED_WIN_MULTIPLIER,
+    odd_2: FIXED_WIN_MULTIPLIER,
   });
   if (error) {
     if (/home_logo|away_logo|competition|ext_event_id|kickoff|column|schema cache/i.test(error.message)) {
@@ -565,17 +549,6 @@ export async function syncRoundResults(roundId: string): Promise<{ settled: numb
     };
   }
   return { settled, error: null };
-}
-
-export async function updateMatchOdds(matchId: string, odd1: number, oddX: number, odd2: number): Promise<{ error: string | null }> {
-  const viewer = await getCurrentViewer();
-  if (!viewer?.isAdmin) return { error: "Solo l'admin" };
-  for (const o of [odd1, oddX, odd2]) if (!Number.isFinite(o) || o < 1) return { error: "Quote non valide" };
-  const db = createAdminClient();
-  const { data: match } = await db.from("fanta_bet_matches").select("result").eq("id", matchId).maybeSingle();
-  if (match?.result) return { error: "Scontro già concluso" };
-  const { error } = await db.from("fanta_bet_matches").update({ odd_1: odd1, odd_x: oddX, odd_2: odd2 }).eq("id", matchId);
-  return { error: error?.message ?? null };
 }
 
 export async function deleteBetMatch(matchId: string): Promise<{ error: string | null }> {

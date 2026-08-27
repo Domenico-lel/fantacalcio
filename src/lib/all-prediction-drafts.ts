@@ -25,7 +25,7 @@ function emptyFantasy(error: string | null = null): PredictionDraftResult {
 }
 
 function emptySerieA(error: string | null = null): SerieAPredictionDraftResult {
-  return { day: null, roundId: null, matches: 0, oddsSources: 0, created: false, skipped: true, error };
+  return { day: null, roundId: null, matches: 0, created: false, skipped: true, error };
 }
 
 async function saveCheckTimestamp(checkedAt: string): Promise<void> {

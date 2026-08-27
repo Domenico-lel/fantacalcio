@@ -4,13 +4,23 @@ import { useState, useEffect, useCallback } from "react";
 import {
   fetchBetCenter, placeBet, setMatchResult,
   createBetRound, setRoundStatus, deleteBetRound, addBetMatch, deleteBetMatch, adjustCredits,
-  updateMatchOdds, adminDeleteBet,
+  adminDeleteBet,
   fetchFootballMatches, addExternalBetMatch, syncRoundResults,
   preparePredictionDraftNow,
   type BetCenter, type BetRound, type BetMatch, type CreditRow,
 } from "@/app/pronostici-actions";
 import { fetchTeams, type Team } from "@/app/teams-actions";
-import { STARTING_CREDITS, FOOTBALL_COMPETITIONS, type ExtMatch } from "@/lib/bet-constants";
+import {
+  STARTING_CREDITS,
+  FIXED_WIN_MULTIPLIER,
+  calculateFixedPayout,
+  FOOTBALL_COMPETITIONS,
+  type ExtMatch,
+} from "@/lib/bet-constants";
+import {
+  groupPredictionRounds,
+  type PredictionCompetitionGroup,
+} from "@/lib/prediction-competition-groups";
 import { isImageAvatar } from "@/lib/avatar";
 import PageHeader from "@/components/PageHeader";
 import SegmentedTabs from "@/components/SegmentedTabs";
@@ -30,10 +40,6 @@ function Avatar({ src, size }: { src: string; size: number }) {
     return <img src={src} alt="" className="rounded-full object-cover flex-none" style={{ width: size, height: size }} />;
   }
   return <span className="flex-none leading-none" style={{ fontSize: size * 0.85 }}>{src}</span>;
-}
-
-function fmtOdd(o: number) {
-  return o.toFixed(2);
 }
 
 function fmtKickoff(iso: string | null) {
@@ -106,9 +112,54 @@ export default function PronosticiPage() {
 
 /* ─── TAB SCOMMETTI ─────────────────────────────────────────────────────── */
 
+function CompetitionFolders({
+  groups,
+  activeKey,
+  onChange,
+}: {
+  groups: PredictionCompetitionGroup<BetRound>[];
+  activeKey: string;
+  onChange: (key: string) => void;
+}) {
+  if (groups.length <= 1) return null;
+  return (
+    <div className="grid grid-cols-2 gap-2" aria-label="Competizioni">
+      {groups.map((group) => {
+        const active = group.key === activeKey;
+        const open = group.rounds.filter((round) => round.status === "open").length;
+        return (
+          <button
+            key={group.key}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(group.key)}
+            className="min-w-0 rounded-2xl px-3 py-3 text-left transition-all active:scale-[0.98]"
+            style={{
+              background: active ? "color-mix(in srgb, var(--accent) 17%, var(--surface))" : "var(--surface)",
+              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+              boxShadow: active ? "0 8px 24px -16px var(--accent-glow)" : "none",
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-xl" aria-hidden="true">{group.icon}</span>
+              <span className="font-display text-sm font-bold text-white truncate">{group.label}</span>
+            </span>
+            <span className="block text-[10px] mt-1" style={{ color: active ? "var(--accent-soft)" : "var(--text-faint)" }}>
+              {open ? (open === 1 ? "1 aperta" : `${open} aperte`) : `${group.rounds.length} giornat${group.rounds.length === 1 ? "a" : "e"}`}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function BetTab({ data, loading, reload, clockOffset }: { data: BetCenter | null; loading: boolean; reload: () => Promise<void>; clockOffset: number }) {
   const rounds = data?.rounds ?? [];
   const canBet = !!data?.viewer && !data.viewer.isAdmin && data.viewer.hasProfile;
+  const groups = groupPredictionRounds(rounds);
+  const [selectedKey, setSelectedKey] = useState("");
+  const activeGroup = groups.find((group) => group.key === selectedKey) ?? groups[0];
 
   return (
     <div className="px-4 py-4 flex flex-col gap-5">
@@ -129,18 +180,34 @@ function BetTab({ data, loading, reload, clockOffset }: { data: BetCenter | null
         </div>
       )}
 
-      {rounds.map((r) => (
-        <div key={r.id} className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 px-1">
-            <span className="font-display font-bold text-white text-sm">Giornata {r.day}{r.title ? ` · ${r.title}` : ""}</span>
-            <RoundBadge status={r.status} />
-          </div>
-          {r.matches.length === 0 && <p className="text-white/35 text-xs">Nessuno scontro inserito.</p>}
-          {r.matches.map((m) => (
-            <MatchBetCard key={m.id} match={m} roundStatus={r.status} canBet={canBet} balance={data?.balance ?? 0} reload={reload} clockOffset={clockOffset} />
+      {!loading && activeGroup && (
+        <>
+          <CompetitionFolders
+            groups={groups}
+            activeKey={activeGroup.key}
+            onChange={setSelectedKey}
+          />
+          {activeGroup.rounds.map((round) => (
+            <details
+              key={round.id}
+              open={round.status === "open"}
+              className="card overflow-hidden group"
+            >
+              <summary className="list-none cursor-pointer px-4 py-3 flex items-center gap-2 select-none">
+                <span className="font-display font-bold text-white text-sm flex-1">Giornata {round.day}</span>
+                <RoundBadge status={round.status} />
+                <span className="text-white/35 text-xs transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="px-3 pb-3 flex flex-col gap-3 border-t" style={{ borderColor: "var(--border)" }}>
+                {round.matches.length === 0 && <p className="text-white/35 text-xs pt-3">Nessuno scontro inserito.</p>}
+                {round.matches.map((match) => (
+                  <MatchBetCard key={match.id} match={match} roundStatus={round.status} canBet={canBet} reload={reload} clockOffset={clockOffset} />
+                ))}
+              </div>
+            </details>
           ))}
-        </div>
-      ))}
+        </>
+      )}
       <div className="h-4" />
     </div>
   );
@@ -159,8 +226,8 @@ function RoundBadge({ status }: { status: BetRound["status"] }) {
   );
 }
 
-function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset }: {
-  match: BetMatch; roundStatus: BetRound["status"]; canBet: boolean; balance: number; reload: () => Promise<void>; clockOffset: number;
+function MatchBetCard({ match, roundStatus, canBet, reload, clockOffset }: {
+  match: BetMatch; roundStatus: BetRound["status"]; canBet: boolean; reload: () => Promise<void>; clockOffset: number;
 }) {
   const [pick, setPick] = useState<Pick | null>(match.myBet?.pick ?? null);
   const [stake, setStake] = useState<string>(match.myBet ? String(match.myBet.stake) : "");
@@ -174,8 +241,7 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset
   // una volta piazzata, la giocata non è più modificabile
   const locked = !!match.result || roundStatus !== "open" || !canBet || !!match.myBet || started;
   const stakeNum = parseInt(stake || "0", 10);
-  const odd = pick === "1" ? match.odd1 : pick === "X" ? match.oddX : pick === "2" ? match.odd2 : 0;
-  const potential = pick && stakeNum > 0 ? Math.round(stakeNum * odd) : 0;
+  const potential = pick && stakeNum > 0 ? calculateFixedPayout(stakeNum) : 0;
 
   async function submit() {
     if (!pick) { setError("Scegli un esito"); return; }
@@ -187,20 +253,9 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset
     await reload();
   }
 
-  const odds: Record<Pick, number> = { "1": match.odd1, X: match.oddX, "2": match.odd2 };
-
   return (
-    <div className="card p-4">
-      {/* competizione + orario (partite reali) */}
-      {match.competition && (
-        <div className="flex items-center gap-2 mb-2.5">
-          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-            style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent-soft)" }}>
-            {match.competition}
-          </span>
-          {match.kickoff && <span className="text-white/35 text-[10px]">{fmtKickoff(match.kickoff)}</span>}
-        </div>
-      )}
+    <div className="card-flat p-3 mt-3">
+      {match.kickoff && <p className="text-white/35 text-[10px] mb-2">{fmtKickoff(match.kickoff)}</p>}
 
       {/* squadre */}
       <div className="flex items-center justify-between gap-2">
@@ -215,7 +270,7 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset
         </div>
       </div>
 
-      {/* esiti / quote */}
+      {/* esiti semplici: la vincita è sempre 2× */}
       <div className="grid grid-cols-3 gap-2 mt-3">
         {(["1", "X", "2"] as Pick[]).map((p) => {
           const isResult = match.result === p;
@@ -230,11 +285,17 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset
                 boxShadow: active ? "0 4px 14px -6px var(--accent-glow)" : "none",
                 opacity: locked && !isResult && !isPicked ? 0.55 : 1,
               }}>
-              <span className="text-[11px] font-bold" style={{ color: isResult ? "var(--accent-ink)" : active ? "var(--accent-soft)" : "var(--text-dim)" }}>{PICK_LABELS[p]}</span>
-              <span className="font-display text-sm font-bold" style={{ color: isResult ? "var(--accent-ink)" : "#fff" }}>{fmtOdd(odds[p])}</span>
+              <span className="font-display text-sm font-bold" style={{ color: isResult ? "var(--accent-ink)" : active ? "var(--accent-soft)" : "#fff" }}>{PICK_LABELS[p]}</span>
+              <span className="text-[9px] mt-0.5" style={{ color: isResult ? "var(--accent-ink)" : "var(--text-faint)" }}>{PICK_NAME[p]}</span>
             </button>
           );
         })}
+      </div>
+      <div className="mt-2 flex justify-center">
+        <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
+          style={{ color: "var(--accent-soft)", background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}>
+          Vincita fissa {FIXED_WIN_MULTIPLIER}×
+        </span>
       </div>
 
       {/* mia giocata già piazzata */}
@@ -246,11 +307,11 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset
           }}>
           <span className="text-xs text-white/70">
             Giocata: <b className="text-white">{PICK_LABELS[match.myBet.pick]}</b>
-            <span className="text-white/45"> ({PICK_NAME[match.myBet.pick]})</span> · {match.myBet.stake} cr · quota {fmtOdd(match.myBet.odd)}
+            <span className="text-white/45"> ({PICK_NAME[match.myBet.pick]})</span> · {match.myBet.stake} cr
           </span>
-          {match.myBet.status === "won" && <span className="text-emerald-400 text-xs font-bold">Vinta +{match.myBet.payout}</span>}
+          {match.myBet.status === "won" && <span className="text-emerald-400 text-xs font-bold">Ricevuti {match.myBet.payout}</span>}
           {match.myBet.status === "lost" && <span className="text-red-400 text-xs font-bold">Persa</span>}
-          {match.myBet.status === "pending" && <span className="text-white/50 text-xs">poss. {Math.round(match.myBet.stake * match.myBet.odd)}</span>}
+          {match.myBet.status === "pending" && <span className="text-white/50 text-xs">vinci {calculateFixedPayout(match.myBet.stake)}</span>}
         </div>
       )}
 
@@ -268,7 +329,7 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset
             className="input w-24 px-3 py-2.5 text-sm" />
           <button onClick={submit} disabled={busy || !pick || stakeNum <= 0}
             className="btn-primary flex-1 py-2.5 text-sm">
-            {busy ? "…" : `Punta${potential ? ` · vinci ${potential}` : ""}`}
+            {busy ? "…" : `Punta${potential ? ` · ricevi ${potential}` : ""}`}
           </button>
         </div>
       )}
@@ -284,7 +345,7 @@ function MatchBetCard({ match, roundStatus, canBet, balance, reload, clockOffset
 function RankTab({ leaderboard, loading }: { leaderboard: CreditRow[]; loading: boolean }) {
   return (
     <div className="px-4 py-4 flex flex-col gap-2">
-      <p className="text-white/40 text-xs mb-1">Saldo crediti dei manager. Si parte da {STARTING_CREDITS} crediti; si guadagna e si perde scommettendo sulle giornate.</p>
+      <p className="text-white/40 text-xs mb-1">Saldo crediti dei manager. Si parte da {STARTING_CREDITS}; ogni pronostico vincente restituisce 2× la puntata.</p>
       {loading && Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="skeleton" style={{ height: 56 }} />
       ))}
@@ -312,6 +373,9 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
   const [msg, setMsg] = useState("");
   const [preparing, setPreparing] = useState(false);
   const [prepareMsg, setPrepareMsg] = useState("");
+  const [selectedKey, setSelectedKey] = useState("");
+  const groups = groupPredictionRounds(rounds);
+  const activeGroup = groups.find((group) => group.key === selectedKey) ?? groups[0];
 
   useEffect(() => { fetchTeams().then(setTeams); }, []);
 
@@ -341,11 +405,7 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
       return `${label} G${draft.day}: ${draft.matches} partite pronte`;
     };
     const hasError = !!(res.fantasy.error || res.serieA.error);
-    const serieADescription = describe("Serie A", res.serieA)
-      + (!res.serieA.error && !res.serieA.skipped && res.serieA.oddsSources > 0
-        ? `, almeno ${res.serieA.oddsSources} bookmaker per partita`
-        : "");
-    setPrepareMsg(`${hasError ? "⚠" : "✓"} ${describe("Fantacalcio", res.fantasy)} · ${serieADescription}`);
+    setPrepareMsg(`${hasError ? "⚠" : "✓"} ${describe("Fantacalcio", res.fantasy)} · ${describe("Serie A", res.serieA)}`);
     await reload();
   }
 
@@ -356,7 +416,7 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
           <div>
             <p className="eyebrow mb-1">Bozza automatica</p>
             <p className="text-sm leading-snug" style={{ color: "var(--text-dim)" }}>
-              Due bozze già complete: lega Fantacalcio con quote dalla classifica e Serie A con calendario reale e consenso dei bookmaker europei. Controlla e premi “Pubblica”.
+              Prepara Fantacalcio e Serie A. Ogni vincita paga sempre 2×.
             </p>
           </div>
           <span className="text-xl flex-none">✨</span>
@@ -368,21 +428,31 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
         {prepareMsg && <p role={prepareMsg.startsWith("✓") ? "status" : "alert"} className="text-xs mt-2" style={{ color: prepareMsg.startsWith("✓") ? "var(--success)" : "var(--text-dim)" }}>{prepareMsg}</p>}
       </div>
 
-      {/* creazione di emergenza, se il calendario Fantacalcio non è disponibile */}
-      <div className="card p-4">
-        <p className="eyebrow mb-1">Creazione manuale</p>
-        <p className="text-white/40 text-xs mb-3">Fallback: crea una bozza vuota soltanto se il calendario automatico non è disponibile.</p>
-        <div className="flex gap-2">
-          <input type="number" value={day} onChange={(e) => setDay(e.target.value)} placeholder="Giornata"
-            className="input w-24 px-3 py-2 text-sm" />
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo (facoltativo)"
-            className="input flex-1 min-w-0 px-3 py-2 text-sm" />
-          <button onClick={create} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
+      {/* fallback nascosto: l'uso normale resta concentrato sulle bozze automatiche */}
+      <details className="card overflow-hidden">
+        <summary className="list-none cursor-pointer px-4 py-3 flex items-center gap-2">
+          <span className="text-sm">🛠️</span>
+          <span className="font-display text-white text-sm font-bold flex-1">Creazione manuale</span>
+          <span className="text-white/35 text-xs">⌄</span>
+        </summary>
+        <div className="px-4 pb-4 border-t pt-3" style={{ borderColor: "var(--border)" }}>
+          <div className="flex gap-2">
+            <input type="number" value={day} onChange={(e) => setDay(e.target.value)} placeholder="Giornata"
+              className="input w-24 px-3 py-2 text-sm" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Competizione"
+              className="input flex-1 min-w-0 px-3 py-2 text-sm" />
+            <button onClick={create} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
+          </div>
+          {msg && <p className="text-white/60 text-xs mt-2">{msg}</p>}
         </div>
-        {msg && <p className="text-white/60 text-xs mt-2">{msg}</p>}
-      </div>
+      </details>
 
-      {rounds.map((r) => <AdminRoundCard key={r.id} round={r} teams={teams} reload={reload} />)}
+      {activeGroup && (
+        <>
+          <CompetitionFolders groups={groups} activeKey={activeGroup.key} onChange={setSelectedKey} />
+          {activeGroup.rounds.map((round) => <AdminRoundCard key={round.id} round={round} teams={teams} reload={reload} />)}
+        </>
+      )}
 
       {/* crediti manuali */}
       <AdminCreditsCard leaderboard={leaderboard} reload={reload} />
@@ -408,23 +478,17 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
   const [rHome, setRHome] = useState("");
   const [rAway, setRAway] = useState("");
 
-  // quote (comuni alle due modalità)
-  const [o1, setO1] = useState("2.00");
-  const [ox, setOx] = useState("3.00");
-  const [o2, setO2] = useState("2.00");
-
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
 
   const hasExternal = round.matches.some((m) => m.external);
-  const odds = () => ({ odd1: parseFloat(o1), oddX: parseFloat(ox), odd2: parseFloat(o2) });
 
   async function addLeague() {
     if (!home || !away) { setErr("Scegli le due squadre"); return; }
     setBusy(true); setErr("");
-    const res = await addBetMatch({ roundId: round.id, homeTeamId: home, awayTeamId: away, ...odds() });
+    const res = await addBetMatch({ roundId: round.id, homeTeamId: home, awayTeamId: away });
     setBusy(false);
     if (res.error) { setErr(res.error); return; }
     setHome(""); setAway("");
@@ -442,10 +506,6 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
 
   function pickMatch(m: ExtMatch) {
     setSel(m); setRHome(m.homeName); setRAway(m.awayName); setErr("");
-    // pre-compila le quote se il provider le ha trovate (restano modificabili)
-    if (m.odd1 && m.oddX && m.odd2) {
-      setO1(m.odd1.toFixed(2)); setOx(m.oddX.toFixed(2)); setO2(m.odd2.toFixed(2));
-    }
   }
 
   async function addReal() {
@@ -459,7 +519,6 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
       competition: compName,
       eventId: sel?.eventId ?? null,
       kickoff: sel?.kickoff ?? null,
-      ...odds(),
     });
     setBusy(false);
     if (res.error) { setErr(res.error); return; }
@@ -479,7 +538,7 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
     <div className="card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-display text-white font-bold text-sm">Giornata {round.day}{round.title ? ` · ${round.title}` : ""}</span>
+          <span className="font-display text-white font-bold text-sm">Giornata {round.day}</span>
           <RoundBadge status={round.status} />
         </div>
         <div className="flex items-center gap-1.5">
@@ -508,8 +567,13 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
       {/* scontri esistenti */}
       {round.matches.map((m) => <AdminMatchRow key={m.id} match={m} reload={reload} />)}
 
-      {/* nuovo scontro */}
-      <div className="card-accent px-3 py-3 flex flex-col gap-2.5" style={{ borderRadius: 14 }}>
+      {/* nuovo scontro: chiuso finché non serve, per mantenere pulita la giornata */}
+      <details className="card-accent overflow-hidden" style={{ borderRadius: 14 }}>
+        <summary className="list-none cursor-pointer px-3 py-2.5 flex items-center gap-2">
+          <span className="font-display text-xs font-bold text-white flex-1">＋ Aggiungi partita</span>
+          <span className="text-[10px]" style={{ color: "var(--accent-soft)" }}>vincita {FIXED_WIN_MULTIPLIER}×</span>
+        </summary>
+        <div className="px-3 pb-3 flex flex-col gap-2.5 border-t pt-2.5" style={{ borderColor: "var(--border)" }}>
         {/* toggle modalità */}
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.05)" }}>
           {([["league", "Squadre lega"], ["real", "Partita reale"]] as const).map(([key, label]) => (
@@ -561,13 +625,6 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
                     </div>
                     <div className="flex items-center gap-2 w-full">
                       <span className="text-white/35 text-[9px]">{fmtKickoff(m.kickoff)}</span>
-                      {m.odd1 && m.oddX && m.odd2 ? (
-                        <span className="text-[9px] font-bold ml-auto" style={{ color: "var(--accent-soft)" }}>
-                          {m.odd1.toFixed(2)} · {m.oddX.toFixed(2)} · {m.odd2.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-white/25 text-[9px] ml-auto">quote n/d</span>
-                      )}
                     </div>
                   </button>
                 ))}
@@ -582,33 +639,18 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
           </>
         )}
 
-        {/* quote + aggiungi (comuni) */}
-        <div className="flex gap-2 items-center">
-          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
-          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
-          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input flex-1 min-w-0 px-2 py-2 text-xs text-center" />
-          <button onClick={mode === "league" ? addLeague : addReal} disabled={busy} className="btn-primary px-4 py-2 text-sm">+</button>
-        </div>
+        <button onClick={mode === "league" ? addLeague : addReal} disabled={busy} className="btn-primary w-full py-2 text-sm">
+          {busy ? "Aggiungo…" : "Aggiungi partita"}
+        </button>
         {err && <p className="text-red-400 text-xs">{err}</p>}
-      </div>
+        </div>
+      </details>
     </div>
   );
 }
 
 function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Promise<void> }) {
   const confirm = useConfirm();
-  const [editOdds, setEditOdds] = useState(false);
-  const [o1, setO1] = useState(m.odd1.toFixed(2));
-  const [ox, setOx] = useState(m.oddX.toFixed(2));
-  const [o2, setO2] = useState(m.odd2.toFixed(2));
-  const [err, setErr] = useState("");
-
-  async function saveOdds() {
-    const res = await updateMatchOdds(m.id, parseFloat(o1), parseFloat(ox), parseFloat(o2));
-    if (res.error) { setErr(res.error); return; }
-    setErr(""); setEditOdds(false);
-    await reload();
-  }
 
   return (
     <div className="card-flat px-3 py-2.5">
@@ -623,23 +665,8 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
       )}
       <div className="flex items-center justify-between gap-2">
         <span className="text-white text-xs font-semibold truncate flex-1">{m.homeName} <span className="text-white/30">vs</span> {m.awayName}</span>
-        <button
-          onClick={() => { setO1(m.odd1.toFixed(2)); setOx(m.oddX.toFixed(2)); setO2(m.odd2.toFixed(2)); setEditOdds((v) => !v); setErr(""); }}
-          disabled={!!m.result}
-          className="text-white/40 text-[10px] flex-none disabled:opacity-40"
-          title={m.result ? "Scontro concluso" : "Modifica quote"}>
-          {fmtOdd(m.odd1)} / {fmtOdd(m.oddX)} / {fmtOdd(m.odd2)} {!m.result && "✏️"}
-        </button>
+        <span className="text-[9px] font-bold flex-none" style={{ color: "var(--accent-soft)" }}>2×</span>
       </div>
-
-      {editOdds && !m.result && (
-        <div className="flex items-center gap-1.5 mt-2">
-          <input value={o1} onChange={(e) => setO1(e.target.value)} placeholder="1" className="input flex-1 min-w-0 px-2 py-1.5 text-xs text-center" />
-          <input value={ox} onChange={(e) => setOx(e.target.value)} placeholder="X" className="input flex-1 min-w-0 px-2 py-1.5 text-xs text-center" />
-          <input value={o2} onChange={(e) => setO2(e.target.value)} placeholder="2" className="input flex-1 min-w-0 px-2 py-1.5 text-xs text-center" />
-          <button onClick={saveOdds} className="btn-primary px-2.5 py-1.5 text-xs">✓</button>
-        </div>
-      )}
 
       {/* risultato: l'admin dichiara chi ha vinto → salda subito le giocate */}
       <p className="text-white/45 text-[10px] mt-2.5 mb-1">
@@ -669,8 +696,6 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
         <button onClick={async () => { if (await confirm({ title: "Eliminare lo scontro?", confirmLabel: "Elimina", danger: true })) { await deleteBetMatch(m.id); await reload(); } }}
           className="btn-danger-soft tap text-[13px] flex-none">✕</button>
       </div>
-
-      {err && <p className="text-red-400 text-xs mt-1.5">{err}</p>}
 
       {/* giocate dei manager — l'admin può cancellarne una piazzata per errore */}
       {m.bets && m.bets.length > 0 && (
@@ -711,9 +736,12 @@ function AdminCreditsCard({ leaderboard, reload }: { leaderboard: CreditRow[]; r
   }
 
   return (
-    <div className="card p-4">
-      <p className="eyebrow mb-3">Crediti manuali</p>
-      <div className="flex flex-col gap-2">
+    <details className="card overflow-hidden">
+      <summary className="list-none cursor-pointer px-4 py-3 flex items-center gap-2">
+        <span className="eyebrow flex-1">Crediti manuali</span>
+        <span className="text-white/35 text-xs">⌄</span>
+      </summary>
+      <div className="px-4 pb-4 pt-3 border-t flex flex-col gap-2" style={{ borderColor: "var(--border)" }}>
         <select value={user} onChange={(e) => setUser(e.target.value)} className="input w-full px-2 py-2 text-sm">
           <option value="">Manager…</option>
           {leaderboard.map((r) => <option key={r.userId} value={r.userId}>{r.name} ({r.balance})</option>)}
@@ -723,8 +751,8 @@ function AdminCreditsCard({ leaderboard, reload }: { leaderboard: CreditRow[]; r
             className="input flex-1 min-w-0 px-3 py-2 text-sm" />
           <button onClick={apply} disabled={busy} className="btn-primary px-5 py-2 text-sm">OK</button>
         </div>
+        <p className="text-white/35 text-[10px]">Usa valori negativi per togliere crediti. Es. +100 ricarica, -50 multa.</p>
       </div>
-      <p className="text-white/35 text-[10px] mt-2">Usa valori negativi per togliere crediti. Es. +100 ricarica, -50 multa.</p>
-    </div>
+    </details>
   );
 }

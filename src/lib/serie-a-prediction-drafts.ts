@@ -1,5 +1,5 @@
 import { fetchCompetitionMatches } from "@/lib/football-data";
-import { annotateWithOddsDetailed } from "@/lib/odds-api";
+import { FIXED_WIN_MULTIPLIER } from "@/lib/bet-constants";
 import { stablePredictionUuid } from "@/lib/prediction-draft-utils";
 import { selectNextCompleteMatchday } from "@/lib/serie-a-prediction-utils";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
@@ -8,7 +8,6 @@ export interface SerieAPredictionDraftResult {
   day: number | null;
   roundId: string | null;
   matches: number;
-  oddsSources: number;
   created: boolean;
   skipped: boolean;
   error: string | null;
@@ -21,7 +20,6 @@ function result(patch: Partial<SerieAPredictionDraftResult> = {}): SerieAPredict
     day: null,
     roundId: null,
     matches: 0,
-    oddsSources: 0,
     created: false,
     skipped: false,
     error: null,
@@ -38,17 +36,6 @@ async function prepareSerieADraft(): Promise<SerieAPredictionDraftResult> {
   const day = fixtures[0]?.matchday ?? null;
   if (!day || fixtures.length === 0) {
     return result({ skipped: true, error: "Calendario della prossima giornata di Serie A non disponibile." });
-  }
-
-  const quoted = await annotateWithOddsDetailed(fixtures, "soccer_italy_serie_a");
-  const complete = quoted.matches.filter((match) => match.odd1 && match.oddX && match.odd2);
-  if (quoted.error) return result({ day, matches: complete.length, error: quoted.error });
-  if (complete.length !== fixtures.length) {
-    return result({
-      day,
-      matches: complete.length,
-      error: `Quote disponibili soltanto per ${complete.length}/${fixtures.length} partite di Serie A: la bozza verrà riprovata automaticamente.`,
-    });
   }
 
   const eventKey = fixtures.map((match) => match.eventId).sort().join(":");
@@ -89,7 +76,7 @@ async function prepareSerieADraft(): Promise<SerieAPredictionDraftResult> {
     return result({ day, roundId, matches: fixtures.length, skipped: true });
   }
 
-  const matches = complete.map((match) => ({
+  const matches = fixtures.map((match) => ({
     id: stablePredictionUuid(`serie-a-match:${match.eventId}`),
     round_id: roundId,
     home_team: null,
@@ -101,9 +88,9 @@ async function prepareSerieADraft(): Promise<SerieAPredictionDraftResult> {
     competition: "Serie A",
     ext_event_id: match.eventId,
     kickoff: match.kickoff,
-    odd_1: match.odd1 as number,
-    odd_x: match.oddX as number,
-    odd_2: match.odd2 as number,
+    odd_1: FIXED_WIN_MULTIPLIER,
+    odd_x: FIXED_WIN_MULTIPLIER,
+    odd_2: FIXED_WIN_MULTIPLIER,
   }));
 
   const { error: upsertError } = await db
@@ -125,8 +112,7 @@ async function prepareSerieADraft(): Promise<SerieAPredictionDraftResult> {
     if (deleteError) return result({ day, roundId, created, error: deleteError.message });
   }
 
-  const oddsSources = Math.min(...quoted.matches.map((match) => match.oddsSources ?? 0));
-  return result({ day, roundId, matches: matches.length, oddsSources, created });
+  return result({ day, roundId, matches: matches.length, created });
 }
 
 /** Prepara o aggiorna la bozza Serie A senza mai duplicare giornata o incontri. */
