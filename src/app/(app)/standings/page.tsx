@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import type { FantacalcioCurrentMatchday, FantacalcioMatchdayMatch, FantacalcioStandingsResult } from "@/lib/fantacalcio-api";
 import { loadViewerCache } from "@/lib/store";
@@ -61,6 +62,28 @@ function PositionBadge({ position }: { position: number }) {
   );
 }
 
+function Logo({ url, fallback, size, radius = 50 }: { url: string | null; fallback: string; size: number; radius?: number }) {
+  if (url) {
+    return (
+      <Image
+        src={url}
+        alt=""
+        width={size}
+        height={size}
+        unoptimized
+        className="object-cover flex-none"
+        style={{ width: size, height: size, borderRadius: radius }}
+      />
+    );
+  }
+  return (
+    <span className="flex-none flex items-center justify-center"
+      style={{ width: size, height: size, borderRadius: radius, background: "rgba(255,255,255,0.07)", fontSize: size * 0.5 }}>
+      {fallback}
+    </span>
+  );
+}
+
 function formatMatchdayPoints(value: number | null): string {
   return value === null
     ? "—"
@@ -75,10 +98,12 @@ function CurrentMatchdayPanel({
   matchday,
   teamId,
   teamName,
+  teams,
 }: {
   matchday: FantacalcioCurrentMatchday | null;
   teamId: string | null;
   teamName: string;
+  teams: StandingEntryWithLogo[];
 }) {
   const match = teamId
     ? matchday?.matches.find((item) => item.homeTeamId === teamId || item.awayTeamId === teamId)
@@ -101,6 +126,10 @@ function CurrentMatchdayPanel({
 
   const isHome = match.homeTeamId === teamId;
   const opponentName = isHome ? match.awayTeamName : match.homeTeamName;
+  const selectedSourceName = isHome ? match.homeTeamName : match.awayTeamName;
+  const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
+  const selectedTeam = teams.find((item) => item.teamId === teamId || item.teamName === selectedSourceName);
+  const opponent = teams.find((item) => item.teamId === opponentId || item.teamName === opponentName);
   const teamPoints = isHome ? match.homePoints : match.awayPoints;
   const opponentPoints = isHome ? match.awayPoints : match.homePoints;
   const teamGoals = scoreFor(match, isHome);
@@ -123,8 +152,9 @@ function CurrentMatchdayPanel({
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-3 rounded-xl px-2.5 py-2.5" style={{ background: "rgba(255,255,255,0.045)" }}>
-        <div className="min-w-0 text-center">
-          <p className="text-xs text-white font-semibold truncate">{teamName}</p>
+        <div className="min-w-0 flex flex-col items-center text-center">
+          <Logo url={selectedTeam?.logoUrl ?? null} fallback={selectedTeam?.logoEmoji ?? assignLogoToTeam(teamName)} size={34} radius={10} />
+          <p className="mt-1.5 w-full truncate text-xs font-semibold text-white">{teamName}</p>
           <p className="font-display text-xl text-white font-extrabold mt-1">{formatMatchdayPoints(teamPoints)}</p>
           <p className="text-[10px]" style={{ color: "var(--text-faint)" }}>fantapunti</p>
         </div>
@@ -134,8 +164,9 @@ function CurrentMatchdayPanel({
             <p className="font-display text-sm text-white font-bold mt-1">{teamGoals}–{opponentGoals}</p>
           )}
         </div>
-        <div className="min-w-0 text-center">
-          <p className="text-xs text-white font-semibold truncate">{opponentName}</p>
+        <div className="min-w-0 flex flex-col items-center text-center">
+          <Logo url={opponent?.logoUrl ?? null} fallback={opponent?.logoEmoji ?? assignLogoToTeam(opponentName)} size={34} radius={10} />
+          <p className="mt-1.5 w-full truncate text-xs font-semibold text-white">{opponent?.displayName ?? opponentName}</p>
           <p className="font-display text-xl text-white font-extrabold mt-1">{formatMatchdayPoints(opponentPoints)}</p>
           <p className="text-[10px]" style={{ color: "var(--text-faint)" }}>fantapunti</p>
         </div>
@@ -181,16 +212,6 @@ export default function StandingsPage() {
       setMyLogo(isImageAvatar(v.logo) ? "⭐" : v.logo || "⭐");
     }).catch(() => {});
   }, []);
-
-  function Logo({ url, fallback, size, radius = 50 }: { url: string | null; fallback: string; size: number; radius?: number }) {
-    if (url) return <img src={url} alt="" className="object-cover flex-none" style={{ width: size, height: size, borderRadius: radius }} />;
-    return (
-      <span className="flex-none flex items-center justify-center"
-        style={{ width: size, height: size, borderRadius: radius, background: "rgba(255,255,255,0.07)", fontSize: size * 0.5 }}>
-        {fallback}
-      </span>
-    );
-  }
 
   const loadStandings = useCallback(async () => {
     try {
@@ -270,7 +291,6 @@ export default function StandingsPage() {
 
   const myEntry = standings.find((e) => e.displayName === myTeamName);
   const leader = standings[0];
-  const maxPoints = leader?.points || 1;
 
   return (
     <div className="screen sec-rank">
@@ -368,7 +388,6 @@ export default function StandingsPage() {
           <div className="card overflow-hidden mt-1">
             {standings.map((entry, i) => {
               const isMe = entry.displayName === myTeamName;
-              const pct = Math.max(6, Math.round((entry.points / maxPoints) * 100));
               const isExpanded = expandedTeamName === entry.teamName;
               const roster = rosters[entry.teamName] ?? [];
               return (
@@ -389,21 +408,16 @@ export default function StandingsPage() {
                         </span>
                         <span className="font-display text-white font-bold text-sm flex-none">{entry.points}</span>
                       </div>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMe ? "var(--accent-grad)" : "rgba(255,255,255,0.28)" }} />
-                        </div>
-                        <span className="text-[11px] flex-none tabular-nums" style={{ color: "var(--text-dim)" }}>
-                          {entry.won}-{entry.drawn}-{entry.lost} · {entry.goalDiff > 0 ? `+${entry.goalDiff}` : entry.goalDiff}
-                        </span>
-                      </div>
+                      <p className="mt-1 text-[11px] tabular-nums" style={{ color: "var(--text-dim)" }}>
+                        {entry.won}-{entry.drawn}-{entry.lost} · {entry.goalDiff > 0 ? `+${entry.goalDiff}` : entry.goalDiff}
+                      </p>
                     </div>
                     <span className="text-xs flex-none" style={{ color: "var(--text-faint)" }} aria-hidden="true">{isExpanded ? "▲" : "▼"}</span>
                   </button>
 
                   {isExpanded && (
                     <div id={`team-detail-${entry.position}`} className="px-3.5 pb-3.5" style={{ background: isMe ? "color-mix(in srgb, var(--accent) 7%, transparent)" : "rgba(255,255,255,0.018)", borderTop: "1px solid var(--border)" }}>
-                      <CurrentMatchdayPanel matchday={currentMatchday} teamId={entry.teamId} teamName={entry.displayName} />
+                      <CurrentMatchdayPanel matchday={currentMatchday} teamId={entry.teamId} teamName={entry.displayName} teams={standings} />
 
                       <div className="mt-3 flex items-center justify-between gap-3">
                         <p className="eyebrow text-[10px]">Rosa · {loadingRosters ? "caricamento…" : `${roster.length} giocatori`}</p>
