@@ -15,7 +15,7 @@ import {
   adminListProfiles, adminUpdateProfile, adminUpdateTeamName, adminReleaseTeam, adminAssignTeam, adminDeleteProfile, adminSetProfileBadges, adminSetTeamCapacity,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
 } from "@/app/teams-actions";
-import { isAppOpen, setAppOpen } from "@/app/release-actions";
+import { isAppOpen, isCareerOpen, setAppOpen, setCareerOpen } from "@/app/release-actions";
 import { getLeagueUrlSetting, setLeagueUrlSetting } from "@/app/league-settings-actions";
 import { isImageAvatar } from "@/lib/avatar";
 import PageHeader from "@/components/PageHeader";
@@ -533,29 +533,41 @@ function ListingRow({ listing, onChange }: { listing: Listing; onChange: () => P
 
 /* ─── TAB GESTIONE (solo admin) ─────────────────────────────────────────── */
 
-/* Interruttore di rilascio: apre l'app a tutti o la rimette in "arrivo".
-   Stato salvato in DB (fanta_settings.app_open), nessun deploy necessario. */
-function AppReleaseToggle() {
+/* Interruttori di rilascio indipendenti, salvati in fanta_settings. */
+function ReleaseToggle({ target }: { target: "app" | "career" }) {
   const confirm = useConfirm();
   const toast = useToast();
   const [open, setOpen] = useState<boolean | null>(null); // null = in caricamento
   const [busy, setBusy] = useState(false);
+  const career = target === "career";
 
-  useEffect(() => { isAppOpen().then(setOpen).catch(() => setOpen(null)); }, []);
+  useEffect(() => {
+    const read = career ? isCareerOpen : isAppOpen;
+    read().then(setOpen).catch(() => setOpen(null));
+  }, [career]);
 
   async function toggle() {
     if (open === null || busy) return;
     const next = !open;
-    const ok = next
-      ? await confirm({ title: "Aprire l'app a tutti?", message: "Da ora ogni manager vedrà l'app completa.", confirmLabel: "Apri a tutti" })
-      : await confirm({ title: "Rimettere in arrivo?", message: "I manager (non admin) vedranno solo la pagina di attesa.", confirmLabel: "Metti in arrivo", danger: true });
+    const ok = career
+      ? next
+        ? await confirm({ title: "Aprire la Carriera?", message: "Da ora tutti i manager potranno usare la modalità Carriera.", confirmLabel: "Apri Carriera" })
+        : await confirm({ title: "Mettere la Carriera in lavorazione?", message: "Solo l'admin potrà entrare e continuare a provarla.", confirmLabel: "Metti in lavorazione", danger: true })
+      : next
+        ? await confirm({ title: "Aprire l'app a tutti?", message: "Da ora ogni manager vedrà l'app completa.", confirmLabel: "Apri a tutti" })
+        : await confirm({ title: "Rimettere in arrivo?", message: "I manager (non admin) vedranno solo la pagina di attesa.", confirmLabel: "Metti in arrivo", danger: true });
     if (!ok) return;
     setBusy(true);
-    const res = await setAppOpen(next);
+    const res = career ? await setCareerOpen(next) : await setAppOpen(next);
     setBusy(false);
     if (res.error) { toast(res.error, "error"); return; }
     setOpen(res.open);
-    toast(res.open ? "App aperta a tutti ✓" : "App rimessa in arrivo", "success");
+    toast(
+      career
+        ? res.open ? "Carriera aperta a tutti ✓" : "Carriera messa in lavorazione"
+        : res.open ? "App aperta a tutti ✓" : "App rimessa in arrivo",
+      "success",
+    );
   }
 
   const loading = open === null;
@@ -569,21 +581,24 @@ function AppReleaseToggle() {
       }}>
       <div className="flex-1 min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: live ? "#34d399" : "#ffd479" }}>
-          Stato app
+          {career ? "Stato Carriera" : "Stato app"}
         </p>
         <p className="text-white font-bold text-sm leading-tight">
-          {loading ? "…" : live ? "Aperta a tutti" : "In arrivo (solo admin)"}
+          {loading ? "…" : live ? "Aperta a tutti" : career ? "In lavorazione (solo admin)" : "In arrivo (solo admin)"}
         </p>
         <p className="text-white/40 text-[11px] mt-0.5">
-          {live ? "I manager vedono l'app completa." : "I manager vedono la pagina “in arrivo”."}
+          {career
+            ? live ? "I manager possono giocare la Carriera." : "I manager vedono soltanto l'avviso di lavorazione."
+            : live ? "I manager vedono l'app completa." : "I manager vedono la pagina “in arrivo”."}
         </p>
       </div>
-      <button onClick={toggle} disabled={loading || busy}
+      <button type="button" role="switch" aria-checked={live} aria-busy={busy}
+        onClick={toggle} disabled={loading || busy}
         className="px-4 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50 flex-none active:scale-95 transition-transform"
         style={live
           ? { background: "rgba(255,177,26,0.15)", border: "1px solid rgba(255,177,26,0.35)", color: "#ffd479" }
           : { background: "var(--accent-grad)", color: "var(--accent-ink)", boxShadow: "0 0 14px var(--accent-glow)" }}>
-        {busy ? "…" : live ? "Metti in arrivo" : "Apri a tutti"}
+        {busy ? "…" : live ? career ? "Metti in lavorazione" : "Metti in arrivo" : career ? "Apri Carriera" : "Apri a tutti"}
       </button>
     </div>
   );
@@ -702,7 +717,10 @@ function GestioneTab() {
         {msg && <p role={syncFailed ? "alert" : "status"} className="mt-3 rounded-xl px-3 py-2.5 text-sm" style={{ background: syncFailed ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)", color: syncFailed ? "#fca5a5" : "#a7f3d0" }}>{msg}</p>}
       </section>
 
-      <AppReleaseToggle />
+      <section className="flex flex-col gap-2" aria-label="Stato pubblicazione">
+        <ReleaseToggle target="app" />
+        <ReleaseToggle target="career" />
+      </section>
 
       {loadError && (
         <div role="alert" className="card p-4 flex flex-col gap-3" style={{ borderColor: "rgba(248,113,113,0.38)" }}>

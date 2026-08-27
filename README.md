@@ -92,6 +92,7 @@ Esegui i file SQL di migrazione nell'SQL Editor del tuo progetto Supabase. I fil
 - `supabase-post-tags-migration.sql` — Sistema di tag per i post della bacheca.
 - `supabase-pronostici-migration.sql` — Tabelle per il sistema dei pronostici.
 - `supabase-bet-slips-migration.sql` — Schedine multiple e chiusura automatica prima delle partite.
+- `supabase-career-release-migration.sql` — Switch admin per aprire o mettere in lavorazione la sola Carriera.
 
 RLS abilitato. Service role key bypassa RLS automaticamente.
 

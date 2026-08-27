@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import { getCurrentViewer, type Viewer } from "@/app/social-actions";
+import { isCareerOpen } from "@/app/release-actions";
+import { CAREER_CLOSED_ERROR, canAccessCareer } from "@/lib/career-release";
 import {
   COUNTRY_OPTIONS,
   ROLE_OPTIONS,
@@ -181,11 +183,38 @@ async function emptyHub(error: string): Promise<CareerHub> {
   return { viewer: null, career: null, seasons: [], archivedCareers: [], error };
 }
 
+type CareerAccess =
+  | { ok: true; viewer: Viewer }
+  | { ok: false; viewer: Viewer | null; error: string };
+
+async function getCareerAccess(): Promise<CareerAccess> {
+  const viewer = await getCurrentViewer();
+  if (!viewer) return { ok: false, viewer: null, error: "Non autenticato." };
+  if (!canAccessCareer(viewer.isAdmin, await isCareerOpen())) {
+    return { ok: false, viewer, error: CAREER_CLOSED_ERROR };
+  }
+  return { ok: true, viewer };
+}
+
+function blockedHub(access: Extract<CareerAccess, { ok: false }>): CareerHub {
+  return {
+    viewer: access.viewer,
+    career: null,
+    seasons: [],
+    archivedCareers: [],
+    error: access.error,
+  };
+}
+
+function blockedMutation(access: Extract<CareerAccess, { ok: false }>): CareerMutationResult {
+  return { hub: blockedHub(access), error: access.error };
+}
+
 export async function fetchCareerHub(): Promise<CareerHub> {
   if (!isSupabaseConfigured()) return emptyHub("Database non configurato.");
-  const viewer = await getCurrentViewer();
-  if (!viewer) return emptyHub("Accedi per giocare la tua carriera.");
-  return readHub(viewer);
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedHub(access);
+  return readHub(access.viewer);
 }
 
 function validRequest(input: CreateCareerRequest): string | null {
@@ -198,8 +227,9 @@ function validRequest(input: CreateCareerRequest): string | null {
 }
 
 export async function createCareer(input: CreateCareerRequest): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   const invalid = validRequest(input);
   if (invalid) return { hub: await readHub(viewer), error: invalid };
 
@@ -267,8 +297,9 @@ async function saveState(
 }
 
 export async function chooseCareerClub(clubName: string): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   const db = createAdminClient();
   const own = await getOwnCareerRow(db, viewer.userId);
   if (own.error || !own.data) {
@@ -290,8 +321,9 @@ export async function chooseCareerClub(clubName: string): Promise<CareerMutation
 }
 
 export async function advanceCareerSeason(choice: TrainingChoice, expectedVersion: number): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   if (!TRAINING_OPTIONS.some((option) => option.code === choice)) {
     return { hub: await readHub(viewer), error: "Scelta di crescita non valida." };
   }
@@ -359,8 +391,9 @@ export async function resolveCareerChoice(
   optionId: string,
   expectedVersion: number,
 ): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   if (!validMutationId(decisionId) || !validMutationId(optionId) || !validExpectedVersion(expectedVersion)) {
     return { hub: await readHub(viewer), error: "Scelta non valida. Ricarica e riprova." };
   }
@@ -409,8 +442,9 @@ export async function continueCareerChoice(
   decisionId: string,
   expectedVersion: number,
 ): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   if (!validMutationId(decisionId) || !validExpectedVersion(expectedVersion)) {
     return { hub: await readHub(viewer), error: "Decisione non valida. Ricarica e riprova." };
   }
@@ -454,8 +488,9 @@ export async function acknowledgeCareerReport(
   seasonId: string,
   expectedVersion: number,
 ): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   if (!validMutationId(seasonId) || !validExpectedVersion(expectedVersion)) {
     return { hub: await readHub(viewer), error: "Report non valido. Ricarica e riprova." };
   }
@@ -499,8 +534,9 @@ export async function acceptCareerTransfer(
   clubName: string,
   expectedVersion: number,
 ): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   if (!validExpectedVersion(expectedVersion)) {
     return { hub: await readHub(viewer), error: "Versione della carriera non valida. Ricarica e riprova." };
   }
@@ -535,8 +571,9 @@ export async function acceptCareerTransfer(
 }
 
 export async function declineCareerTransfers(expectedVersion: number): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   if (!validExpectedVersion(expectedVersion)) {
     return { hub: await readHub(viewer), error: "Versione della carriera non valida. Ricarica e riprova." };
   }
@@ -572,8 +609,9 @@ export async function declineCareerTransfers(expectedVersion: number): Promise<C
 }
 
 export async function restartCareer(expectedVersion: number): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   const db = createAdminClient();
   const own = await getOwnCareerRow(db, viewer.userId);
   if (own.error) {
@@ -614,8 +652,9 @@ export async function restartCareer(expectedVersion: number): Promise<CareerMuta
 
 /** Elimina in modo definitivo la carriera attiva (e le relative stagioni in cascata). */
 export async function deleteCurrentCareer(expectedVersion: number): Promise<CareerMutationResult> {
-  const viewer = await getCurrentViewer();
-  if (!viewer) return { hub: await emptyHub("Non autenticato."), error: "Non autenticato." };
+  const access = await getCareerAccess();
+  if (!access.ok) return blockedMutation(access);
+  const viewer = access.viewer;
   if (!validExpectedVersion(expectedVersion)) {
     return { hub: await readHub(viewer), error: "Versione della carriera non valida. Ricarica e riprova." };
   }
