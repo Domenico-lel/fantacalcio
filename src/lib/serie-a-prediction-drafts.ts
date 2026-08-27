@@ -1,5 +1,5 @@
 import { fetchCompetitionMatches } from "@/lib/football-data";
-import { FIXED_WIN_MULTIPLIER } from "@/lib/bet-constants";
+import { FIXED_WIN_MULTIPLIER, calculateBetClosesAt } from "@/lib/bet-constants";
 import { stablePredictionUuid } from "@/lib/prediction-draft-utils";
 import { selectNextCompleteMatchday } from "@/lib/serie-a-prediction-utils";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
@@ -37,6 +37,7 @@ async function prepareSerieADraft(): Promise<SerieAPredictionDraftResult> {
   if (!day || fixtures.length === 0) {
     return result({ skipped: true, error: "Calendario della prossima giornata di Serie A non disponibile." });
   }
+  const closesAt = calculateBetClosesAt(fixtures.map((match) => match.kickoff));
 
   const eventKey = fixtures.map((match) => match.eventId).sort().join(":");
   const roundId = stablePredictionUuid(`serie-a-round:${day}:${eventKey}`);
@@ -53,7 +54,7 @@ async function prepareSerieADraft(): Promise<SerieAPredictionDraftResult> {
   if (!targetRound) {
     const { data: inserted, error: insertError } = await db
       .from("fanta_bet_rounds")
-      .insert({ id: roundId, day, title: "Serie A", status: "draft" })
+      .insert({ id: roundId, day, title: "Serie A", status: "draft", closes_at: closesAt })
       .select("id, status")
       .single();
     if (insertError) {
@@ -75,6 +76,12 @@ async function prepareSerieADraft(): Promise<SerieAPredictionDraftResult> {
   if (targetRound.status !== "draft") {
     return result({ day, roundId, matches: fixtures.length, skipped: true });
   }
+
+  const { error: closingError } = await db
+    .from("fanta_bet_rounds")
+    .update({ closes_at: closesAt })
+    .eq("id", targetRound.id);
+  if (closingError) return result({ day, roundId, created, error: closingError.message });
 
   const matches = fixtures.map((match) => ({
     id: stablePredictionUuid(`serie-a-match:${match.eventId}`),

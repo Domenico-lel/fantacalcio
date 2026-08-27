@@ -11,7 +11,7 @@ App mobile PWA per gestire il fantacalcio creativo con amici. **Installabile com
 - **🔵 Notizie** (`/news`) — Feed RSS da Corriere dello Sport e Tuttosport, cache 5 min.
 - **🟠 Mercato** (`/players`) — Transfer rumors da Transfermarkt (top 5 leghe europee). Clicca card → scheda con dati trasferimento e link profilo TM.
 - **🟣 Classifica** (`/standings`) — Classifica reale, giornata corrente e rose ufficiali della lega; i giocatori vengono sincronizzati automaticamente ogni giorno.
-- **🟡 Pronostici** (`/pronostici`) — Competizioni raccolte in cartelle, bozze automatiche per Fantacalcio e Serie A e vincita fissa pari a 2× la puntata; l'admin controlla e pubblica.
+- **🟡 Pronostici** (`/pronostici`) — Una schedina completa per ogni competizione, chiusura automatica 15 minuti prima della prima partita e vincita fissa pari a 2× la puntata; l'admin controlla e pubblica.
 - **🟢 Bacheca Social** (`/bacheca`) — Feed di post dove interagire, commentare, usare tag.
 
 **Profilo & Badge**:
@@ -91,6 +91,7 @@ Esegui i file SQL di migrazione nell'SQL Editor del tuo progetto Supabase. I fil
 - `supabase-social-fix.sql` — Correzioni aggiuntive alla bacheca.
 - `supabase-post-tags-migration.sql` — Sistema di tag per i post della bacheca.
 - `supabase-pronostici-migration.sql` — Tabelle per il sistema dei pronostici.
+- `supabase-bet-slips-migration.sql` — Schedine multiple e chiusura automatica prima delle partite.
 
 RLS abilitato. Service role key bypassa RLS automaticamente.
 

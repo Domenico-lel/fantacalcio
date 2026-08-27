@@ -311,6 +311,7 @@ export interface Database {
           day: number;
           title: string | null;
           status: "draft" | "open" | "closed" | "settled";
+          closes_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -318,11 +319,13 @@ export interface Database {
           day: number;
           title?: string | null;
           status?: "draft" | "open" | "closed" | "settled";
+          closes_at?: string | null;
         };
         Update: {
           day?: number;
           title?: string | null;
           status?: "draft" | "open" | "closed" | "settled";
+          closes_at?: string | null;
         };
         Relationships: [];
       };
@@ -412,6 +415,51 @@ export interface Database {
         };
         Relationships: [];
       };
+      fanta_bet_slips: {
+        Row: {
+          id: string;
+          round_id: string;
+          user_id: string;
+          stake: number;
+          status: "pending" | "won" | "lost";
+          payout: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          round_id: string;
+          user_id: string;
+          stake: number;
+          status?: "pending" | "won" | "lost";
+          payout?: number;
+          created_at?: string;
+        };
+        Update: {
+          status?: "pending" | "won" | "lost";
+          payout?: number;
+        };
+        Relationships: [];
+      };
+      fanta_bet_slip_picks: {
+        Row: {
+          id: string;
+          slip_id: string;
+          match_id: string;
+          pick: "1" | "X" | "2";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          slip_id: string;
+          match_id: string;
+          pick: "1" | "X" | "2";
+          created_at?: string;
+        };
+        Update: {
+          pick?: "1" | "X" | "2";
+        };
+        Relationships: [];
+      };
       fanta_careers: {
         Row: {
           id: string;
@@ -489,6 +537,16 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      place_fanta_bet_slip: {
+        Args: {
+          p_round_id: string;
+          p_user_id: string;
+          p_account_key: string;
+          p_stake: number;
+          p_picks: Json;
+        };
+        Returns: string;
+      };
       save_fanta_career_season: {
         Args: {
           p_career_id: string;

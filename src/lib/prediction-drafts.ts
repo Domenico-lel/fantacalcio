@@ -1,7 +1,9 @@
 import { fetchFantacalcioStandings } from "@/lib/fantacalcio-api";
-import { FIXED_WIN_MULTIPLIER } from "@/lib/bet-constants";
+import { FIXED_WIN_MULTIPLIER, calculateBetClosesAt } from "@/lib/bet-constants";
+import { fetchCompetitionMatches } from "@/lib/football-data";
 import { getLeagueUrl } from "@/lib/league-config";
 import { stablePredictionUuid } from "@/lib/prediction-draft-utils";
+import { selectNextCompleteMatchday } from "@/lib/serie-a-prediction-utils";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 
 const LAST_CHECK_KEY = "prediction_draft_last_checked_at";
@@ -49,7 +51,11 @@ async function saveCheckTimestamp(checkedAt: string): Promise<void> {
 async function preparePredictionDraft(): Promise<PredictionDraftResult> {
   if (!isSupabaseConfigured()) return result({ error: "Supabase non configurato." });
 
-  const [source, leagueUrl] = await Promise.all([fetchFantacalcioStandings(), getLeagueUrl()]);
+  const [source, leagueUrl, serieASource] = await Promise.all([
+    fetchFantacalcioStandings(),
+    getLeagueUrl(),
+    fetchCompetitionMatches("SA"),
+  ]);
   if (source.error) return result({ error: source.error });
   if (!leagueUrl) return result({ error: "Link della lega non configurato." });
   const matchday = source.currentMatchday;
@@ -59,6 +65,8 @@ async function preparePredictionDraft(): Promise<PredictionDraftResult> {
     await saveCheckTimestamp(checkedAt);
     return result({ day: matchday.matchweek, skipped: true, checkedAt });
   }
+  const serieAFixtures = serieASource.error ? [] : selectNextCompleteMatchday(serieASource.matches);
+  const closesAt = calculateBetClosesAt(serieAFixtures.map((match) => match.kickoff));
 
   const competitionId = leagueUrl.match(/\/competition\/(\d+)(?:\/|$)/i)?.[1] ?? leagueUrl;
   const roundId = stablePredictionUuid(`fantacalcio-round:${competitionId}:${matchday.matchweek}`);
@@ -106,7 +114,13 @@ async function preparePredictionDraft(): Promise<PredictionDraftResult> {
   if (!targetRound) {
     const { data: insertedRound, error: insertError } = await db
       .from("fanta_bet_rounds")
-      .insert({ id: roundId, day: matchday.matchweek, title: "Lega Fantacalcio", status: "draft" })
+      .insert({
+        id: roundId,
+        day: matchday.matchweek,
+        title: "Lega Fantacalcio",
+        status: "draft",
+        closes_at: closesAt,
+      })
       .select("id, status")
       .single();
     if (insertError) {
@@ -135,7 +149,10 @@ async function preparePredictionDraft(): Promise<PredictionDraftResult> {
   // che non avevano un titolo e sarebbero ambigue accanto alla Serie A.
   const { error: titleError } = await db
     .from("fanta_bet_rounds")
-    .update({ title: "Lega Fantacalcio" })
+    .update({
+      title: "Lega Fantacalcio",
+      ...(closesAt ? { closes_at: closesAt } : {}),
+    })
     .eq("id", targetRound.id);
   if (titleError) {
     return result({ day: matchday.matchweek, roundId: targetRound.id, created, error: titleError.message });

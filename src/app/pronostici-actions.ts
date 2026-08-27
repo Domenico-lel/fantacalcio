@@ -6,9 +6,11 @@ import {
   STARTING_CREDITS,
   FIXED_WIN_MULTIPLIER,
   calculateFixedPayout,
+  calculateBetClosesAt,
   type ExtMatch,
 } from "@/lib/bet-constants";
 import { fetchCompetitionMatches, fetchMatchResult } from "@/lib/football-data";
+import { evaluateSlipStatus } from "@/lib/bet-slip";
 import {
   ensureAllPredictionDrafts,
   ensureAllPredictionDraftsIfStale,
@@ -20,23 +22,18 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 
 // ─── Tipi esposti al client ─────────────────────────────────────────────────
 
-export interface MyBet {
-  pick: Pick;
+export interface BetSlip {
+  id: string;
   stake: number;
   status: "pending" | "won" | "lost";
   payout: number;
+  picks: Record<string, Pick>;
 }
 
-// Dettaglio di una singola giocata, visibile solo all'admin (per gestirla/cancellarla)
-export interface AdminBet {
-  betId: string;
+export interface AdminSlip extends BetSlip {
   userId: string;
   name: string;
   logo: string;
-  pick: Pick;
-  stake: number;
-  status: "pending" | "won" | "lost";
-  payout: number;
 }
 
 export interface BetMatch {
@@ -49,9 +46,6 @@ export interface BetMatch {
   kickoff: string | null;     // data/ora ISO della partita reale
   external: boolean;          // true = partita reale (non squadre della lega)
   result: Pick | null;
-  myBet: MyBet | null;
-  betCount: number;
-  bets?: AdminBet[]; // popolato solo per l'admin
 }
 
 export interface BetRound {
@@ -59,8 +53,12 @@ export interface BetRound {
   day: number;
   title: string | null;
   status: "draft" | "open" | "closed" | "settled";
+  closesAt: string | null;
   createdAt: string;
   matches: BetMatch[];
+  mySlip: BetSlip | null;
+  slipCount: number;
+  slips?: AdminSlip[];
 }
 
 export interface CreditRow {
@@ -162,35 +160,50 @@ export async function fetchBetCenter(): Promise<BetCenter> {
     .select("*")
     .order("created_at", { ascending: true });
 
-  const matchIds = (matches ?? []).map((m) => m.id);
-  const allBets = matchIds.length
+  const roundIds = (rounds ?? []).map((round) => round.id);
+  const allSlips = roundIds.length
     ? (await db
-        .from("fanta_bets")
-        .select("id, match_id, user_id, pick, stake, status, payout")
-        .in("match_id", matchIds)).data
+        .from("fanta_bet_slips")
+        .select("id, round_id, user_id, stake, status, payout, created_at")
+        .in("round_id", roundIds)).data
+    : [];
+  const slipIds = (allSlips ?? []).map((slip) => slip.id);
+  const allPicks = slipIds.length
+    ? (await db
+        .from("fanta_bet_slip_picks")
+        .select("slip_id, match_id, pick")
+        .in("slip_id", slipIds)).data
     : [];
 
-  const myBetByMatch = new Map<string, MyBet>();
-  const countByMatch = new Map<string, number>();
-  const adminBetsByMatch = new Map<string, AdminBet[]>();
-  for (const b of allBets ?? []) {
-    countByMatch.set(b.match_id, (countByMatch.get(b.match_id) ?? 0) + 1);
-    if (b.user_id === viewer.userId) {
-      myBetByMatch.set(b.match_id, { pick: b.pick, stake: b.stake, status: b.status, payout: b.payout });
-    }
+  const picksBySlip = new Map<string, Record<string, Pick>>();
+  for (const pick of allPicks ?? []) {
+    const picks = picksBySlip.get(pick.slip_id) ?? {};
+    picks[pick.match_id] = pick.pick;
+    picksBySlip.set(pick.slip_id, picks);
+  }
+
+  const mySlipByRound = new Map<string, BetSlip>();
+  const adminSlipsByRound = new Map<string, AdminSlip[]>();
+  const slipCountByRound = new Map<string, number>();
+  for (const slip of allSlips ?? []) {
+    const base: BetSlip = {
+      id: slip.id,
+      stake: slip.stake,
+      status: slip.status,
+      payout: slip.payout,
+      picks: picksBySlip.get(slip.id) ?? {},
+    };
+    slipCountByRound.set(slip.round_id, (slipCountByRound.get(slip.round_id) ?? 0) + 1);
+    if (slip.user_id === viewer.userId) mySlipByRound.set(slip.round_id, base);
     if (viewer.isAdmin) {
-      const list = adminBetsByMatch.get(b.match_id) ?? [];
+      const list = adminSlipsByRound.get(slip.round_id) ?? [];
       list.push({
-        betId: b.id,
-        userId: b.user_id,
-        name: nameByUser.get(b.user_id) ?? "Manager",
-        logo: logoByUser.get(b.user_id) ?? "⚽",
-        pick: b.pick,
-        stake: b.stake,
-        status: b.status,
-        payout: b.payout,
+        ...base,
+        userId: slip.user_id,
+        name: nameByUser.get(slip.user_id) ?? "Manager",
+        logo: logoByUser.get(slip.user_id) ?? "⚽",
       });
-      adminBetsByMatch.set(b.match_id, list);
+      adminSlipsByRound.set(slip.round_id, list);
     }
   }
 
@@ -207,23 +220,45 @@ export async function fetchBetCenter(): Promise<BetCenter> {
       kickoff: m.kickoff ?? null,
       external: !!(m.ext_event_id || m.competition),
       result: m.result,
-      myBet: myBetByMatch.get(m.id) ?? null,
-      betCount: countByMatch.get(m.id) ?? 0,
-      bets: viewer.isAdmin ? (adminBetsByMatch.get(m.id) ?? []) : undefined,
     });
     matchesByRound.set(m.round_id, list);
   }
 
+  const firstKickoffByRound = new Map<string, string>();
+  const firstKickoffByDay = new Map<number, string>();
+  const dayByRound = new Map((rounds ?? []).map((round) => [round.id, round.day]));
+  for (const match of matches ?? []) {
+    if (!match.kickoff) continue;
+    const currentRound = firstKickoffByRound.get(match.round_id);
+    if (!currentRound || match.kickoff < currentRound) firstKickoffByRound.set(match.round_id, match.kickoff);
+    const day = dayByRound.get(match.round_id);
+    if (day === undefined) continue;
+    const currentDay = firstKickoffByDay.get(day);
+    if (!currentDay || match.kickoff < currentDay) firstKickoffByDay.set(day, match.kickoff);
+  }
+
   const roundList: BetRound[] = (rounds ?? [])
     .filter((round) => viewer.isAdmin || round.status !== "draft")
-    .map((r) => ({
-      id: r.id,
-      day: r.day,
-      title: r.title,
-      status: r.status,
-      createdAt: r.created_at,
-      matches: matchesByRound.get(r.id) ?? [],
-    }));
+    .map((r) => {
+      const closesAt = r.closes_at ?? calculateBetClosesAt([
+        firstKickoffByRound.get(r.id) ?? firstKickoffByDay.get(r.day),
+      ]);
+      const status = r.status === "open" && closesAt && Date.parse(closesAt) <= Date.now()
+        ? "closed"
+        : r.status;
+      return {
+        id: r.id,
+        day: r.day,
+        title: r.title,
+        status,
+        closesAt,
+        createdAt: r.created_at,
+        matches: matchesByRound.get(r.id) ?? [],
+        mySlip: mySlipByRound.get(r.id) ?? null,
+        slipCount: slipCountByRound.get(r.id) ?? 0,
+        slips: viewer.isAdmin ? (adminSlipsByRound.get(r.id) ?? []) : undefined,
+      };
+    });
 
   // classifica crediti — una riga per squadra assegnata (l'admin non è in gara).
   // I comproprietari di una squadra condivisa (doppio) condividono la stessa
@@ -258,53 +293,41 @@ export async function fetchBetCenter(): Promise<BetCenter> {
 
 // ─── Scommessa (manager) ─────────────────────────────────────────────────────
 
-export async function placeBet(matchId: string, pick: Pick, stake: number): Promise<{ error: string | null; balance?: number }> {
+export async function placeBetSlip(
+  roundId: string,
+  picks: Array<{ matchId: string; pick: Pick }>,
+  stake: number,
+): Promise<{ error: string | null; balance?: number }> {
   const viewer = await getCurrentViewer();
   if (!viewer) return { error: "Non autenticato" };
   if (viewer.isAdmin) return { error: "L'admin non può scommettere" };
   if (!viewer.hasProfile) return { error: "Completa prima il tuo profilo squadra" };
-  if (!["1", "X", "2"].includes(pick)) return { error: "Esito non valido" };
   if (!Number.isInteger(stake) || stake <= 0) return { error: "Puntata non valida" };
-
-  const db = createAdminClient();
-
-  const { data: match } = await db.from("fanta_bet_matches").select("*").eq("id", matchId).maybeSingle();
-  if (!match) return { error: "Scontro non trovato" };
-  if (match.result) return { error: "Scontro già concluso" };
-
-  const { data: round } = await db.from("fanta_bet_rounds").select("status").eq("id", match.round_id).maybeSingle();
-  if (round?.status !== "open") return { error: "Scommesse chiuse per questa giornata" };
-
-  // niente giocate dopo il calcio d'inizio della partita reale
-  if (match.kickoff && new Date(match.kickoff).getTime() <= Date.now()) {
-    return { error: "Partita già iniziata: scommesse chiuse" };
+  if (!Array.isArray(picks) || picks.length === 0) return { error: "Completa la schedina" };
+  if (picks.some((item) => !item.matchId || !["1", "X", "2"].includes(item.pick))) {
+    return { error: "La schedina contiene un esito non valido" };
   }
 
-  // una giocata già piazzata non si può più modificare
-  const { data: existing } = await db
-    .from("fanta_bets")
-    .select("id")
-    .eq("match_id", matchId)
-    .eq("user_id", viewer.userId)
-    .maybeSingle();
-  if (existing) return { error: "Hai già piazzato la giocata, non puoi modificarla" };
-
+  const db = createAdminClient();
   const balance = await getBalance(db, viewer.userId);
   if (balance < stake) return { error: `Crediti insufficienti (hai ${balance})` };
-
-  await addBalance(db, viewer.userId, -stake); // scala dalla cassa condivisa della squadra
-  const { error } = await db.from("fanta_bets").insert({
-    match_id: matchId,
-    user_id: viewer.userId,
-    pick,
-    stake,
-    odd: FIXED_WIN_MULTIPLIER,
+  const accountKey = await creditAccountKey(db, viewer.userId);
+  const { error } = await db.rpc("place_fanta_bet_slip", {
+    p_round_id: roundId,
+    p_user_id: viewer.userId,
+    p_account_key: accountKey,
+    p_stake: stake,
+    p_picks: picks.map((item) => ({ match_id: item.matchId, pick: item.pick })),
   });
   if (error) {
-    console.error("[pronostici] Salvataggio giocata fallito", error);
-    // Se il salvataggio fallisce, ripristina subito la puntata scalata.
-    await addBalance(db, viewer.userId, stake);
-    return { error: "Non è stato possibile registrare la giocata. Riprova." };
+    console.error("[pronostici] Salvataggio schedina fallito", error);
+    if (/duplicate|unique|fanta_bet_slips_round_id_user_id/i.test(error.message)) {
+      return { error: "Hai già piazzato la schedina per questa giornata" };
+    }
+    if (/tempo scaduto|chiuse|scadenza|completa|selezioni|crediti insufficienti|giornata non trovata/i.test(error.message)) {
+      return { error: error.message };
+    }
+    return { error: "Non è stato possibile registrare la schedina. Riprova." };
   }
 
   return { error: null, balance: balance - stake };
@@ -312,34 +335,35 @@ export async function placeBet(matchId: string, pick: Pick, stake: number): Prom
 
 // ─── Settlement (admin) ──────────────────────────────────────────────────────
 
-type MatchRow = {
-  id: string;
-  home_team: string | null;
-  away_team: string | null;
-  result: Pick | null;
-};
+async function recalculateRoundSlips(db: AdminClient, roundId: string): Promise<void> {
+  const [{ data: matches }, { data: slips }] = await Promise.all([
+    db.from("fanta_bet_matches").select("id, result").eq("round_id", roundId),
+    db.from("fanta_bet_slips").select("id, user_id, stake, status, payout").eq("round_id", roundId),
+  ]);
+  const matchList = matches ?? [];
+  const slipList = slips ?? [];
+  if (matchList.length === 0 || slipList.length === 0) return;
 
-async function reverseMatch(db: AdminClient, match: MatchRow): Promise<void> {
-  if (!match.result) return;
-  // annulla payout scommesse
-  const { data: bets } = await db.from("fanta_bets").select("*").eq("match_id", match.id);
-  for (const b of bets ?? []) {
-    if (b.status === "won" && b.payout) await addBalance(db, b.user_id, -b.payout);
-    await db.from("fanta_bets").update({ status: "pending", payout: 0 }).eq("id", b.id);
+  const slipIds = slipList.map((slip) => slip.id);
+  const { data: picks } = await db
+    .from("fanta_bet_slip_picks")
+    .select("slip_id, match_id, pick")
+    .in("slip_id", slipIds);
+  const picksBySlip = new Map<string, Record<string, Pick>>();
+  for (const pick of picks ?? []) {
+    const slipPicks = picksBySlip.get(pick.slip_id) ?? {};
+    slipPicks[pick.match_id] = pick.pick;
+    picksBySlip.set(pick.slip_id, slipPicks);
   }
-}
 
-async function settleMatch(db: AdminClient, matchId: string, result: Pick): Promise<void> {
-  const { data: bets } = await db.from("fanta_bets").select("*").eq("match_id", matchId);
-  for (const b of bets ?? []) {
-    if (b.status !== "pending" && b.status !== "won" && b.status !== "lost") continue;
-    if (b.pick === result) {
-      const payout = calculateFixedPayout(b.stake);
-      await addBalance(db, b.user_id, payout);
-      await db.from("fanta_bets").update({ status: "won", payout }).eq("id", b.id);
-    } else {
-      await db.from("fanta_bets").update({ status: "lost", payout: 0 }).eq("id", b.id);
-    }
+  for (const slip of slipList) {
+    const slipPicks = picksBySlip.get(slip.id) ?? {};
+    const nextStatus = evaluateSlipStatus(matchList, slipPicks);
+    const nextPayout = nextStatus === "won" ? calculateFixedPayout(slip.stake) : 0;
+
+    if (slip.status === "won" && slip.payout > 0) await addBalance(db, slip.user_id, -slip.payout);
+    if (nextStatus === "won") await addBalance(db, slip.user_id, nextPayout);
+    await db.from("fanta_bet_slips").update({ status: nextStatus, payout: nextPayout }).eq("id", slip.id);
   }
 }
 
@@ -352,20 +376,12 @@ export async function setMatchResult(matchId: string, result: Pick | null): Prom
   const { data: match } = await db.from("fanta_bet_matches").select("*").eq("id", matchId).maybeSingle();
   if (!match) return { error: "Scontro non trovato" };
 
-  // se già concluso, prima annulla il vecchio settlement
-  if (match.settled_at || match.result) {
-    await reverseMatch(db, match);
-  }
-
-  if (result === null) {
-    await db.from("fanta_bet_matches").update({ result: null, settled_at: null }).eq("id", matchId);
-    await refreshRoundStatus(db, match.round_id);
-    return { error: null };
-  }
-
-  await settleMatch(db, matchId, result);
-
-  await db.from("fanta_bet_matches").update({ result, settled_at: new Date().toISOString() }).eq("id", matchId);
+  const { error } = await db.from("fanta_bet_matches").update({
+    result,
+    settled_at: result ? new Date().toISOString() : null,
+  }).eq("id", matchId);
+  if (error) return { error: error.message };
+  await recalculateRoundSlips(db, match.round_id);
   await refreshRoundStatus(db, match.round_id);
   return { error: null };
 }
@@ -417,24 +433,46 @@ export async function setRoundStatus(roundId: string, status: "open" | "closed")
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { error: "Solo l'admin" };
   const db = createAdminClient();
+  if (status === "open") {
+    const { data: round } = await db.from("fanta_bet_rounds").select("closes_at").eq("id", roundId).maybeSingle();
+    if (!round?.closes_at) return { error: "Impossibile pubblicare: scadenza schedina non disponibile" };
+    if (Date.parse(round.closes_at) <= Date.now()) return { error: "La scadenza delle schedine è già trascorsa" };
+  }
   const { error } = await db.from("fanta_bet_rounds").update({ status }).eq("id", roundId);
   return { error: error?.message ?? null };
+}
+
+async function refundAndDeleteRoundSlips(db: AdminClient, roundId: string): Promise<void> {
+  const { data: slips } = await db
+    .from("fanta_bet_slips")
+    .select("id, user_id, stake, status, payout")
+    .eq("round_id", roundId);
+  for (const slip of slips ?? []) {
+    const delta = slip.stake - (slip.status === "won" ? slip.payout : 0);
+    if (delta) await addBalance(db, slip.user_id, delta);
+  }
+  await db.from("fanta_bet_slips").delete().eq("round_id", roundId);
+}
+
+async function roundHasSlips(db: AdminClient, roundId: string): Promise<boolean> {
+  const { count } = await db
+    .from("fanta_bet_slips")
+    .select("id", { count: "exact", head: true })
+    .eq("round_id", roundId);
+  return (count ?? 0) > 0;
+}
+
+async function refreshRoundClosingAt(db: AdminClient, roundId: string): Promise<void> {
+  const { data: matches } = await db.from("fanta_bet_matches").select("kickoff").eq("round_id", roundId);
+  const closesAt = calculateBetClosesAt((matches ?? []).map((match) => match.kickoff));
+  if (closesAt) await db.from("fanta_bet_rounds").update({ closes_at: closesAt }).eq("id", roundId);
 }
 
 export async function deleteBetRound(roundId: string): Promise<{ error: string | null }> {
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { error: "Solo l'admin" };
   const db = createAdminClient();
-  // annulla eventuali settlement (payout + bonus) e rimborsa le puntate prima di cancellare
-  const { data: matches } = await db.from("fanta_bet_matches").select("*").eq("round_id", roundId);
-  for (const m of matches ?? []) {
-    if (m.settled_at || m.result) await reverseMatch(db, m);
-  }
-  const ids = (matches ?? []).map((m) => m.id);
-  if (ids.length) {
-    const { data: bets } = await db.from("fanta_bets").select("user_id, stake, status").in("match_id", ids);
-    for (const b of bets ?? []) if (b.status === "pending") await addBalance(db, b.user_id, b.stake);
-  }
+  await refundAndDeleteRoundSlips(db, roundId);
   const { error } = await db.from("fanta_bet_rounds").delete().eq("id", roundId);
   return { error: error?.message ?? null };
 }
@@ -448,6 +486,7 @@ export async function addBetMatch(input: {
   if (!viewer?.isAdmin) return { error: "Solo l'admin" };
   if (input.homeTeamId === input.awayTeamId) return { error: "Scegli due squadre diverse" };
   const db = createAdminClient();
+  if (await roundHasSlips(db, input.roundId)) return { error: "Non puoi modificare gli incontri dopo la prima schedina" };
   const { data: teams } = await db.from("fanta_teams").select("id, name").in("id", [input.homeTeamId, input.awayTeamId]);
   const nameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
   const homeName = nameById.get(input.homeTeamId);
@@ -498,6 +537,7 @@ export async function addExternalBetMatch(input: {
   const away = input.awayName.trim();
   if (!home || !away) return { error: "Inserisci entrambe le squadre" };
   const db = createAdminClient();
+  if (await roundHasSlips(db, input.roundId)) return { error: "Non puoi modificare gli incontri dopo la prima schedina" };
   const { error } = await db.from("fanta_bet_matches").insert({
     round_id: input.roundId,
     home_name: home,
@@ -517,6 +557,7 @@ export async function addExternalBetMatch(input: {
     }
     return { error: error.message };
   }
+  await refreshRoundClosingAt(db, input.roundId);
   await refreshRoundStatus(db, input.roundId);
   return { error: null };
 }
@@ -537,10 +578,10 @@ export async function syncRoundResults(roundId: string): Promise<{ settled: numb
     const r = await fetchMatchResult(m.ext_event_id as string);
     if (r.error) { lastErr = r.error; continue; }
     if (!r.finished || !r.result) continue;
-    await settleMatch(db, m.id, r.result);
     await db.from("fanta_bet_matches").update({ result: r.result, settled_at: new Date().toISOString() }).eq("id", m.id);
     settled++;
   }
+  if (settled > 0) await recalculateRoundSlips(db, roundId);
   await refreshRoundStatus(db, roundId);
   if (settled === 0) {
     return {
@@ -557,12 +598,10 @@ export async function deleteBetMatch(matchId: string): Promise<{ error: string |
   const db = createAdminClient();
   const { data: match } = await db.from("fanta_bet_matches").select("*").eq("id", matchId).maybeSingle();
   if (!match) return { error: "Scontro non trovato" };
-  if (match.settled_at || match.result) await reverseMatch(db, match);
-  // rimborsa le puntate pending
-  const { data: bets } = await db.from("fanta_bets").select("user_id, stake, status").eq("match_id", matchId);
-  for (const b of bets ?? []) if (b.status === "pending") await addBalance(db, b.user_id, b.stake);
   const roundId = match.round_id;
+  await refundAndDeleteRoundSlips(db, roundId);
   const { error } = await db.from("fanta_bet_matches").delete().eq("id", matchId);
+  await refreshRoundClosingAt(db, roundId);
   await refreshRoundStatus(db, roundId);
   return { error: error?.message ?? null };
 }
@@ -576,20 +615,19 @@ export async function adjustCredits(userId: string, delta: number): Promise<{ er
   return { error: null };
 }
 
-// Cancella una singola giocata (es. piazzata per errore), stornando i crediti coinvolti.
-export async function adminDeleteBet(betId: string): Promise<{ error: string | null }> {
+// Cancella una schedina e ripristina il saldo come se non fosse mai stata piazzata.
+export async function adminDeleteBetSlip(slipId: string): Promise<{ error: string | null }> {
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) return { error: "Solo l'admin" };
   const db = createAdminClient();
-  const { data: bet } = await db
-    .from("fanta_bets")
+  const { data: slip } = await db
+    .from("fanta_bet_slips")
     .select("user_id, stake, status, payout")
-    .eq("id", betId)
+    .eq("id", slipId)
     .maybeSingle();
-  if (!bet) return { error: "Giocata non trovata" };
-  // rimborsa la puntata se ancora in gioco; storna la vincita se era già stata pagata
-  if (bet.status === "pending") await addBalance(db, bet.user_id, bet.stake);
-  else if (bet.status === "won" && bet.payout) await addBalance(db, bet.user_id, -bet.payout);
-  const { error } = await db.from("fanta_bets").delete().eq("id", betId);
+  if (!slip) return { error: "Schedina non trovata" };
+  const delta = slip.stake - (slip.status === "won" ? slip.payout : 0);
+  if (delta) await addBalance(db, slip.user_id, delta);
+  const { error } = await db.from("fanta_bet_slips").delete().eq("id", slipId);
   return { error: error?.message ?? null };
 }

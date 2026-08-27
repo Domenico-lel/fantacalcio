@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  fetchBetCenter, placeBet, setMatchResult,
+  fetchBetCenter, placeBetSlip, setMatchResult,
   createBetRound, setRoundStatus, deleteBetRound, addBetMatch, deleteBetMatch, adjustCredits,
-  adminDeleteBet,
+  adminDeleteBetSlip,
   fetchFootballMatches, addExternalBetMatch, syncRoundResults,
   preparePredictionDraftNow,
   type BetCenter, type BetRound, type BetMatch, type CreditRow,
@@ -14,6 +14,8 @@ import {
   STARTING_CREDITS,
   FIXED_WIN_MULTIPLIER,
   calculateFixedPayout,
+  countdownTone,
+  BET_CUTOFF_MINUTES,
   FOOTBALL_COMPETITIONS,
   type ExtMatch,
 } from "@/lib/bet-constants";
@@ -47,6 +49,51 @@ function fmtKickoff(iso: string | null) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   return d.toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatCountdown(milliseconds: number): string {
+  if (milliseconds <= 0) return "Schedine chiuse";
+  const seconds = Math.floor(milliseconds / 1000);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (days > 0) return `${days}g ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+  return `${minutes}m ${secs}s`;
+}
+
+function useServerNow(clockOffset: number) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(Date.now() + clockOffset);
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [clockOffset]);
+  return now;
+}
+
+function BetCountdown({ closesAt, now }: { closesAt: string | null; now: number | null }) {
+  if (!closesAt) {
+    return <p className="text-[10px] text-white/45">Scadenza non disponibile</p>;
+  }
+  const remaining = now === null ? null : Date.parse(closesAt) - now;
+  const tone = remaining === null ? "normal" : countdownTone(remaining);
+  const color = tone === "red" || tone === "closed" ? "#f87171" : tone === "orange" ? "#f59e0b" : "var(--accent-soft)";
+  return (
+    <div className="rounded-xl px-3 py-2 flex items-center gap-2" role="timer" aria-live="polite"
+      style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 35%, transparent)` }}>
+      <span aria-hidden="true">⏱️</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[9px] uppercase tracking-wider font-bold" style={{ color }}>Tempo per giocare</p>
+        <p className="font-display text-sm font-extrabold" style={{ color }}>
+          {remaining === null ? "Calcolo…" : formatCountdown(remaining)}
+        </p>
+      </div>
+      <span className="text-[9px] text-white/35 text-right">chiusura<br />{fmtKickoff(closesAt)}</span>
+    </div>
+  );
 }
 
 export default function PronosticiPage() {
@@ -103,7 +150,7 @@ export default function PronosticiPage() {
       <TabPanel tabKey={tab} keys={tabKeys}>
         {tab === "bet" ? <BetTab data={data} loading={loading} reload={load} clockOffset={clockOffset} />
           : tab === "rank" ? <RankTab leaderboard={data?.leaderboard ?? []} loading={loading} />
-          : isAdmin ? <AdminTab rounds={data?.rounds ?? []} leaderboard={data?.leaderboard ?? []} reload={load} />
+          : isAdmin ? <AdminTab rounds={data?.rounds ?? []} leaderboard={data?.leaderboard ?? []} reload={load} clockOffset={clockOffset} />
           : null}
       </TabPanel>
     </div>
@@ -199,10 +246,7 @@ function BetTab({ data, loading, reload, clockOffset }: { data: BetCenter | null
                 <span className="text-white/35 text-xs transition-transform group-open:rotate-180">⌄</span>
               </summary>
               <div className="px-3 pb-3 flex flex-col gap-3 border-t" style={{ borderColor: "var(--border)" }}>
-                {round.matches.length === 0 && <p className="text-white/35 text-xs pt-3">Nessuno scontro inserito.</p>}
-                {round.matches.map((match) => (
-                  <MatchBetCard key={match.id} match={match} roundStatus={round.status} canBet={canBet} reload={reload} clockOffset={clockOffset} />
-                ))}
+                <RoundSlipCard round={round} canBet={canBet} reload={reload} clockOffset={clockOffset} />
               </div>
             </details>
           ))}
@@ -226,116 +270,121 @@ function RoundBadge({ status }: { status: BetRound["status"] }) {
   );
 }
 
-function MatchBetCard({ match, roundStatus, canBet, reload, clockOffset }: {
-  match: BetMatch; roundStatus: BetRound["status"]; canBet: boolean; reload: () => Promise<void>; clockOffset: number;
+function RoundSlipCard({ round, canBet, reload, clockOffset }: {
+  round: BetRound; canBet: boolean; reload: () => Promise<void>; clockOffset: number;
 }) {
-  const [pick, setPick] = useState<Pick | null>(match.myBet?.pick ?? null);
-  const [stake, setStake] = useState<string>(match.myBet ? String(match.myBet.stake) : "");
+  const [picks, setPicks] = useState<Record<string, Pick>>(round.mySlip?.picks ?? {});
+  const [stake, setStake] = useState<string>(round.mySlip ? String(round.mySlip.stake) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  // partita iniziata: niente più giocate (allineato al controllo server).
-  // Uso l'ora del server (Date.now() + scarto d'orologio) per non bloccare per errore
-  // chi ha l'orologio del telefono in anticipo rispetto al server.
-  const started = !!match.kickoff && new Date(match.kickoff).getTime() <= Date.now() + clockOffset;
-  // una volta piazzata, la giocata non è più modificabile
-  const locked = !!match.result || roundStatus !== "open" || !canBet || !!match.myBet || started;
+  const now = useServerNow(clockOffset);
+  const expired = !!round.closesAt && now !== null && Date.parse(round.closesAt) <= now;
+  const locked = round.status !== "open" || !canBet || !!round.mySlip || expired || !round.closesAt;
   const stakeNum = parseInt(stake || "0", 10);
-  const potential = pick && stakeNum > 0 ? calculateFixedPayout(stakeNum) : 0;
+  const selectedCount = round.matches.filter((match) => !!picks[match.id]).length;
+  const complete = round.matches.length > 0 && selectedCount === round.matches.length;
+  const potential = complete && stakeNum > 0 ? calculateFixedPayout(stakeNum) : 0;
 
   async function submit() {
-    if (!pick) { setError("Scegli un esito"); return; }
+    if (!complete) { setError("Completa tutti i pronostici della schedina"); return; }
     if (!Number.isInteger(stakeNum) || stakeNum <= 0) { setError("Inserisci una puntata"); return; }
     setBusy(true); setError("");
-    const res = await placeBet(match.id, pick, stakeNum);
+    const res = await placeBetSlip(
+      round.id,
+      round.matches.map((match) => ({ matchId: match.id, pick: picks[match.id] })),
+      stakeNum,
+    );
     setBusy(false);
     if (res.error) { setError(res.error); return; }
     await reload();
   }
 
   return (
-    <div className="card-flat p-3 mt-3">
-      {match.kickoff && <p className="text-white/35 text-[10px] mb-2">{fmtKickoff(match.kickoff)}</p>}
+    <div className="pt-3 flex flex-col gap-3">
+      <BetCountdown closesAt={round.closesAt} now={now} />
+      <p className="text-[10px] text-white/40 px-1">
+        Scegli tutti gli esiti e gioca una sola schedina. Chiude {BET_CUTOFF_MINUTES} minuti prima della prima partita.
+      </p>
 
-      {/* squadre */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Avatar src={match.homeLogo} size={30} />
-          <span className="text-white text-sm font-semibold truncate">{match.homeName}</span>
-        </div>
-        <span className="text-white/30 text-[11px] font-bold flex-none px-1">VS</span>
-        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-          <span className="text-white text-sm font-semibold truncate text-right">{match.awayName}</span>
-          <Avatar src={match.awayLogo} size={30} />
-        </div>
-      </div>
+      {round.matches.length === 0 && <p className="text-white/35 text-xs">Nessun incontro inserito.</p>}
+      {round.matches.map((match) => {
+        const chosen = round.mySlip?.picks[match.id] ?? picks[match.id] ?? null;
+        return (
+          <div key={match.id} className="card-flat p-3">
+            {match.kickoff && <p className="text-white/35 text-[10px] mb-2">{fmtKickoff(match.kickoff)}</p>}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Avatar src={match.homeLogo} size={28} />
+                <span className="text-white text-xs font-semibold truncate">{match.homeName}</span>
+              </div>
+              <span className="text-white/30 text-[10px] font-bold flex-none">VS</span>
+              <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                <span className="text-white text-xs font-semibold truncate text-right">{match.awayName}</span>
+                <Avatar src={match.awayLogo} size={28} />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mt-2.5">
+              {(["1", "X", "2"] as Pick[]).map((pick) => {
+                const active = chosen === pick;
+                const correct = !!match.result && match.result === pick;
+                const wrongChoice = !!match.result && active && match.result !== pick;
+                return (
+                  <button key={pick} type="button" disabled={locked}
+                    aria-label={`${PICK_NAME[pick]}: ${match.homeName} - ${match.awayName}`}
+                    aria-pressed={active}
+                    onClick={() => setPicks((current) => ({ ...current, [match.id]: pick }))}
+                    className="py-2 rounded-xl transition-all active:scale-95 disabled:cursor-default"
+                    style={{
+                      background: correct ? "rgba(52,211,153,0.18)" : wrongChoice ? "rgba(248,113,113,0.16)" : active ? "color-mix(in srgb, var(--accent) 18%, transparent)" : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${correct ? "#34d399" : wrongChoice ? "#f87171" : active ? "var(--accent)" : "var(--border)"}`,
+                      color: correct ? "#34d399" : wrongChoice ? "#f87171" : active ? "var(--accent-soft)" : "var(--text-dim)",
+                    }}>
+                    <span className="font-display text-sm font-bold">{PICK_LABELS[pick]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
 
-      {/* esiti semplici: la vincita è sempre 2× */}
-      <div className="grid grid-cols-3 gap-2 mt-3">
-        {(["1", "X", "2"] as Pick[]).map((p) => {
-          const isResult = match.result === p;
-          const isPicked = pick === p;
-          const active = isPicked && !match.result;
-          return (
-            <button key={p} disabled={locked} onClick={() => setPick(p)}
-              className="flex flex-col items-center py-2.5 rounded-xl transition-all active:scale-95 disabled:cursor-default"
-              style={{
-                background: isResult ? "var(--accent-grad)" : active ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "rgba(255,255,255,0.05)",
-                border: `1px solid ${isResult || active ? "var(--accent)" : "var(--border)"}`,
-                boxShadow: active ? "0 4px 14px -6px var(--accent-glow)" : "none",
-                opacity: locked && !isResult && !isPicked ? 0.55 : 1,
-              }}>
-              <span className="font-display text-sm font-bold" style={{ color: isResult ? "var(--accent-ink)" : active ? "var(--accent-soft)" : "#fff" }}>{PICK_LABELS[p]}</span>
-              <span className="text-[9px] mt-0.5" style={{ color: isResult ? "var(--accent-ink)" : "var(--text-faint)" }}>{PICK_NAME[p]}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-2 flex justify-center">
-        <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
-          style={{ color: "var(--accent-soft)", background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}>
-          Vincita fissa {FIXED_WIN_MULTIPLIER}×
-        </span>
-      </div>
-
-      {/* mia giocata già piazzata */}
-      {match.myBet && (
-        <div className="mt-3 flex items-center justify-between rounded-xl px-3 py-2"
+      {round.mySlip ? (
+        <div className="rounded-xl px-3 py-3 flex items-center justify-between gap-3"
           style={{
-            background: match.myBet.status === "won" ? "rgba(52,211,153,0.12)" : match.myBet.status === "lost" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)",
+            background: round.mySlip.status === "won" ? "rgba(52,211,153,0.12)" : round.mySlip.status === "lost" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)",
             border: "1px solid var(--border)",
           }}>
-          <span className="text-xs text-white/70">
-            Giocata: <b className="text-white">{PICK_LABELS[match.myBet.pick]}</b>
-            <span className="text-white/45"> ({PICK_NAME[match.myBet.pick]})</span> · {match.myBet.stake} cr
-          </span>
-          {match.myBet.status === "won" && <span className="text-emerald-400 text-xs font-bold">Ricevuti {match.myBet.payout}</span>}
-          {match.myBet.status === "lost" && <span className="text-red-400 text-xs font-bold">Persa</span>}
-          {match.myBet.status === "pending" && <span className="text-white/50 text-xs">vinci {calculateFixedPayout(match.myBet.stake)}</span>}
+          <div>
+            <p className="text-xs font-bold text-white">Schedina giocata · {round.mySlip.stake} cr</p>
+            <p className="text-[10px] text-white/45">{Object.keys(round.mySlip.picks).length} pronostici · vincita {calculateFixedPayout(round.mySlip.stake)} cr</p>
+          </div>
+          {round.mySlip.status === "won" && <span className="text-emerald-400 text-xs font-bold">Vinta +{round.mySlip.payout}</span>}
+          {round.mySlip.status === "lost" && <span className="text-red-400 text-xs font-bold">Persa</span>}
+          {round.mySlip.status === "pending" && <span className="text-white/50 text-xs font-bold">In gioco</span>}
         </div>
-      )}
-
-      {/* partita già iniziata: scommesse chiuse (solo se non hai già giocato) */}
-      {started && !match.myBet && !match.result && (
-        <p className="mt-3 text-white/45 text-xs flex items-center gap-1.5">🔒 Partita iniziata — scommesse chiuse</p>
-      )}
-
-      {/* form puntata */}
-      {!locked && (
-        <div className="mt-3 flex items-center gap-2">
+      ) : !locked ? (
+        <div className="card-accent p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-white/60">Pronostici scelti</span>
+            <span className="font-display text-sm font-bold" style={{ color: complete ? "#34d399" : "var(--accent-soft)" }}>{selectedCount}/{round.matches.length}</span>
+          </div>
+          <div className="flex items-center gap-2">
           <input
             type="number" inputMode="numeric" min={1} value={stake}
             onChange={(e) => setStake(e.target.value)} placeholder="Crediti"
             className="input w-24 px-3 py-2.5 text-sm" />
-          <button onClick={submit} disabled={busy || !pick || stakeNum <= 0}
+          <button onClick={submit} disabled={busy || !complete || stakeNum <= 0}
             className="btn-primary flex-1 py-2.5 text-sm">
-            {busy ? "…" : `Punta${potential ? ` · ricevi ${potential}` : ""}`}
+            {busy ? "Invio…" : `Gioca schedina${potential ? ` · ricevi ${potential}` : ""}`}
           </button>
+          </div>
         </div>
+      ) : (
+        <p className="text-center text-xs text-white/45 py-2">🔒 Schedine chiuse</p>
       )}
 
       {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
-      {match.betCount > 0 && <p className="text-white/30 text-[10px] mt-2">{match.betCount} giocate</p>}
+      {round.slipCount > 0 && <p className="text-white/30 text-[10px] text-center">{round.slipCount} schedine giocate</p>}
     </div>
   );
 }
@@ -345,7 +394,7 @@ function MatchBetCard({ match, roundStatus, canBet, reload, clockOffset }: {
 function RankTab({ leaderboard, loading }: { leaderboard: CreditRow[]; loading: boolean }) {
   return (
     <div className="px-4 py-4 flex flex-col gap-2">
-      <p className="text-white/40 text-xs mb-1">Saldo crediti dei manager. Si parte da {STARTING_CREDITS}; ogni pronostico vincente restituisce 2× la puntata.</p>
+      <p className="text-white/40 text-xs mb-1">Saldo crediti dei manager. Si parte da {STARTING_CREDITS}; una schedina completa vincente restituisce 2× la puntata.</p>
       {loading && Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="skeleton" style={{ height: 56 }} />
       ))}
@@ -365,7 +414,7 @@ function RankTab({ leaderboard, loading }: { leaderboard: CreditRow[]; loading: 
 
 /* ─── TAB GESTIONE (admin) ──────────────────────────────────────────────── */
 
-function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderboard: CreditRow[]; reload: () => Promise<void> }) {
+function AdminTab({ rounds, leaderboard, reload, clockOffset }: { rounds: BetRound[]; leaderboard: CreditRow[]; reload: () => Promise<void>; clockOffset: number }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [day, setDay] = useState("");
   const [title, setTitle] = useState("");
@@ -450,7 +499,7 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
       {activeGroup && (
         <>
           <CompetitionFolders groups={groups} activeKey={activeGroup.key} onChange={setSelectedKey} />
-          {activeGroup.rounds.map((round) => <AdminRoundCard key={round.id} round={round} teams={teams} reload={reload} />)}
+          {activeGroup.rounds.map((round) => <AdminRoundCard key={round.id} round={round} teams={teams} reload={reload} clockOffset={clockOffset} />)}
         </>
       )}
 
@@ -461,7 +510,7 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
   );
 }
 
-function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team[]; reload: () => Promise<void> }) {
+function AdminRoundCard({ round, teams, reload, clockOffset }: { round: BetRound; teams: Team[]; reload: () => Promise<void>; clockOffset: number }) {
   const confirm = useConfirm();
   const [mode, setMode] = useState<"league" | "real">("league");
 
@@ -482,6 +531,7 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
   const [err, setErr] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
+  const now = useServerNow(clockOffset);
 
   const hasExternal = round.matches.some((m) => m.external);
 
@@ -534,6 +584,14 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
     await reload();
   }
 
+  async function changeStatus(status: "open" | "closed") {
+    setBusy(true); setErr("");
+    const res = await setRoundStatus(round.id, status);
+    setBusy(false);
+    if (res.error) { setErr(res.error); return; }
+    await reload();
+  }
+
   return (
     <div className="card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -548,11 +606,11 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
             </button>
           )}
           {round.status === "draft" && (
-            <button onClick={async () => { await setRoundStatus(round.id, "open"); await reload(); }}
+            <button type="button" onClick={() => changeStatus("open")} disabled={busy}
               className="btn-primary px-3 py-1.5 text-[11px]">Pubblica</button>
           )}
           {round.status !== "draft" && round.status !== "settled" && (
-            <button onClick={async () => { await setRoundStatus(round.id, round.status === "open" ? "closed" : "open"); await reload(); }}
+            <button type="button" onClick={() => changeStatus(round.status === "open" ? "closed" : "open")} disabled={busy}
               className="btn-soft px-2.5 py-1.5 text-[11px]">
               {round.status === "open" ? "Chiudi" : "Riapri"}
             </button>
@@ -563,12 +621,39 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
       </div>
 
       {syncMsg && <p className="text-white/60 text-xs">{syncMsg}</p>}
+      <BetCountdown closesAt={round.closesAt} now={now} />
 
       {/* scontri esistenti */}
       {round.matches.map((m) => <AdminMatchRow key={m.id} match={m} reload={reload} />)}
 
-      {/* nuovo scontro: chiuso finché non serve, per mantenere pulita la giornata */}
-      <details className="card-accent overflow-hidden" style={{ borderRadius: 14 }}>
+      {round.slips && round.slips.length > 0 && (
+        <details className="card-flat overflow-hidden">
+          <summary className="list-none cursor-pointer px-3 py-2.5 flex items-center gap-2">
+            <span className="font-display text-xs font-bold text-white flex-1">🎟️ Schedine ({round.slips.length})</span>
+            <span className="text-white/35 text-xs">⌄</span>
+          </summary>
+          <div className="px-3 pb-3 border-t flex flex-col gap-1.5 pt-2.5" style={{ borderColor: "var(--border)" }}>
+            {round.slips.map((slip) => (
+              <div key={slip.id} className="flex items-center gap-2 px-2 py-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                <Avatar src={slip.logo} size={20} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-white/85 text-xs truncate">{slip.name}</p>
+                  <p className="text-white/40 text-[9px]">{Object.keys(slip.picks).length} pronostici · {slip.stake} cr</p>
+                </div>
+                <span className="text-[10px] flex-none"
+                  style={{ color: slip.status === "won" ? "#34d399" : slip.status === "lost" ? "#f87171" : "rgba(255,255,255,0.45)" }}>
+                  {slip.status === "won" ? `+${slip.payout}` : slip.status === "lost" ? "persa" : "in gioco"}
+                </span>
+                <button onClick={async () => { if (await confirm({ title: `Eliminare la schedina di ${slip.name}?`, message: "Il saldo verrà ripristinato.", confirmLabel: "Elimina", danger: true })) { await adminDeleteBetSlip(slip.id); await reload(); } }}
+                  className="tap text-red-400/70 text-sm flex-none">✕</button>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {/* Gli incontri diventano immutabili appena esiste una schedina. */}
+      {round.slipCount === 0 ? <details className="card-accent overflow-hidden" style={{ borderRadius: 14 }}>
         <summary className="list-none cursor-pointer px-3 py-2.5 flex items-center gap-2">
           <span className="font-display text-xs font-bold text-white flex-1">＋ Aggiungi partita</span>
           <span className="text-[10px]" style={{ color: "var(--accent-soft)" }}>vincita {FIXED_WIN_MULTIPLIER}×</span>
@@ -644,7 +729,9 @@ function AdminRoundCard({ round, teams, reload }: { round: BetRound; teams: Team
         </button>
         {err && <p className="text-red-400 text-xs">{err}</p>}
         </div>
-      </details>
+      </details> : (
+        <p className="text-center text-[10px] text-white/35">Incontri bloccati: sono già state giocate delle schedine.</p>
+      )}
     </div>
   );
 }
@@ -665,12 +752,11 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
       )}
       <div className="flex items-center justify-between gap-2">
         <span className="text-white text-xs font-semibold truncate flex-1">{m.homeName} <span className="text-white/30">vs</span> {m.awayName}</span>
-        <span className="text-[9px] font-bold flex-none" style={{ color: "var(--accent-soft)" }}>2×</span>
       </div>
 
       {/* risultato: l'admin dichiara chi ha vinto → salda subito le giocate */}
       <p className="text-white/45 text-[10px] mt-2.5 mb-1">
-        {m.result ? "Risultato — tocca per cambiare, oppure annulla" : "Chi ha vinto? Imposta il risultato e salda le giocate"}
+        {m.result ? "Risultato — tocca per cambiare, oppure annulla" : "Imposta il risultato: la schedina verrà aggiornata automaticamente"}
       </p>
       <div className="flex items-center gap-1.5">
         {(["1", "X", "2"] as Pick[]).map((p) => {
@@ -693,29 +779,9 @@ function AdminMatchRow({ match: m, reload }: { match: BetMatch; reload: () => Pr
           <button onClick={async () => { await setMatchResult(m.id, null); await reload(); }}
             className="btn-soft px-2 py-1.5 text-[11px] flex-none">annulla</button>
         )}
-        <button onClick={async () => { if (await confirm({ title: "Eliminare lo scontro?", confirmLabel: "Elimina", danger: true })) { await deleteBetMatch(m.id); await reload(); } }}
+        <button onClick={async () => { if (await confirm({ title: "Eliminare lo scontro?", message: "Le schedine già piazzate nella giornata verranno rimborsate.", confirmLabel: "Elimina", danger: true })) { await deleteBetMatch(m.id); await reload(); } }}
           className="btn-danger-soft tap text-[13px] flex-none">✕</button>
       </div>
-
-      {/* giocate dei manager — l'admin può cancellarne una piazzata per errore */}
-      {m.bets && m.bets.length > 0 && (
-        <div className="mt-2.5 flex flex-col gap-1">
-          <p className="text-white/35 text-[10px] font-semibold uppercase tracking-wide">Giocate ({m.bets.length})</p>
-          {m.bets.map((b) => (
-            <div key={b.betId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
-              <Avatar src={b.logo} size={18} />
-              <span className="text-white/85 text-xs flex-1 truncate">{b.name}</span>
-              <span className="text-white/60 text-[11px] flex-none">{PICK_LABELS[b.pick]} · {b.stake}cr</span>
-              <span className="text-[10px] flex-none w-12 text-right"
-                style={{ color: b.status === "won" ? "#34d399" : b.status === "lost" ? "#f87171" : "rgba(255,255,255,0.4)" }}>
-                {b.status === "won" ? `+${b.payout}` : b.status === "lost" ? "persa" : "in gioco"}
-              </span>
-              <button onClick={async () => { if (await confirm({ title: `Eliminare la giocata di ${b.name}?`, confirmLabel: "Elimina", danger: true })) { await adminDeleteBet(b.betId); await reload(); } }}
-                className="tap text-red-400/70 text-sm flex-none">✕</button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
