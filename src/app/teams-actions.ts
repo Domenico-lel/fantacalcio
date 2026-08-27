@@ -4,6 +4,7 @@ import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
 import { fetchLeagueTeams } from "@/lib/league-teams";
 import { getCurrentViewer } from "@/app/social-actions";
 import { normalizeBadges } from "@/lib/badges";
+import { syncLeagueRosters, type RosterSyncResult } from "@/lib/roster-sync";
 
 export interface Team {
   id: string;
@@ -243,6 +244,24 @@ export async function syncTeams(): Promise<{ count: number; merged: number; erro
   }
 
   return { count: officialTeams.length, merged, error: null };
+}
+
+export async function syncRostersNow(): Promise<RosterSyncResult> {
+  const viewer = await getCurrentViewer();
+  if (!viewer?.isAdmin) {
+    return {
+      teams: 0,
+      players: 0,
+      inserted: 0,
+      updated: 0,
+      deleted: 0,
+      unresolved: 0,
+      skipped: false,
+      syncedAt: null,
+      error: "Solo l'admin può sincronizzare le rose",
+    };
+  }
+  return syncLeagueRosters();
 }
 
 export async function uploadTeamLogo(teamRef: string, formData: FormData): Promise<{ url: string | null; error: string | null }> {

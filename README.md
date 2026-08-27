@@ -10,7 +10,7 @@ App mobile PWA per gestire il fantacalcio creativo con amici. **Installabile com
 
 - **🔵 Notizie** (`/news`) — Feed RSS da Corriere dello Sport e Tuttosport, cache 5 min.
 - **🟠 Mercato** (`/players`) — Transfer rumors da Transfermarkt (top 5 leghe europee). Clicca card → scheda con dati trasferimento e link profilo TM.
-- **🟣 Classifica** (`/standings`) — Classifica reale lega amici da Leghe FC, scraping HTML cache 10 min.
+- **🟣 Classifica** (`/standings`) — Classifica reale, giornata corrente e rose ufficiali della lega; i giocatori vengono sincronizzati automaticamente ogni giorno.
 - **🟡 Pronostici** (`/pronostici`) — Sezione pronostici con sistema crediti (esclude admin dalla classifica).
 - **🟢 Bacheca Social** (`/bacheca`) — Feed di post dove interagire, commentare, usare tag.
 
@@ -66,6 +66,14 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/onboarding
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
+
+# Fantacalcio — account abilitato ad aprire la competizione
+FANTACALCIO_LEAGUE_URL=https://leghe.fantacalcio.it/nome-lega/view/competition/123
+FANTACALCIO_USERNAME=
+FANTACALCIO_PASSWORD=
+
+# Protegge il job Vercel che aggiorna le rose ogni giorno alle 03:15 UTC
+CRON_SECRET=una_stringa_lunga_e_casuale
 ```
 
 > **Demo mode**: se `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` non è presente, l'app gira con utente locale e localStorage (nessuna autenticazione richiesta).
@@ -113,6 +121,7 @@ Dual-layer strategy:
 - `GET /api/news` — RSS Corriere dello Sport + Tuttosport, cache 5 min.
 - `GET /api/transfers` — scraping Transfermarkt top 5 leghe, cache 5 min (in-memory per dev).
 - `GET /api/standings` — scraping Leghe FC, cache 10 min.
+- `GET /api/cron/sync-rosters` — sincronizzazione giornaliera protetta di squadre, giocatori e scambi.
 
 ## Configurazione Clerk (importante per utenti italiani)
 

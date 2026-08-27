@@ -7,6 +7,11 @@ import {
   type FantacalcioCalendarStandingFixture,
   valueForAliases as valueFor,
 } from "@/lib/fantacalcio-parser";
+import {
+  parseFantacalcioPlayerCatalog,
+  parseFantacalcioRosterTeams,
+  type FantacalcioRole,
+} from "@/lib/fantacalcio-roster-parser";
 
 const API_BASE = (process.env.FANTACALCIO_API_BASE ?? "https://apileague.fantacalcio.it").replace(/\/$/, "");
 const LEGACY_API_BASE = (process.env.FANTACALCIO_LEGACY_API_BASE ?? "https://leghe.fantacalcio.it/servizi").replace(/\/$/, "");
@@ -14,6 +19,9 @@ const LEGACY_SITE_BASE = (process.env.FANTACALCIO_LEGACY_SITE_BASE ?? "https://l
 // Chiave pubblica usata dal client web di Leghe Fantacalcio. Si può comunque
 // sovrascrivere senza un nuovo deploy se il fornitore la cambia.
 const APP_KEY = process.env.FANTACALCIO_APP_KEY ?? "ICiELOObd5DF5uJEATi77CRvHiiRuMU0";
+const QUOTATIONS_URL = process.env.FANTACALCIO_QUOTATIONS_URL ?? "https://www.fantacalcio.it/quotazioni-fantacalcio";
+const PLAYER_IMAGE_BASE = (process.env.FANTACALCIO_PLAYER_IMAGE_BASE
+  ?? "https://content.fantacalcio.it/web/campioncini/21/small").replace(/\/$/, "");
 
 export interface FantacalcioStanding {
   position: number;
@@ -57,6 +65,27 @@ export interface FantacalcioCurrentMatchday {
   realMatchweek: number | null;
   calculated: boolean;
   matches: FantacalcioMatchdayMatch[];
+}
+
+export interface FantacalcioRosterPlayer {
+  sourceId: string;
+  name: string;
+  role: FantacalcioRole;
+  photoUrl: string;
+}
+
+export interface FantacalcioTeamRoster {
+  teamId: string;
+  teamName: string;
+  players: FantacalcioRosterPlayer[];
+  unresolvedPlayerIds: string[];
+}
+
+export interface FantacalcioRostersResult {
+  teams: FantacalcioTeamRoster[];
+  playerCount: number;
+  unresolvedCount: number;
+  error: string | null;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -323,20 +352,94 @@ function findTeamRows(value: unknown, depth = 0): JsonRecord[] {
   return [];
 }
 
-async function fetchCompetitionTeams(competitionId: string, token: string): Promise<Map<string, string>> {
+async function fetchCompetitionTeamPayload(competitionId: string, token: string): Promise<unknown> {
   const params = new URLSearchParams({ page: "1", pageSize: "100", competitionId });
   const response = await fetch(`${API_BASE}/onboarding/v1/league/competition/teams?${params}`, {
     headers: headers(token),
     cache: "no-store",
   });
   if (!response.ok) throw new Error(`teams:${response.status}`);
+  return readJson(response);
+}
+
+async function fetchCompetitionTeams(competitionId: string, token: string): Promise<Map<string, string>> {
+  const payload = await fetchCompetitionTeamPayload(competitionId, token);
   const teams = new Map<string, string>();
-  for (const row of findTeamRows(await readJson(response))) {
+  for (const row of findTeamRows(payload)) {
     const id = nestedTeamId(row);
     const name = parseFantacalcioTeamName(row);
     if (id && name) teams.set(id, name);
   }
   return teams;
+}
+
+/**
+ * Recupera le rose ufficiali della competizione e risolve gli ID attraverso
+ * il listone pubblico Fantacalcio (nome, ruolo Classic e Campioncino).
+ */
+export async function fetchFantacalcioRosters(): Promise<FantacalcioRostersResult> {
+  const leagueUrl = await getLeagueUrl();
+  if (!leagueUrl) {
+    return { teams: [], playerCount: 0, unresolvedCount: 0, error: "Link della lega non configurato." };
+  }
+  const competitionId = competitionIdFromUrl(leagueUrl);
+  if (!competitionId) {
+    return { teams: [], playerCount: 0, unresolvedCount: 0, error: "Il link della lega non contiene l'ID della competizione." };
+  }
+
+  const auth = await loginAndGetToken(leagueUrl);
+  if (auth.error) return { teams: [], playerCount: 0, unresolvedCount: 0, error: auth.error };
+
+  try {
+    const [teamPayload, quotationsResponse] = await Promise.all([
+      fetchCompetitionTeamPayload(competitionId, auth.token),
+      fetch(QUOTATIONS_URL, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "it-IT,it;q=0.9",
+          "User-Agent": "Mozilla/5.0 (compatible; FantaSoccerClub/1.0)",
+        },
+        cache: "no-store",
+      }),
+    ]);
+    if (!quotationsResponse.ok) throw new Error(`quotations:${quotationsResponse.status}`);
+
+    const sourceTeams = parseFantacalcioRosterTeams(teamPayload);
+    const catalog = parseFantacalcioPlayerCatalog(await quotationsResponse.text());
+    if (!sourceTeams.length) {
+      return { teams: [], playerCount: 0, unresolvedCount: 0, error: "Fantacalcio non ha restituito le rose della competizione." };
+    }
+    if (!catalog.size) {
+      return { teams: [], playerCount: 0, unresolvedCount: 0, error: "Il listone ufficiale Fantacalcio non è leggibile." };
+    }
+
+    const teams = sourceTeams.map((team) => {
+      const unresolvedPlayerIds: string[] = [];
+      const players = team.playerIds.flatMap((sourceId) => {
+        const player = catalog.get(sourceId);
+        if (!player) {
+          unresolvedPlayerIds.push(sourceId);
+          return [];
+        }
+        return [{
+          sourceId,
+          name: player.name,
+          role: player.role,
+          photoUrl: `${PLAYER_IMAGE_BASE}/${encodeURIComponent(sourceId)}.png`,
+        }];
+      });
+      return { ...team, players, unresolvedPlayerIds };
+    });
+    const playerCount = teams.reduce((total, team) => total + team.players.length, 0);
+    const unresolvedCount = teams.reduce((total, team) => total + team.unresolvedPlayerIds.length, 0);
+    if (!playerCount) {
+      return { teams: [], playerCount: 0, unresolvedCount, error: "Le rose risultano vuote oppure i calciatori non sono presenti nel listone ufficiale." };
+    }
+    return { teams, playerCount, unresolvedCount, error: null };
+  } catch (error) {
+    console.error("[fantacalcio] Lettura rose non riuscita", error);
+    return { teams: [], playerCount: 0, unresolvedCount: 0, error: "Non riesco a leggere le rose da Fantacalcio. Riprova tra poco." };
+  }
 }
 
 interface LegacyProviderError {

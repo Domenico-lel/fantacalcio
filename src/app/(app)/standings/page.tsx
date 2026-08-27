@@ -410,7 +410,7 @@ export default function StandingsPage() {
                         {!loadingRosters && roster.length > 0 && <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>P · D · C · A</span>}
                       </div>
                       {loadingRosters && <p className="text-xs mt-2" style={{ color: "var(--text-dim)" }}>Carico la rosa…</p>}
-                      {!loadingRosters && roster.length === 0 && <p className="text-xs mt-2" style={{ color: "var(--text-dim)" }}>Rosa non ancora inserita dall&apos;admin.</p>}
+                      {!loadingRosters && roster.length === 0 && <p className="text-xs mt-2" style={{ color: "var(--text-dim)" }}>Rosa in attesa della sincronizzazione automatica.</p>}
                       {!loadingRosters && roster.length > 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
                           {roster.map((player) => (

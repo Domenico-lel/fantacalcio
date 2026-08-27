@@ -10,7 +10,7 @@ import { ADMIN_POST_TAGS } from "@/lib/post-tags";
 import { BADGES, BADGE_MAP } from "@/lib/badges";
 import BadgeRow from "@/components/Badges";
 import {
-  fetchTeams, syncTeams, uploadTeamLogo, fetchRoster,
+  fetchTeams, syncTeams, syncRostersNow, uploadTeamLogo, fetchRoster,
   addRosterPlayer, deleteRosterPlayer, searchPlayers,
   adminListProfiles, adminUpdateProfile, adminUpdateTeamName, adminReleaseTeam, adminAssignTeam, adminDeleteProfile, adminSetProfileBadges, adminSetTeamCapacity,
   type Team, type RosterPlayer, type AdminProfile, type PlayerHit,
@@ -639,7 +639,13 @@ function GestioneTab() {
       if (saved.error) { setMsg(saved.error); return; }
       const res = await syncTeams();
       if (res.error) { setMsg(res.error); return; }
-      setMsg(`✓ Sincronizzate ${res.count} squadre dalla classifica${res.merged ? ` · accorpati ${res.merged} doppioni` : ""}`);
+      const rosterRes = await syncRostersNow();
+      if (rosterRes.error) {
+        setMsg(`Squadre sincronizzate, ma non riesco ad aggiornare le rose: ${rosterRes.error}`);
+        await load();
+        return;
+      }
+      setMsg(`✓ Sincronizzate ${res.count} squadre e ${rosterRes.players} giocatori${res.merged ? ` · accorpati ${res.merged} doppioni` : ""}${rosterRes.unresolved ? ` · ${rosterRes.unresolved} ID non risolti, dati precedenti preservati` : ""}`);
       await load();
     } catch {
       setMsg("Sincronizzazione non riuscita. Controlla il link della lega e riprova.");
@@ -670,11 +676,11 @@ function GestioneTab() {
             style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}>↻</span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <h2 id="league-connection-title" className="font-display text-white font-bold text-base">Classifica della lega</h2>
+              <h2 id="league-connection-title" className="font-display text-white font-bold text-base">Squadre e rose della lega</h2>
               <span className="chip">{teams.length ? `${teams.length} squadre` : "Da collegare"}</span>
             </div>
             <p className="text-sm leading-snug mt-1" style={{ color: "var(--text-dim)" }}>
-              Incolla il link della tua lega, salvalo e importa le squadre in un tap.
+              Importa squadre e giocatori in un tap. Le rose vengono poi aggiornate automaticamente ogni giorno.
             </p>
           </div>
         </div>
@@ -1115,7 +1121,7 @@ function TeamAdminCard({ team, profiles, onTeamsChange }: { team: Team; profiles
 
           {/* Rosa */}
           <div>
-            <p className="eyebrow text-[10px] mb-2">Rosa</p>
+            <p className="eyebrow text-[10px] mb-2">Rosa · sincronizzazione giornaliera</p>
             <RosterAdder teamRef={team.id} onAdded={loadRoster} />
 
             {loadingRoster && <p className="text-white/40 text-xs">Carico rosa…</p>}
