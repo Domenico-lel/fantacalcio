@@ -37,4 +37,6 @@ export interface ExtMatch {
   odd1?: number | null;
   oddX?: number | null;
   odd2?: number | null;
+  // numero di bookmaker confluiti nel consenso (solo informativo, non salvato nel DB)
+  oddsSources?: number;
 }

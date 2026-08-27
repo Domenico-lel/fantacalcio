@@ -114,41 +114,24 @@ async function preparePredictionDraft(): Promise<PredictionDraftResult> {
   let targetRound = exactRound;
   let created = false;
   if (!targetRound) {
-    const { data: roundsForDay, error: dayError } = await db
+    const { data: insertedRound, error: insertError } = await db
       .from("fanta_bet_rounds")
+      .insert({ id: roundId, day: matchday.matchweek, title: "Lega Fantacalcio", status: "draft" })
       .select("id, status")
-      .eq("day", matchday.matchweek)
-      .order("created_at", { ascending: false });
-    if (dayError) return result({ day: matchday.matchweek, error: dayError.message });
-
-    const currentRound = (roundsForDay ?? []).find((round) => round.status !== "settled");
-    if (currentRound?.status !== "draft") {
-      if (currentRound) {
-        const checkedAt = new Date().toISOString();
-        await saveCheckTimestamp(checkedAt);
-        return result({ day: matchday.matchweek, roundId: currentRound.id, skipped: true, checkedAt });
-      }
-      const { data: insertedRound, error: insertError } = await db
+      .single();
+    if (insertError) {
+      // Due invocazioni contemporanee usano lo stesso UUID: quella che perde
+      // il conflitto recupera semplicemente la bozza appena creata.
+      const { data: concurrentRound } = await db
         .from("fanta_bet_rounds")
-        .insert({ id: roundId, day: matchday.matchweek, title: null, status: "draft" })
         .select("id, status")
-        .single();
-      if (insertError) {
-        // Due invocazioni contemporanee usano lo stesso UUID: quella che perde
-        // il conflitto recupera semplicemente la bozza appena creata.
-        const { data: concurrentRound } = await db
-          .from("fanta_bet_rounds")
-          .select("id, status")
-          .eq("id", roundId)
-          .maybeSingle();
-        if (!concurrentRound) return result({ day: matchday.matchweek, error: insertError.message });
-        targetRound = concurrentRound;
-      } else {
-        targetRound = insertedRound;
-        created = true;
-      }
+        .eq("id", roundId)
+        .maybeSingle();
+      if (!concurrentRound) return result({ day: matchday.matchweek, error: insertError.message });
+      targetRound = concurrentRound;
     } else {
-      targetRound = currentRound;
+      targetRound = insertedRound;
+      created = true;
     }
   }
 
@@ -158,8 +141,18 @@ async function preparePredictionDraft(): Promise<PredictionDraftResult> {
     await saveCheckTimestamp(checkedAt);
     return result({ day: matchday.matchweek, roundId: targetRound.id, skipped: true, checkedAt });
   }
+  // Aggiorna anche eventuali bozze create dalla prima versione dell'automazione,
+  // che non avevano un titolo e sarebbero ambigue accanto alla Serie A.
+  const { error: titleError } = await db
+    .from("fanta_bet_rounds")
+    .update({ title: "Lega Fantacalcio" })
+    .eq("id", targetRound.id);
+  if (titleError) {
+    return result({ day: matchday.matchweek, roundId: targetRound.id, created, error: titleError.message });
+  }
 
-  // Se riutilizziamo una bozza manuale, gli incontri devono puntare al suo ID.
+  // Il round ha un UUID specifico per la lega: può convivere con una giornata
+  // Serie A che abbia lo stesso numero senza riutilizzare bozze manuali.
   const matchesForRound = preparedMatches.map((match) => ({
     ...match,
     id: stablePredictionUuid(`fantacalcio-match:${targetRound.id}:${match.home_team}:${match.away_team}`),

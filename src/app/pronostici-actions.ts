@@ -6,10 +6,10 @@ import { STARTING_CREDITS, FOOTBALL_COMPETITIONS, type ExtMatch } from "@/lib/be
 import { fetchCompetitionMatches, fetchMatchResult } from "@/lib/football-data";
 import { annotateWithOdds } from "@/lib/odds-api";
 import {
-  ensureCurrentPredictionDraft,
-  ensureCurrentPredictionDraftIfStale,
-  type PredictionDraftResult,
-} from "@/lib/prediction-drafts";
+  ensureAllPredictionDrafts,
+  ensureAllPredictionDraftsIfStale,
+  type AllPredictionDraftsResult,
+} from "@/lib/all-prediction-drafts";
 
 type Pick = "1" | "X" | "2";
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -127,8 +127,8 @@ export async function fetchBetCenter(): Promise<BetCenter> {
   // Il cron resta la fonte principale. Questo controllo rende però la bozza
   // disponibile anche al primo accesso admin dopo una nuova giornata.
   if (viewer.isAdmin) {
-    await ensureCurrentPredictionDraftIfStale().catch((error) => {
-      console.error("[prediction-draft] Controllo all'apertura fallito", error);
+    await ensureAllPredictionDraftsIfStale().catch((error) => {
+      console.error("[prediction-drafts] Controllo all'apertura fallito", error);
     });
   }
 
@@ -392,20 +392,23 @@ export async function createBetRound(day: number, title: string): Promise<{ erro
   return { error: error?.message ?? null };
 }
 
-export async function preparePredictionDraftNow(): Promise<PredictionDraftResult> {
+export async function preparePredictionDraftNow(): Promise<AllPredictionDraftsResult> {
   const viewer = await getCurrentViewer();
   if (!viewer?.isAdmin) {
+    const error = "Solo l'admin può preparare le bozze";
     return {
-      day: null,
-      roundId: null,
-      matches: 0,
-      created: false,
-      skipped: false,
+      fantasy: {
+        day: null, roundId: null, matches: 0, created: false,
+        skipped: true, checkedAt: null, error,
+      },
+      serieA: {
+        day: null, roundId: null, matches: 0, oddsSources: 0,
+        created: false, skipped: true, error,
+      },
       checkedAt: null,
-      error: "Solo l'admin può preparare la bozza",
     };
   }
-  return ensureCurrentPredictionDraft();
+  return ensureAllPredictionDrafts();
 }
 
 export async function setRoundStatus(roundId: string, status: "open" | "closed"): Promise<{ error: string | null }> {

@@ -70,7 +70,9 @@ export async function fetchCompetitionMatches(
   }
   const params = new URLSearchParams();
   if (matchday && matchday > 0) params.set("matchday", String(matchday));
-  else params.set("status", "SCHEDULED");
+  // Le partite con orario già ufficiale passano da SCHEDULED a TIMED.
+  // Il filtro supporta una lista separata da virgole: servono entrambi gli stati.
+  else params.set("status", "SCHEDULED,TIMED");
 
   try {
     const res = await fetch(`${BASE}/competitions/${encodeURIComponent(code)}/matches?${params}`, {
@@ -84,9 +86,10 @@ export async function fetchCompetitionMatches(
     }
     let list: FDMatch[] = Array.isArray(json?.matches) ? json.matches : [];
     list = list.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
-    // senza giornata mostro solo le prossime, limitate
+    // Senza giornata restituiamo abbastanza incontri da distinguere un
+    // recupero isolato dalle due prossime giornate complete.
     if (!matchday) {
-      list = list.filter((m) => m.status === "SCHEDULED" || m.status === "TIMED").slice(0, 20);
+      list = list.filter((m) => m.status === "SCHEDULED" || m.status === "TIMED").slice(0, 30);
     }
     return { matches: list.map(normalize), error: null };
   } catch (err) {

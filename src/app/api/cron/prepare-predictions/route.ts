@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureCurrentPredictionDraft } from "@/lib/prediction-drafts";
+import { ensureAllPredictionDrafts } from "@/lib/all-prediction-drafts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,9 +13,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Non autorizzato" }, { status: 401 });
   }
 
-  const result = await ensureCurrentPredictionDraft();
+  const result = await ensureAllPredictionDrafts();
+  const error = result.fantasy.error || result.serieA.error;
   return NextResponse.json(
-    { ok: !result.error, ...result },
-    { status: result.error ? 502 : 200, headers: { "Cache-Control": "no-store" } },
+    { ok: !error, ...result },
+    { status: error ? 502 : 200, headers: { "Cache-Control": "no-store" } },
   );
 }

@@ -330,12 +330,22 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
     setPreparing(true); setPrepareMsg("");
     const res = await preparePredictionDraftNow();
     setPreparing(false);
-    if (res.error) { setPrepareMsg(res.error); return; }
-    if (res.skipped) {
-      setPrepareMsg(res.day ? `✓ La giornata ${res.day} è già pronta o pubblicata.` : "✓ Nessuna nuova giornata da preparare.");
-    } else {
-      setPrepareMsg(`✓ Giornata ${res.day}: ${res.matches} scontri precompilati con quote aggiornate.`);
-    }
+    const describe = (
+      label: string,
+      draft: { day: number | null; matches: number; skipped: boolean; error: string | null },
+    ) => {
+      if (draft.error) return `${label}: ${draft.error}`;
+      if (draft.skipped) return draft.day
+        ? `${label} G${draft.day} già pronta/pubblicata`
+        : `${label}: nessuna novità`;
+      return `${label} G${draft.day}: ${draft.matches} partite pronte`;
+    };
+    const hasError = !!(res.fantasy.error || res.serieA.error);
+    const serieADescription = describe("Serie A", res.serieA)
+      + (!res.serieA.error && !res.serieA.skipped && res.serieA.oddsSources > 0
+        ? `, almeno ${res.serieA.oddsSources} bookmaker per partita`
+        : "");
+    setPrepareMsg(`${hasError ? "⚠" : "✓"} ${describe("Fantacalcio", res.fantasy)} · ${serieADescription}`);
     await reload();
   }
 
@@ -346,14 +356,14 @@ function AdminTab({ rounds, leaderboard, reload }: { rounds: BetRound[]; leaderb
           <div>
             <p className="eyebrow mb-1">Bozza automatica</p>
             <p className="text-sm leading-snug" style={{ color: "var(--text-dim)" }}>
-              Accoppiamenti dal calendario Fantacalcio e quote calcolate sulla classifica attuale. Controlla la bozza e premi “Pubblica”.
+              Due bozze già complete: lega Fantacalcio con quote dalla classifica e Serie A con calendario reale e consenso dei bookmaker europei. Controlla e premi “Pubblica”.
             </p>
           </div>
           <span className="text-xl flex-none">✨</span>
         </div>
         <button type="button" onClick={prepare} disabled={preparing}
           className="btn-primary w-full min-h-[44px] px-4 text-sm mt-3 disabled:opacity-50">
-          {preparing ? "Preparo…" : "Aggiorna bozza ora"}
+          {preparing ? "Preparo…" : "Aggiorna entrambe le bozze"}
         </button>
         {prepareMsg && <p role={prepareMsg.startsWith("✓") ? "status" : "alert"} className="text-xs mt-2" style={{ color: prepareMsg.startsWith("✓") ? "var(--success)" : "var(--text-dim)" }}>{prepareMsg}</p>}
       </div>

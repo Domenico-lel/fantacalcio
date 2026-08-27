@@ -11,7 +11,7 @@ App mobile PWA per gestire il fantacalcio creativo con amici. **Installabile com
 - **🔵 Notizie** (`/news`) — Feed RSS da Corriere dello Sport e Tuttosport, cache 5 min.
 - **🟠 Mercato** (`/players`) — Transfer rumors da Transfermarkt (top 5 leghe europee). Clicca card → scheda con dati trasferimento e link profilo TM.
 - **🟣 Classifica** (`/standings`) — Classifica reale, giornata corrente e rose ufficiali della lega; i giocatori vengono sincronizzati automaticamente ogni giorno.
-- **🟡 Pronostici** (`/pronostici`) — Bozza automatica per ogni giornata Fantacalcio, con accoppiamenti reali e quote basate sulla classifica; l'admin controlla e pubblica.
+- **🟡 Pronostici** (`/pronostici`) — Due bozze automatiche per giornata: lega Fantacalcio con quote basate sulla classifica e Serie A con calendario reale e consenso dei bookmaker; l'admin controlla e pubblica.
 - **🟢 Bacheca Social** (`/bacheca`) — Feed di post dove interagire, commentare, usare tag.
 
 **Profilo & Badge**:
@@ -72,7 +72,11 @@ FANTACALCIO_LEAGUE_URL=https://leghe.fantacalcio.it/nome-lega/view/competition/1
 FANTACALCIO_USERNAME=
 FANTACALCIO_PASSWORD=
 
-# Protegge il job Vercel che aggiorna le rose ogni giorno alle 03:15 UTC
+# Calendario/risultati Serie A e consenso quote bookmaker europei
+FOOTBALL_DATA_API_KEY=
+ODDS_API_KEY=
+
+# Protegge i job Vercel: rose alle 03:15 e bozze pronostici alle 03:30 UTC
 CRON_SECRET=una_stringa_lunga_e_casuale
 ```
 
