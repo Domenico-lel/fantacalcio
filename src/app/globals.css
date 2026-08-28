@@ -89,21 +89,6 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-/* Quando viene avviata dalla Home, la PWA occupa tutta la viewport e usa il
-   colore dell'app anche dietro notch, isola dinamica e indicatore Home. */
-@media (display-mode: standalone) {
-  html,
-  body {
-    width: 100%;
-    min-height: 100dvh;
-    background-color: var(--bg);
-  }
-
-  body {
-    overscroll-behavior-y: none;
-  }
-}
-
 #__next,
 main {
   min-height: 100dvh;

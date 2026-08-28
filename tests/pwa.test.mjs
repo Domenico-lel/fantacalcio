@@ -36,5 +36,11 @@ test("la schermata offline contiene un messaggio e un comando di ripristino", as
 
   assert.match(offline, /Sei fuori gioco/);
   assert.match(offline, /location\.reload\(\)/);
-  assert.match(offline, /viewport-fit=cover/);
+  assert.doesNotMatch(offline, /viewport-fit=cover/);
+});
+
+test("il layout non forza l'area edge-to-edge che mostra la barra di sistema su iOS 26", async () => {
+  const layout = await readFile(new URL("src/app/layout.tsx", root), "utf8");
+
+  assert.doesNotMatch(layout, /viewportFit\s*:\s*["']cover["']/);
 });

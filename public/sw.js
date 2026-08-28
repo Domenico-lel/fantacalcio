@@ -1,6 +1,6 @@
 /* Fanta Soccer Club — cache PWA intenzionalmente conservativa.
  * API, pagine autenticate e risposte dinamiche restano sempre network-only. */
-const CACHE_NAME = "fanta-soccer-static-v1";
+const CACHE_NAME = "fanta-soccer-static-v2";
 const CORE_ASSETS = [
   "/offline.html",
   "/manifest.json",
