@@ -77,8 +77,9 @@ type Step = { icon: ReactNode; text: ReactNode };
 
 const STEPS: Record<Plat, Step[]> = {
   ios: [
-    { icon: <ShareIcon />, text: <>Tocca <b>Condividi</b> nella barra di <b>Safari</b> (il quadrato con la freccia ↑).</> },
+    { icon: <ShareIcon />, text: <>In <b>Safari</b> tocca <b>Condividi</b>. Se non lo vedi, apri prima il menu <b>•••</b>.</> },
     { icon: <AddSquareIcon />, text: <>Scorri e tocca <b>Aggiungi alla schermata Home</b>.</> },
+    { icon: <InstallIcon />, text: <>Lascia attivo <b>Apri come app web</b>, così si avvierà senza le barre di Safari.</> },
     { icon: <CheckIcon />, text: <>Tocca <b>Aggiungi</b> in alto a destra. Fatto! 🎉</> },
   ],
   android: [

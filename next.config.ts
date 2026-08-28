@@ -18,6 +18,25 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "eredivisie.b-cdn.net" },
     ],
   },
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+      {
+        source: "/manifest.json",
+        headers: [
+          { key: "Content-Type", value: "application/manifest+json" },
+          { key: "Cache-Control", value: "public, max-age=3600, must-revalidate" },
+        ],
+      },
+    ];
+  },
   // La sezione Trofei ora vive dentro /standings (Classifica). Le vecchie
   // pagine /news e /trofei sono linkate da config Clerk legacy, bookmark e
   // PWA: reindirizziamo a /standings per evitare il 404 post-login.

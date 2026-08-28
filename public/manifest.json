@@ -1,13 +1,45 @@
 {
+  "id": "/",
   "name": "Fanta Soccer Club",
-  "short_name": "Fanta Soccer Club",
+  "short_name": "Fanta Soccer",
   "description": "La lega più scatenata del fantacalcio",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0f1d",
-  "theme_color": "#0a0f1d",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
   "orientation": "portrait",
+  "categories": ["sports", "social", "entertainment"],
+  "lang": "it-IT",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Classifica",
+      "short_name": "Classifica",
+      "description": "Apri classifica e giornata corrente",
+      "url": "/standings",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Pronostici",
+      "short_name": "Pronostici",
+      "description": "Apri le schedine della lega",
+      "url": "/pronostici",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Bacheca",
+      "short_name": "Bacheca",
+      "description": "Apri la bacheca della lega",
+      "url": "/bacheca",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

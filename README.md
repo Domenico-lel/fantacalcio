@@ -112,6 +112,10 @@ App installabile su:
 - Start URL: `/` (dopo login → `/news`)
 - Background color: `#0a0f1d` (dark theme)
 - Orientamento: portrait
+- Icone PNG dedicate per iOS, Android e modalità maskable
+- Service worker leggero: cache delle sole risorse statiche, senza mettere in cache API o dati autenticati
+- Schermata offline e avviso quando torna disponibile una nuova versione
+- Nessuna notifica push
 
 ## Persistenza dati
 
