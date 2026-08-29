@@ -89,14 +89,14 @@ test("ignora le giornate non ancora calcolate", () => {
   }]), []);
 });
 
-test("calcola il parziale live ignorando gli zero segnaposto", () => {
+test("calcola il parziale live ignorando i sentinella senza voto", () => {
   assert.deepEqual(parseFantacalcioLineupSummary({
     tot: 0,
     mdl: "343",
     starts: [
-      { cscr: 0 },
+      { cscr: 100 },
       { cscr: "6,5" },
-      { cscr: 0 },
+      { cscr: 100 },
     ],
   }), {
     total: 6.5,
@@ -105,11 +105,11 @@ test("calcola il parziale live ignorando gli zero segnaposto", () => {
   });
 });
 
-test("non presenta come votata una formazione con soli zero", () => {
+test("non presenta come votata una formazione con soli sentinella", () => {
   assert.deepEqual(parseFantacalcioLineupSummary({
     tot: 0,
     mdl: 532,
-    starts: Array.from({ length: 11 }, () => ({ cscr: 0 })),
+    starts: Array.from({ length: 11 }, () => ({ cscr: 100 })),
   }), {
     total: null,
     formation: "532",

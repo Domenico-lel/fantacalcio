@@ -208,10 +208,10 @@ export interface FantacalcioLineupSummary {
 }
 
 /**
- * Il live di Leghe Fantacalcio lascia `tot` e i voti non ancora disponibili a
- * zero. Sommiamo quindi i punteggi correnti non nulli dei titolari: in questo
- * modo uno 0 segnaposto non diventa un voto e il parziale arriva prima del
- * calcolo definitivo della giornata.
+ * Il live di Leghe Fantacalcio lascia `tot` a zero e codifica il voto non
+ * disponibile come `100` (nelle varianti precedenti anche `0`). Sommiamo
+ * quindi soltanto i punteggi correnti reali dei titolari, prima che venga
+ * eseguito il calcolo definitivo della giornata.
  */
 export function parseFantacalcioLineupSummary(value: unknown): FantacalcioLineupSummary {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -227,7 +227,7 @@ export function parseFantacalcioLineupSummary(value: unknown): FantacalcioLineup
       player as FantacalcioJsonRecord,
       ["cscr", "currentScore", "fantagrade", "scr", "score", "grade"],
     ));
-    return score === null || score === 0 ? [] : [score];
+    return score === null || score === 0 || score === 100 ? [] : [score];
   });
   const explicitTotal = parseOptionalFantacalcioNumber(valueForAliases(
     record,
