@@ -213,7 +213,10 @@ export interface FantacalcioLineupSummary {
  * quindi soltanto i punteggi correnti reali dei titolari, prima che venga
  * eseguito il calcolo definitivo della giornata.
  */
-export function parseFantacalcioLineupSummary(value: unknown): FantacalcioLineupSummary {
+export function parseFantacalcioLineupSummary(
+  value: unknown,
+  officialLiveScores?: ReadonlyMap<string, number>,
+): FantacalcioLineupSummary {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { total: null, formation: null, playersWithVote: 0 };
   }
@@ -221,7 +224,21 @@ export function parseFantacalcioLineupSummary(value: unknown): FantacalcioLineup
   const record = value as FantacalcioJsonRecord;
   const startersValue = valueForAliases(record, ["starts", "starters"]);
   const starters = Array.isArray(startersValue) ? startersValue : [];
-  const liveScores = starters.flatMap((player) => {
+  const officialScores = starters.flatMap((player) => {
+    if (!officialLiveScores || !player || typeof player !== "object" || Array.isArray(player)) return [];
+    const source = player as FantacalcioJsonRecord;
+    const nested = valueForAliases(source, ["player", "calciatore"]);
+    const nestedRecord = nested && typeof nested === "object" && !Array.isArray(nested)
+      ? nested as FantacalcioJsonRecord
+      : null;
+    const id = text(valueForAliases(source, [
+      "playerId", "player_id", "idPlayer", "id_player", "idCalciatore", "id_calciatore",
+      "calciatoreId", "calciatore_id", "pid", "idp", "cal", "id",
+    ]) ?? (nestedRecord ? valueForAliases(nestedRecord, ["id", "playerId", "idCalciatore"]) : undefined));
+    const score = id ? officialLiveScores.get(id) : undefined;
+    return score === undefined ? [] : [score];
+  });
+  const providerScores = starters.flatMap((player) => {
     if (!player || typeof player !== "object" || Array.isArray(player)) return [];
     const score = parseOptionalFantacalcioNumber(valueForAliases(
       player as FantacalcioJsonRecord,
@@ -229,6 +246,7 @@ export function parseFantacalcioLineupSummary(value: unknown): FantacalcioLineup
     ));
     return score === null || score === 0 || score === 100 ? [] : [score];
   });
+  const liveScores = officialScores.length > 0 ? officialScores : providerScores;
   const explicitTotal = parseOptionalFantacalcioNumber(valueForAliases(
     record,
     ["tot", "total", "fantapoints", "fantapunti"],

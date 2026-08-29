@@ -116,3 +116,20 @@ test("non presenta come votata una formazione con soli sentinella", () => {
     playersWithVote: 0,
   });
 });
+
+test("sostituisce i punteggi congelati con i voti live ufficiali dei titolari", () => {
+  const live = new Map([["6956", 6], ["6531", 4]]);
+  assert.deepEqual(parseFantacalcioLineupSummary({
+    tot: 0,
+    mdl: 532,
+    starts: [
+      { id: 6956, cscr: 100 },
+      { idCalciatore: 6531, cscr: 100 },
+      { id: 9999, cscr: 100 },
+    ],
+  }, live), {
+    total: 10,
+    formation: "532",
+    playersWithVote: 2,
+  });
+});

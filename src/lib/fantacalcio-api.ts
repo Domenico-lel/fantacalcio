@@ -20,6 +20,7 @@ import {
   parseFantacalcioRosterTeams,
   type FantacalcioRole,
 } from "@/lib/fantacalcio-roster-parser";
+import { fetchFantacalcioLiveScores } from "@/lib/fantacalcio-live-votes";
 
 const API_BASE = (process.env.FANTACALCIO_API_BASE ?? "https://apileague.fantacalcio.it").replace(/\/$/, "");
 const LEGACY_API_BASE = (process.env.FANTACALCIO_LEGACY_API_BASE ?? "https://leghe.fantacalcio.it/servizi").replace(/\/$/, "");
@@ -712,7 +713,13 @@ function recordPayload(value: unknown, depth = 0): JsonRecord | null {
   return isRecord(data) ? recordPayload(data, depth + 1) : value;
 }
 
-async function fetchMatchLineup(competitionId: string, fixture: CalendarFixture, token: string, syncToken: string): Promise<{
+async function fetchMatchLineup(
+  competitionId: string,
+  fixture: CalendarFixture,
+  token: string,
+  syncToken: string,
+  liveScores: ReadonlyMap<string, number>,
+): Promise<{
   home: ReturnType<typeof parseFantacalcioLineupSummary>;
   away: ReturnType<typeof parseFantacalcioLineupSummary>;
 } | null> {
@@ -730,8 +737,8 @@ async function fetchMatchLineup(competitionId: string, fixture: CalendarFixture,
     const payload = recordPayload(await readJson(response));
     if (!payload) return null;
     return {
-      home: parseFantacalcioLineupSummary(valueFor(payload, ["home"])),
-      away: parseFantacalcioLineupSummary(valueFor(payload, ["away"])),
+      home: parseFantacalcioLineupSummary(valueFor(payload, ["home"]), liveScores),
+      away: parseFantacalcioLineupSummary(valueFor(payload, ["away"]), liveScores),
     };
   } catch {
     return null;
@@ -747,7 +754,18 @@ async function buildCurrentMatchday(
 ): Promise<FantacalcioCurrentMatchday | null> {
   const current = selectCurrentFixtures(fixtures);
   if (!current.length) return null;
-  const lineups = await Promise.all(current.map((fixture) => fetchMatchLineup(competitionId, fixture, token, syncToken)));
+  const realMatchweek = current.find((fixture) => fixture.realMatchweek !== null)?.realMatchweek ?? null;
+  let liveScores: ReadonlyMap<string, number> = new Map();
+  if (realMatchweek !== null) {
+    try {
+      liveScores = await fetchFantacalcioLiveScores(realMatchweek);
+    } catch (error) {
+      console.warn("[fantacalcio] Feed voti live non disponibile; usato il provider lega", error);
+    }
+  }
+  const lineups = await Promise.all(current.map((fixture) => (
+    fetchMatchLineup(competitionId, fixture, token, syncToken, liveScores)
+  )));
   return {
     matchweek: current[0].matchweek,
     realMatchweek: current[0].realMatchweek,
