@@ -1,4 +1,11 @@
 import { getLeagueUrl } from "@/lib/league-config";
+import { unstable_cache } from "next/cache";
+import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase-server";
+import {
+  FANTACALCIO_SYNC_INTERVAL_MS,
+  fantacalcioSyncToken,
+  withFantacalcioSyncToken,
+} from "@/lib/fantacalcio-sync-utils";
 import {
   deriveFantacalcioStandingsFromCalendar,
   parseFantacalcioLineupSummary,
@@ -43,6 +50,8 @@ export interface FantacalcioStandingsResult {
   items: FantacalcioStanding[];
   error: string | null;
   currentMatchday: FantacalcioCurrentMatchday | null;
+  syncedAt?: string | null;
+  stale?: boolean;
 }
 
 export interface FantacalcioMatchdayMatch {
@@ -209,6 +218,8 @@ function headers(token?: string): HeadersInit {
   return {
     Accept: "application/json",
     "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
     app_key: APP_KEY,
     ...(token ? { Authorization: `Bearer ${token}`, token } : {}),
   };
@@ -548,7 +559,7 @@ async function openLegacySession(
   return { cookie, status: loginResponse.status, providerError: null };
 }
 
-async function fetchLegacyStandings(leagueUrl: string, competitionId: string): Promise<LegacyStandingsResponse> {
+async function fetchLegacyStandings(leagueUrl: string, competitionId: string, syncToken: string): Promise<LegacyStandingsResponse> {
   const alias = new URL(leagueUrl).pathname.split("/").filter(Boolean)[0] ?? "";
   const session = await openLegacySession(leagueUrl, competitionId);
   if (session.providerError) {
@@ -559,6 +570,7 @@ async function fetchLegacyStandings(leagueUrl: string, competitionId: string): P
     id_competizione: competitionId,
     giornata_inizio: "1",
     giornata_fine: "60",
+    _: syncToken,
   });
   try {
     const response = await fetch(`${LEGACY_API_BASE}/V1_LegheCompetizione/ClassificaGiornate?${params}`, {
@@ -674,9 +686,13 @@ function selectCurrentFixtures(fixtures: CalendarFixture[]): CalendarFixture[] {
   return fixtures.filter((fixture) => fixture.matchweek === current);
 }
 
-async function fetchCompetitionCalendar(competitionId: string, token: string): Promise<CalendarFixture[]> {
+async function fetchCompetitionCalendar(competitionId: string, token: string, syncToken: string): Promise<CalendarFixture[]> {
   try {
-    const response = await fetch(`${API_BASE}/onboarding/v1/league/competition/calendar/${encodeURIComponent(competitionId)}`, {
+    const url = withFantacalcioSyncToken(
+      `${API_BASE}/onboarding/v1/league/competition/calendar/${encodeURIComponent(competitionId)}`,
+      syncToken,
+    );
+    const response = await fetch(url, {
       headers: headers(token),
       cache: "no-store",
     });
@@ -696,7 +712,7 @@ function recordPayload(value: unknown, depth = 0): JsonRecord | null {
   return isRecord(data) ? recordPayload(data, depth + 1) : value;
 }
 
-async function fetchMatchLineup(competitionId: string, fixture: CalendarFixture, token: string): Promise<{
+async function fetchMatchLineup(competitionId: string, fixture: CalendarFixture, token: string, syncToken: string): Promise<{
   home: ReturnType<typeof parseFantacalcioLineupSummary>;
   away: ReturnType<typeof parseFantacalcioLineupSummary>;
 } | null> {
@@ -705,7 +721,8 @@ async function fetchMatchLineup(competitionId: string, fixture: CalendarFixture,
     .map((part) => encodeURIComponent(String(part)))
     .join("/");
   try {
-    const response = await fetch(`${API_BASE}/gaming/v1/teamLineup/${parts}`, {
+    const url = withFantacalcioSyncToken(`${API_BASE}/gaming/v1/teamLineup/${parts}`, syncToken);
+    const response = await fetch(url, {
       headers: headers(token),
       cache: "no-store",
     });
@@ -726,10 +743,11 @@ async function buildCurrentMatchday(
   token: string,
   teams: Map<string, string>,
   fixtures: CalendarFixture[],
+  syncToken: string,
 ): Promise<FantacalcioCurrentMatchday | null> {
   const current = selectCurrentFixtures(fixtures);
   if (!current.length) return null;
-  const lineups = await Promise.all(current.map((fixture) => fetchMatchLineup(competitionId, fixture, token)));
+  const lineups = await Promise.all(current.map((fixture) => fetchMatchLineup(competitionId, fixture, token, syncToken)));
   return {
     matchweek: current[0].matchweek,
     realMatchweek: current[0].realMatchweek,
@@ -779,7 +797,7 @@ function legacyProviderErrorMessage(error: LegacyProviderError): string {
  * competizione e classifica per giornate. L'HTML pubblico è ormai soltanto
  * il guscio dell'app Angular e non contiene più dati utilizzabili dal server.
  */
-async function fetchFantacalcioStandingsUncached(): Promise<FantacalcioStandingsResult> {
+async function fetchFantacalcioStandingsUncached(syncToken: string): Promise<FantacalcioStandingsResult> {
   const leagueUrl = await getLeagueUrl();
   if (!leagueUrl) return { items: [], error: "Link della lega non configurato: aggiungilo nella sezione Gestione.", currentMatchday: null };
   const competitionId = competitionIdFromUrl(leagueUrl);
@@ -793,8 +811,8 @@ async function fetchFantacalcioStandingsUncached(): Promise<FantacalcioStandings
   try {
     const [teams, standings, calendar] = await Promise.all([
       fetchCompetitionTeams(competitionId, auth.token),
-      fetchLegacyStandings(leagueUrl, competitionId),
-      fetchCompetitionCalendar(competitionId, auth.token),
+      fetchLegacyStandings(leagueUrl, competitionId, syncToken),
+      fetchCompetitionCalendar(competitionId, auth.token, syncToken),
     ]);
     const teamIdByName = new Map([...teams].map(([id, name]) => [name.trim().toLocaleLowerCase("it-IT"), id]));
     const items = standings.rows
@@ -809,7 +827,7 @@ async function fetchFantacalcioStandingsUncached(): Promise<FantacalcioStandings
         return toStanding({ ...row, teamName: name, teamId }, index + 1);
       })
       .filter((row): row is FantacalcioStanding => !!row);
-    const currentMatchday = await buildCurrentMatchday(competitionId, auth.token, teams, calendar);
+    const currentMatchday = await buildCurrentMatchday(competitionId, auth.token, teams, calendar, syncToken);
     if (items.length) return { items: items.sort((a, b) => a.position - b.position), error: null, currentMatchday };
 
     // Il calendario moderno contiene risultato, fantapunteggi e punti in
@@ -873,23 +891,74 @@ async function fetchFantacalcioStandingsUncached(): Promise<FantacalcioStandings
   return { items: [], error: "Fantacalcio non ha restituito una classifica leggibile. Verifica che la competizione abbia almeno una giornata calcolata.", currentMatchday: null };
 }
 
-const LIVE_SNAPSHOT_TTL_MS = 15_000;
-let liveSnapshot: { expiresAt: number; value: FantacalcioStandingsResult } | null = null;
-let liveRequest: Promise<FantacalcioStandingsResult> | null = null;
+const STANDINGS_SNAPSHOT_KEY = "fantacalcio_standings_snapshot_v2";
 
-/** Condivide per pochi secondi lo stesso snapshot tra gli utenti senza renderlo stale. */
+function validSnapshot(value: unknown): value is FantacalcioStandingsResult {
+  if (!isRecord(value)) return false;
+  return Array.isArray(value.items) && (value.currentMatchday === null || isRecord(value.currentMatchday));
+}
+
+async function readPersistedSnapshot(): Promise<FantacalcioStandingsResult | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const db = createAdminClient();
+    const { data, error } = await db
+      .from("fanta_settings")
+      .select("value, updated_at")
+      .eq("key", STANDINGS_SNAPSHOT_KEY)
+      .maybeSingle();
+    if (error || !data?.value) return null;
+    const value: unknown = JSON.parse(data.value);
+    if (!validSnapshot(value)) return null;
+    return { ...value, syncedAt: value.syncedAt ?? data.updated_at };
+  } catch {
+    return null;
+  }
+}
+
+async function persistSnapshot(value: FantacalcioStandingsResult): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const syncedAt = value.syncedAt ?? new Date().toISOString();
+  try {
+    const db = createAdminClient();
+    const { error } = await db.from("fanta_settings").upsert(
+      { key: STANDINGS_SNAPSHOT_KEY, value: JSON.stringify(value), updated_at: syncedAt },
+      { onConflict: "key" },
+    );
+    if (error) console.error("[fantacalcio-sync] Salvataggio snapshot fallito", error.message);
+  } catch (error) {
+    console.error("[fantacalcio-sync] Salvataggio snapshot non disponibile", error);
+  }
+}
+
+async function refreshCentralSnapshot(): Promise<FantacalcioStandingsResult> {
+  const previous = await readPersistedSnapshot();
+  const fresh = await fetchFantacalcioStandingsUncached(fantacalcioSyncToken());
+  if (fresh.items.length > 0 && !fresh.error) {
+    const value = { ...fresh, syncedAt: new Date().toISOString(), stale: false };
+    await persistSnapshot(value);
+    return value;
+  }
+  if (previous?.items.length) return { ...previous, error: null, stale: true };
+  return { ...fresh, syncedAt: null, stale: false };
+}
+
+// Data Cache Vercel: una sola sincronizzazione upstream per tutta la lega,
+// anche se più istanze serverless o più telefoni richiedono la classifica.
+const fetchCentralSnapshot = unstable_cache(
+  refreshCentralSnapshot,
+  [STANDINGS_SNAPSHOT_KEY],
+  { revalidate: FANTACALCIO_SYNC_INTERVAL_MS / 1000, tags: [STANDINGS_SNAPSHOT_KEY] },
+);
+
+/** Restituisce lo snapshot centrale e usa l'ultimo dato valido in caso di errore. */
 export async function fetchFantacalcioStandings(): Promise<FantacalcioStandingsResult> {
-  const now = Date.now();
-  if (liveSnapshot && liveSnapshot.expiresAt > now) return liveSnapshot.value;
-  if (liveRequest) return liveRequest;
-
-  liveRequest = fetchFantacalcioStandingsUncached()
-    .then((value) => {
-      liveSnapshot = { expiresAt: Date.now() + LIVE_SNAPSHOT_TTL_MS, value };
-      return value;
-    })
-    .finally(() => {
-      liveRequest = null;
-    });
-  return liveRequest;
+  try {
+    return await fetchCentralSnapshot();
+  } catch (error) {
+    console.error("[fantacalcio-sync] Aggiornamento centrale fallito", error);
+    const previous = await readPersistedSnapshot();
+    if (previous?.items.length) return { ...previous, error: null, stale: true };
+    return { items: [], currentMatchday: null, syncedAt: null, stale: false, error: "Sincronizzazione Fantacalcio temporaneamente non disponibile." };
+  }
 }

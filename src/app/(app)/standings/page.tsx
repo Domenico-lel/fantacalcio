@@ -99,11 +99,15 @@ function CurrentMatchdayPanel({
   teamId,
   teamName,
   teams,
+  lastUpdated,
+  stale,
 }: {
   matchday: FantacalcioCurrentMatchday | null;
   teamId: string | null;
   teamName: string;
   teams: StandingEntryWithLogo[];
+  lastUpdated: string | null;
+  stale: boolean;
 }) {
   const match = teamId
     ? matchday?.matches.find((item) => item.homeTeamId === teamId || item.awayTeamId === teamId)
@@ -177,6 +181,11 @@ function CurrentMatchdayPanel({
           {formation ? `Modulo ${formation}` : "Formazione schierata"}{playersWithVote > 0 ? ` · ${playersWithVote}/11 con voto` : ""}
         </p>
       )}
+      {lastUpdated && (
+        <p className="text-[10px] mt-1.5 text-center" style={{ color: "var(--text-faint)" }}>
+          {stale ? "Ultimo dato valido" : "Sincronizzato"} alle {lastUpdated}
+        </p>
+      )}
     </div>
   );
 }
@@ -196,6 +205,7 @@ export default function StandingsPage() {
   const [rostersLoaded, setRostersLoaded] = useState(false);
   const [loadingRosters, setLoadingRosters] = useState(false);
   const [currentMatchday, setCurrentMatchday] = useState<FantacalcioCurrentMatchday | null>(null);
+  const [staleSnapshot, setStaleSnapshot] = useState(false);
   const standingsRequestRunning = useRef(false);
   const standingsLoaded = useRef(false);
   const teamInfo = useRef<Record<string, StandingsTeamInfo>>({});
@@ -244,7 +254,9 @@ export default function StandingsPage() {
       });
       setStandings(withLogos);
       setCurrentMatchday(data.currentMatchday ?? null);
-      setLastUpdated(new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
+      const syncedAt = data.syncedAt ? new Date(data.syncedAt) : new Date();
+      setLastUpdated(syncedAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
+      setStaleSnapshot(data.stale === true);
       standingsLoaded.current = true;
     } catch {
       if (!standingsLoaded.current) {
@@ -270,7 +282,7 @@ export default function StandingsPage() {
     const refreshOnFocus = () => {
       if (tab === "classifica" && document.visibilityState === "visible") void loadStandings(true);
     };
-    const interval = window.setInterval(refreshWhenVisible, 20_000);
+    const interval = window.setInterval(refreshWhenVisible, 60_000);
     window.addEventListener("focus", refreshOnFocus);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
@@ -433,7 +445,7 @@ export default function StandingsPage() {
 
                   {isExpanded && (
                     <div id={`team-detail-${entry.position}`} className="px-3.5 pb-3.5" style={{ background: isMe ? "color-mix(in srgb, var(--accent) 7%, transparent)" : "rgba(255,255,255,0.018)", borderTop: "1px solid var(--border)" }}>
-                      <CurrentMatchdayPanel matchday={currentMatchday} teamId={entry.teamId} teamName={entry.displayName} teams={standings} />
+                      <CurrentMatchdayPanel matchday={currentMatchday} teamId={entry.teamId} teamName={entry.displayName} teams={standings} lastUpdated={lastUpdated} stale={staleSnapshot} />
 
                       <div className="mt-3 flex items-center justify-between gap-3">
                         <p className="eyebrow text-[10px]">Rosa · {loadingRosters ? "caricamento…" : `${roster.length} giocatori`}</p>
