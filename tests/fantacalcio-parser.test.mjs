@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   deriveFantacalcioStandingsFromCalendar,
+  parseFantacalcioLineupSummary,
   parseFantacalcioTeamName,
 } from "../src/lib/fantacalcio-parser.ts";
 
@@ -86,4 +87,32 @@ test("ignora le giornate non ancora calcolate", () => {
     homeStandingPoints: null,
     awayStandingPoints: null,
   }]), []);
+});
+
+test("calcola il parziale live ignorando gli zero segnaposto", () => {
+  assert.deepEqual(parseFantacalcioLineupSummary({
+    tot: 0,
+    mdl: "343",
+    starts: [
+      { cscr: 0 },
+      { cscr: "6,5" },
+      { cscr: 0 },
+    ],
+  }), {
+    total: 6.5,
+    formation: "343",
+    playersWithVote: 1,
+  });
+});
+
+test("non presenta come votata una formazione con soli zero", () => {
+  assert.deepEqual(parseFantacalcioLineupSummary({
+    tot: 0,
+    mdl: 532,
+    starts: Array.from({ length: 11 }, () => ({ cscr: 0 })),
+  }), {
+    total: null,
+    formation: "532",
+    playersWithVote: 0,
+  });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { FantacalcioCurrentMatchday, FantacalcioMatchdayMatch, FantacalcioStandingsResult } from "@/lib/fantacalcio-api";
 import { loadViewerCache } from "@/lib/store";
 import { getCurrentViewer } from "@/app/social-actions";
@@ -196,6 +196,9 @@ export default function StandingsPage() {
   const [rostersLoaded, setRostersLoaded] = useState(false);
   const [loadingRosters, setLoadingRosters] = useState(false);
   const [currentMatchday, setCurrentMatchday] = useState<FantacalcioCurrentMatchday | null>(null);
+  const standingsRequestRunning = useRef(false);
+  const standingsLoaded = useRef(false);
+  const teamInfo = useRef<Record<string, StandingsTeamInfo>>({});
 
   useEffect(() => {
     // Identità autorevole dal server (stessa fonte dell'header), con paint immediato dalla cache.
@@ -213,19 +216,24 @@ export default function StandingsPage() {
     }).catch(() => {});
   }, []);
 
-  const loadStandings = useCallback(async () => {
+  const loadStandings = useCallback(async (refreshTeamInfo = false) => {
+    if (standingsRequestRunning.current) return;
+    standingsRequestRunning.current = true;
     try {
       // Il refresh deve aggiornare anche logo e nome personalizzato: prima
       // venivano letti soltanto al mount e in una PWA potevano restare vecchi.
-      const [res, overrides] = await Promise.all([
+      const [res, refreshedTeamInfo] = await Promise.all([
         fetch("/api/standings", { cache: "no-store", headers: { Accept: "application/json" } }),
-        fetchStandingsNameMap().catch((): Record<string, StandingsTeamInfo> => ({})),
+        refreshTeamInfo
+          ? fetchStandingsNameMap().catch((): Record<string, StandingsTeamInfo> => teamInfo.current)
+          : Promise.resolve(teamInfo.current),
       ]);
       if (!res.ok) throw new Error("Failed to fetch standings");
       const data = await res.json() as FantacalcioStandingsResult;
+      teamInfo.current = refreshedTeamInfo;
       setSourceError(data.error || "");
       const withLogos: StandingEntryWithLogo[] = (data.items || []).map((entry) => {
-        const ov = overrides[entry.teamName];
+        const ov = refreshedTeamInfo[entry.teamName];
         const displayName = ov?.displayName || entry.teamName;
         return {
           ...entry,
@@ -237,36 +245,44 @@ export default function StandingsPage() {
       setStandings(withLogos);
       setCurrentMatchday(data.currentMatchday ?? null);
       setLastUpdated(new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
+      standingsLoaded.current = true;
     } catch {
-      setStandings([]);
-      setCurrentMatchday(null);
+      if (!standingsLoaded.current) {
+        setStandings([]);
+        setCurrentMatchday(null);
+      }
       setSourceError("Impossibile caricare la classifica. Riprova tra poco.");
     } finally {
       setLoading(false);
+      standingsRequestRunning.current = false;
     }
   }, [myTeamName, myLogo]);
 
-  useEffect(() => { loadStandings(); }, [loadStandings]);
+  useEffect(() => { void loadStandings(true); }, [loadStandings]);
 
-  // Mantiene la classifica allineata al calcolo di fine giornata anche nelle
-  // PWA lasciate aperte: aggiorna al ritorno in primo piano e ogni 5 minuti.
+  // Durante la giornata live riallinea automaticamente i parziali. I metadati
+  // locali (nomi e loghi) vengono riletti solo al focus per non sovraccaricare
+  // Supabase a ogni polling.
   useEffect(() => {
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void loadStandings();
+      if (tab === "classifica" && document.visibilityState === "visible") void loadStandings();
     };
-    const interval = window.setInterval(refreshWhenVisible, 5 * 60 * 1000);
-    window.addEventListener("focus", refreshWhenVisible);
+    const refreshOnFocus = () => {
+      if (tab === "classifica" && document.visibilityState === "visible") void loadStandings(true);
+    };
+    const interval = window.setInterval(refreshWhenVisible, 20_000);
+    window.addEventListener("focus", refreshOnFocus);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", refreshWhenVisible);
+      window.removeEventListener("focus", refreshOnFocus);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [loadStandings]);
+  }, [loadStandings, tab]);
 
   async function refreshStandings() {
     setRefreshing(true);
-    await loadStandings();
+    await loadStandings(true);
     setRefreshing(false);
   }
 

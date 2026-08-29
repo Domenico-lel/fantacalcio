@@ -1,6 +1,7 @@
 import { getLeagueUrl } from "@/lib/league-config";
 import {
   deriveFantacalcioStandingsFromCalendar,
+  parseFantacalcioLineupSummary,
   parseFantacalcioTeamName,
   parseFantacalcioNumber as numeric,
   parseOptionalFantacalcioNumber as optionalNumeric,
@@ -695,24 +696,9 @@ function recordPayload(value: unknown, depth = 0): JsonRecord | null {
   return isRecord(data) ? recordPayload(data, depth + 1) : value;
 }
 
-function lineupSummary(value: unknown): { total: number | null; formation: string | null; playersWithVote: number } {
-  if (!isRecord(value)) return { total: null, formation: null, playersWithVote: 0 };
-  const startersValue = valueFor(value, ["starts", "starters"]);
-  const starters = Array.isArray(startersValue) ? startersValue : [];
-  const playersWithVote = starters.filter((player) => {
-    if (!isRecord(player)) return false;
-    return optionalNumeric(valueFor(player, ["cscr", "fantagrade", "scr", "grade"])) !== null;
-  }).length;
-  return {
-    total: optionalNumeric(valueFor(value, ["tot", "total", "fantapoints", "fantapunti"])),
-    formation: text(valueFor(value, ["mdl", "formation", "module"])) || null,
-    playersWithVote,
-  };
-}
-
 async function fetchMatchLineup(competitionId: string, fixture: CalendarFixture, token: string): Promise<{
-  home: ReturnType<typeof lineupSummary>;
-  away: ReturnType<typeof lineupSummary>;
+  home: ReturnType<typeof parseFantacalcioLineupSummary>;
+  away: ReturnType<typeof parseFantacalcioLineupSummary>;
 } | null> {
   if (fixture.realMatchweek === null) return null;
   const parts = [competitionId, fixture.matchweek, fixture.realMatchweek, fixture.homeTeamId, fixture.awayTeamId]
@@ -727,8 +713,8 @@ async function fetchMatchLineup(competitionId: string, fixture: CalendarFixture,
     const payload = recordPayload(await readJson(response));
     if (!payload) return null;
     return {
-      home: lineupSummary(valueFor(payload, ["home"])),
-      away: lineupSummary(valueFor(payload, ["away"])),
+      home: parseFantacalcioLineupSummary(valueFor(payload, ["home"])),
+      away: parseFantacalcioLineupSummary(valueFor(payload, ["away"])),
     };
   } catch {
     return null;
@@ -750,13 +736,20 @@ async function buildCurrentMatchday(
     calculated: current.every((fixture) => fixture.calculated),
     matches: current.map((fixture, index) => {
       const lineup = lineups[index];
+      const hasLiveLineup = (lineup?.home.total ?? null) !== null || (lineup?.away.total ?? null) !== null;
+      const homePoints = fixture.calculated
+        ? fixture.homePoints ?? lineup?.home.total ?? null
+        : hasLiveLineup ? lineup?.home.total ?? 0 : null;
+      const awayPoints = fixture.calculated
+        ? fixture.awayPoints ?? lineup?.away.total ?? null
+        : hasLiveLineup ? lineup?.away.total ?? 0 : null;
       return {
         homeTeamId: fixture.homeTeamId,
         awayTeamId: fixture.awayTeamId,
         homeTeamName: teams.get(fixture.homeTeamId) ?? "Squadra di casa",
         awayTeamName: teams.get(fixture.awayTeamId) ?? "Squadra ospite",
-        homePoints: fixture.homePoints ?? lineup?.home.total ?? null,
-        awayPoints: fixture.awayPoints ?? lineup?.away.total ?? null,
+        homePoints,
+        awayPoints,
         homeGoals: fixture.homeGoals,
         awayGoals: fixture.awayGoals,
         homeFormation: lineup?.home.formation ?? null,
@@ -786,7 +779,7 @@ function legacyProviderErrorMessage(error: LegacyProviderError): string {
  * competizione e classifica per giornate. L'HTML pubblico è ormai soltanto
  * il guscio dell'app Angular e non contiene più dati utilizzabili dal server.
  */
-export async function fetchFantacalcioStandings(): Promise<FantacalcioStandingsResult> {
+async function fetchFantacalcioStandingsUncached(): Promise<FantacalcioStandingsResult> {
   const leagueUrl = await getLeagueUrl();
   if (!leagueUrl) return { items: [], error: "Link della lega non configurato: aggiungilo nella sezione Gestione.", currentMatchday: null };
   const competitionId = competitionIdFromUrl(leagueUrl);
@@ -878,4 +871,25 @@ export async function fetchFantacalcioStandings(): Promise<FantacalcioStandingsR
     return { items: [], error: "Non riesco a leggere squadre e classifica da Fantacalcio. Controlla il link della competizione e riprova.", currentMatchday: null };
   }
   return { items: [], error: "Fantacalcio non ha restituito una classifica leggibile. Verifica che la competizione abbia almeno una giornata calcolata.", currentMatchday: null };
+}
+
+const LIVE_SNAPSHOT_TTL_MS = 15_000;
+let liveSnapshot: { expiresAt: number; value: FantacalcioStandingsResult } | null = null;
+let liveRequest: Promise<FantacalcioStandingsResult> | null = null;
+
+/** Condivide per pochi secondi lo stesso snapshot tra gli utenti senza renderlo stale. */
+export async function fetchFantacalcioStandings(): Promise<FantacalcioStandingsResult> {
+  const now = Date.now();
+  if (liveSnapshot && liveSnapshot.expiresAt > now) return liveSnapshot.value;
+  if (liveRequest) return liveRequest;
+
+  liveRequest = fetchFantacalcioStandingsUncached()
+    .then((value) => {
+      liveSnapshot = { expiresAt: Date.now() + LIVE_SNAPSHOT_TTL_MS, value };
+      return value;
+    })
+    .finally(() => {
+      liveRequest = null;
+    });
+  return liveRequest;
 }

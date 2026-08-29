@@ -200,3 +200,45 @@ export function parseFantacalcioNumber(value: unknown): number {
 export function parseOptionalFantacalcioNumber(value: unknown): number | null {
   return parsedNumber(value);
 }
+
+export interface FantacalcioLineupSummary {
+  total: number | null;
+  formation: string | null;
+  playersWithVote: number;
+}
+
+/**
+ * Il live di Leghe Fantacalcio lascia `tot` e i voti non ancora disponibili a
+ * zero. Sommiamo quindi i punteggi correnti non nulli dei titolari: in questo
+ * modo uno 0 segnaposto non diventa un voto e il parziale arriva prima del
+ * calcolo definitivo della giornata.
+ */
+export function parseFantacalcioLineupSummary(value: unknown): FantacalcioLineupSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { total: null, formation: null, playersWithVote: 0 };
+  }
+
+  const record = value as FantacalcioJsonRecord;
+  const startersValue = valueForAliases(record, ["starts", "starters"]);
+  const starters = Array.isArray(startersValue) ? startersValue : [];
+  const liveScores = starters.flatMap((player) => {
+    if (!player || typeof player !== "object" || Array.isArray(player)) return [];
+    const score = parseOptionalFantacalcioNumber(valueForAliases(
+      player as FantacalcioJsonRecord,
+      ["cscr", "currentScore", "fantagrade", "scr", "score", "grade"],
+    ));
+    return score === null || score === 0 ? [] : [score];
+  });
+  const explicitTotal = parseOptionalFantacalcioNumber(valueForAliases(
+    record,
+    ["tot", "total", "fantapoints", "fantapunti"],
+  ));
+
+  return {
+    total: liveScores.length > 0
+      ? liveScores.reduce((sum, score) => sum + score, 0)
+      : explicitTotal !== null && explicitTotal !== 0 ? explicitTotal : null,
+    formation: String(valueForAliases(record, ["mdl", "formation", "module"]) ?? "").trim() || null,
+    playersWithVote: liveScores.length,
+  };
+}
